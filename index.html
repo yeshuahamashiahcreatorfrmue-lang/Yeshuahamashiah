@@ -304,7 +304,7 @@ function updateTrade(dt){
   for(const c of castles){ if(!c.tradePost){c.escort=0;continue;} let e=0; for(const u of units)if(u.alive&&u.team===c.owner&&u.ttype===1&&!isShip(u)&&u.kind!=='courier'&&Math.hypot(u.x-c.x,u.y-c.y)<c.r+50)e+=u.troops; c.escort=e; } // 기마병참대(주둔 기병)
   for(const u of units){ if(!u.alive||!isCarrier(u))continue; const sea=u.shipType==='passenger'; const nodes=sea?castles.filter(c=>c.port):castles.filter(c=>c.tradePost);
     if(!u.laden){ let best=null,bd=1e9; for(const c of nodes){if(c===(u.homePort||u.homePost))continue;const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
-      if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){const raid=best.owner!==u.team?1.6:1.0;const esc=(u.homePost&&u.homePost.escort)||0;const cmul=u.kind==='courier'?1+Math.min(41,Math.floor(esc/100)*0.1):1;u.cargo=(20+Math.hypot(best.x-(u.homePort||u.homePost).x,best.y-(u.homePort||u.homePost).y)*0.05)*raid*cmul;u.laden=true;}} }
+      if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){const raid=best.owner!==u.team?1.6:1.0;const esc=(u.homePost&&u.homePost.escort)||0;const cmul=u.kind==='courier'?1+Math.min(41,Math.floor(esc/100)*0.1):1;u.cargo=(20+Math.hypot(best.x-(u.homePort||u.homePost).x,best.y-(u.homePort||u.homePost).y)*0.05)*raid*cmul;u.laden=true;u.cargoType=raid>1?'약탈물':['곡물','장비','무기'][Math.floor(Math.random()*3)];}} }
     else { const own=nodes.filter(c=>c.owner===u.team); let best=null,bd=1e9; for(const c of own){const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
       if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){gold[u.team]=(gold[u.team]||0)+u.cargo;u.cargo=0;u.laden=false;}} else u.laden=false; }
     if(sea){for(const o of units)if(o.alive&&isArmy(o)&&!isPower(o.team)&&Math.hypot(o.x-u.x,o.y-u.y)<BOARD)o.ferry=now+15;} } }
@@ -423,7 +423,11 @@ function draw(){ ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#05070c'; ctx
   // 선택 표시
   if(sel&&sel.length){for(const u of sel){if(!u.alive)continue;ctx.strokeStyle='#fff';ctx.lineWidth=1.5/cam.zoom;ctx.beginPath();ctx.arc(u.x,u.y,radius(u)+3/cam.zoom,0,7);ctx.stroke();}}
   for(const u of units){ if(!u.alive)continue; const col=tcolor(u.team),R=radius(u);
-    if(isShip(u)||u.kind==='courier'){ ctx.fillStyle=col;ctx.globalAlpha=.95;ctx.beginPath();ctx.ellipse(u.x,u.y,R*1.4,R*.7,0,0,7);ctx.fill();ctx.globalAlpha=1; if(u.crew==='navy'){ctx.strokeStyle='#fde047';ctx.lineWidth=2/cam.zoom;ctx.stroke();} if(u.laden){ctx.fillStyle='#fde68a';ctx.beginPath();ctx.arc(u.x,u.y-R,2.4/cam.zoom,0,7);ctx.fill();} continue; }
+    if(isShip(u)||u.kind==='courier'){
+      if(u.laden){ctx.setLineDash([4/cam.zoom,3/cam.zoom]);ctx.strokeStyle=col+'77';ctx.lineWidth=1/cam.zoom;ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(u.tx,u.ty);ctx.stroke();ctx.setLineDash([]);}
+      ctx.fillStyle=col;ctx.globalAlpha=.95;ctx.beginPath();ctx.ellipse(u.x,u.y,R*1.4,R*.7,0,0,7);ctx.fill();ctx.globalAlpha=1; if(u.crew==='navy'){ctx.strokeStyle='#fde047';ctx.lineWidth=2/cam.zoom;ctx.stroke();}
+      if(u.laden){ctx.fillStyle='#fde68a';ctx.beginPath();ctx.arc(u.x,u.y-R,2.4/cam.zoom,0,7);ctx.fill();if(cam.zoom>1){ctx.fillStyle='#fde68a';ctx.font=`${7/cam.zoom}px sans-serif`;ctx.textAlign='center';ctx.fillText(u.cargoType||'',u.x,u.y+R+6/cam.zoom);}} continue; }
+    if(u.atSea){ctx.fillStyle='#5b4636';ctx.beginPath();ctx.ellipse(u.x,u.y+R*.35,R*1.25,R*.55,0,0,7);ctx.fill();ctx.fillStyle='#caa472';ctx.fillRect(u.x-1/cam.zoom,u.y-R*.6,2/cam.zoom,R*.8);}
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(u.x,u.y+R*.55,R*.85,R*.38,0,0,7);ctx.fill();
     ctx.globalAlpha=.92;ctx.fillStyle=col;ctx.beginPath();ctx.arc(u.x,u.y,R,0,7);ctx.fill();ctx.globalAlpha=1;
     ctx.strokeStyle=TCOL[u.ttype]||'#fff';ctx.lineWidth=1.5/cam.zoom;ctx.beginPath();ctx.arc(u.x,u.y,R-1/cam.zoom,0,7);ctx.stroke();
