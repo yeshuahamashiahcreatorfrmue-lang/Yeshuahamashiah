@@ -240,7 +240,7 @@ function startGame(idx){
     for(const c of homeIdx) md=Math.min(md,Math.hypot(castles[i].x-castles[c].x,castles[i].y-castles[c].y)); if(md>bd){bd=md;bi=i;} } homeIdx.push(bi); }
   homeIdx.forEach((ci,f)=>{ const c=castles[ci]; c.owner=f; c.tier=Math.max(c.tier,4); c.r=TIER_R[c.tier]; c.fort=Math.max(c.fort,TIER_FORT[c.tier]); c.barracks=Math.max(3,c.barracks); c.farm=Math.max(2,c.farm); c.capital=true; }); // 본거지=수도성
   buildTerritories();
-  gold={}; coinPool={}; for(let i=0;i<7;i++){ gold[i]=120; coinPool[i]=0; } for(let i=0;i<7;i++){ gold[100+i]=40; coinPool[100+i]=0; } warCD={}; navalTimer=0; selFleet=null; train.on=false;
+  gold={}; coinPool={}; for(let i=0;i<7;i++){ gold[i]=120; coinPool[i]=0; } for(let i=0;i<7;i++){ gold[100+i]=40; coinPool[100+i]=0; } warCD={}; navalTimer=0; selFleet=null; train.on=false; zone=null; zoneCD=0;
 
   units=[];
   homeIdx.forEach((ci,f)=>{ const h=castles[ci];
@@ -644,43 +644,72 @@ function updateHUD(){ const u=playerUnit; const cap=capMaxOf(playerIdx);
 }
 // ================= 전술 존(zone) 전투맵 (개인 관여 교전만) =================
 let zone=null, zoneCD=0;
-const ZBLK=420, ZMAXSIDE=40, ZBR=15, ZLR=11, ZSPD=64;
+const ZBLK=420, ZMAXSIDE=24, ZBR=15, ZLR=11, ZSPD=64, ZRANGE=132;
+const ZTCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd']; // 병종 구분 테두리색
+function isRangedT(t){ return t===2||t===3; }                    // 궁병·소총병=원거리(7초 일제사격)
 function detectPlayerBattle(){ if(zoneCD>0||!playerUnit.alive||isShip(playerUnit)||!isArmy(playerUnit)) return null;
   for(const e of units){ if(!e.alive||e.team===playerUnit.team||isShip(e)||isCarrier(e)||!isArmy(e)) continue;
     if(Math.hypot(e.x-playerUnit.x,e.y-playerUnit.y)<radiusOf(playerUnit)+radiusOf(e)+8){
       const cx=(playerUnit.x+e.x)/2, cy=(playerUnit.y+e.y)/2, allies=[],foes=[];
       for(const u of units){ if(!u.alive||isShip(u)||isCarrier(u)||!isArmy(u))continue; if(Math.hypot(u.x-cx,u.y-cy)>240)continue;
-        if(u.team===playerUnit.team){ if(allies.length<8) allies.push(u); } else if(foes.length<8) foes.push(u); }
-      if(allies.length&&foes.length) return {allies,foes}; } }
+        if(u.team===playerUnit.team){ if(allies.length<6) allies.push(u); } else if(foes.length<6) foes.push(u); }
+      if(allies.length&&foes.length) return {allies,foes,cx,cy}; } }
   return null; }
 function placeSide(arr,yStart,dir){ const n=arr.length; if(!n)return; const cols=Math.max(1,Math.ceil(Math.sqrt(n*1.6))), sx=cv.width/(cols+1);
   arr.forEach((b,i)=>{ const r=(i/cols)|0,c=i%cols; b.x=sx*(c+1)+(r%2?sx*0.3:0); b.y=yStart+dir*r*30; b.x=Math.max(ZBR,Math.min(cv.width-ZBR,b.x)); }); }
 function enterZone(t){ const W=cv.width,H=cv.height;
+  const ti=terrAt(t.cx,t.cy), coastal = ti<=1 || isCoastalCell((t.cx/GCELL)|0,(t.cy/GCELL)|0) || t.foes.some(u=>u.atSea)||t.allies.some(u=>u.atSea);
   const mk=(list)=>{ const out=[]; for(const u of list){ if(u===playerUnit) continue; u._zb=[];
     const n=Math.max(1,Math.min(ZMAXSIDE,Math.round(u.troops/ZBLK))), per=u.troops/n;
-    for(let i=0;i<n;i++){ const b={src:u,team:u.team,ttype:u.ttype,troops:per,side:(u.team===playerUnit.team?0:1),x:0,y:0}; out.push(b); u._zb.push(b);} } return out; };
-  const aB=mk(t.allies), fB=mk(t.foes); placeSide(fB,70,1); placeSide(aB,H-100,-1);
-  zone={allies:t.allies,foes:t.foes,blocks:aB.concat(fB),lx:W/2,ly:H-56,ltx:null,lty:null,t:0,btn:null}; closeTown(); train.on=false;
+    for(let i=0;i<n;i++){ const b={src:u,team:u.team,ttype:u.ttype,troops:per,side:(u.team===playerUnit.team?0:1),x:0,y:0,px:0,py:0,surr:false,stationary:false,rcd:Math.random()*7,ft:0}; out.push(b); u._zb.push(b);} } return out; };
+  const aB=mk(t.allies), fB=mk(t.foes); const seaY = coastal? H*0.22 : -1;
+  placeSide(fB, coastal?38:70, 1); placeSide(aB,H-100,-1);
+  zone={allies:t.allies,foes:t.foes,blocks:aB.concat(fB),lx:W/2,ly:H-56,ltx:null,lty:null,t:0,btn:null,
+    terr:ti, terrDef:TERR[ti].def, terrSpd:Math.max(0.55,Math.min(1.25,TERR[ti].spd)), terrName:TERR[ti].name, coastal, seaY};
+  closeTown(); train.on=false;
   document.getElementById('hud').classList.add('hidden'); document.getElementById('hint').classList.add('hidden'); }
-function zfightCore(att,def,dt){ let raw=atkBlocks(att.troops)-0.5*atkBlocks(def.troops); if(raw<0.05)raw=0.05;
-  if(att.ttype!=null&&def.ttype!=null){ if(counters(att.ttype,def.ttype))raw*=TAC_ATK; if(counters(def.ttype,att.ttype))raw*=TAC_DEF; }
-  def.troops-=raw*42*COMBAT_RATE*dt*0.55; if(def.troops<0)def.troops=0; }
+// 존 전투 차감 산식: 기병=기갑外 전부 공격발동 / 보병 포위-77%·정지(비기병)-42% / 그外 포위+42%+일반상성
+function zoneDamage(aT,dT,aTr,dTr,defStat,defSurr){ let raw=atkBlocks(aTr)-0.5*atkBlocks(dTr); if(raw<0.05)raw=0.05;
+  if(aT===1){ if(dT!==4) raw*=TAC_ATK; } else if(counters(aT,dT)) raw*=TAC_ATK;
+  if(dT===0){ if(defSurr) raw*=TAC_DEF; else if(defStat && aT!==1) raw*=0.58; }
+  else { if(defSurr) raw*=1.42; if(counters(dT,aT)) raw*=TAC_DEF; }
+  return raw; }
+function zoneApply(att,def,dt){ const raw=zoneDamage(att.ttype,def.ttype,att.troops,def.troops,def.stationary,def.surr);
+  def.troops-=raw*42*COMBAT_RATE*dt*0.55*zone.terrDef; if(def.troops<0)def.troops=0; }
 function updateZone(dt){ const Z=zone,W=cv.width,H=cv.height,Lu=playerUnit; Z.t+=dt;
   const live=Z.blocks.filter(b=>b.troops>0);
+  for(const b of live){ b.px=b.x; b.py=b.y; }
+  for(const b of live){ let c=0; for(const o of live){ if(o.side===b.side)continue; if((o.x-b.x)**2+(o.y-b.y)**2<(ZBR*1.9)**2)c++; }
+    if(b.side===1&&Lu.alive&&(Z.lx-b.x)**2+(Z.ly-b.y)**2<(ZBR*1.9)**2)c++; b.surr=c>=3; }
+  // 진격(밀물): 적/군주로. 기병 가속, 원거리 카이팅, 지형/물띠 속도
   for(const b of live){ let bx=null,by=null,bd=1e18; for(const o of live){ if(o.side===b.side)continue; const d=(o.x-b.x)**2+(o.y-b.y)**2; if(d<bd){bd=d;bx=o.x;by=o.y;} }
-    if(b.side===1 && Lu.alive){ const dl=(Z.lx-b.x)**2+(Z.ly-b.y)**2; if(dl<bd){ bd=dl; bx=Z.lx; by=Z.ly; } } // 적은 군주(개인)에게도 밀물처럼
+    if(b.side===1&&Lu.alive){ const dl=(Z.lx-b.x)**2+(Z.ly-b.y)**2; if(dl<bd){bd=dl;bx=Z.lx;by=Z.ly;} }
     let dx,dy; if(bx!=null){ dx=bx-b.x; dy=by-b.y; } else { dx=0; dy=(b.side===0?-1:1)*40; }
-    const d=Math.hypot(dx,dy)||1; b.x+=dx/d*ZSPD*dt; b.y+=dy/d*ZSPD*dt; }
+    const dist=Math.hypot(dx,dy)||1; let spd=ZSPD*Z.terrSpd; if(b.ttype===1) spd*=1.5; if(Z.seaY>0&&b.y<Z.seaY) spd*=0.5;
+    let mv=spd*dt; if(isRangedT(b.ttype)&&bd<(ZRANGE*0.85)**2){ mv = bd<(ZRANGE*0.5)**2 ? -spd*dt*0.6 : 0; }
+    b.x+=dx/dist*mv; b.y+=dy/dist*mv; }
   for(let i=0;i<live.length;i++)for(let j=i+1;j<live.length;j++){ const a=live[i],c=live[j],dx=c.x-a.x,dy=c.y-a.y,d=Math.hypot(dx,dy)||1;
     if(a.side===c.side){ const min=ZBR*1.5; if(d<min){ const p=(min-d)/2/d; a.x-=dx*p;a.y-=dy*p;c.x+=dx*p;c.y+=dy*p; } }
-    else if(d<ZBR*1.7){ zfightCore(a,c,dt); zfightCore(c,a,dt); } }
-  if(Lu.alive){ let lx=Z.lx,ly=Z.ly; const tx=Z.ltx==null?lx:Z.ltx, ty=Z.lty==null?ly:Z.lty, dx=tx-lx,dy=ty-ly,d=Math.hypot(dx,dy);
-    if(d>2){ lx+=dx/d*ZSPD*1.5*dt; ly+=dy/d*ZSPD*1.5*dt; }
-    for(const b of live){ if(b.side===0)continue; const ddx=lx-b.x,ddy=ly-b.y,dd=Math.hypot(ddx,ddy)||1; if(dd<ZLR+ZBR){ const p=(ZLR+ZBR-dd)/dd; lx+=ddx*p; ly+=ddy*p; // 적에 막힘
-      zfightCore(Lu,b,dt); zfightCore(b,Lu,dt); } }
+    else if(d<ZBR*1.7){ if(!isRangedT(a.ttype)) zoneApply(a,c,dt); if(!isRangedT(c.ttype)) zoneApply(c,a,dt); } }
+  for(const b of live){ b.stationary = Math.hypot(b.x-b.px,b.y-b.py) < ZSPD*dt*0.4; b.x=Math.max(ZBR,Math.min(W-ZBR,b.x)); b.y=Math.max(ZBR,Math.min(H-ZBR,b.y)); }
+  // 원거리 7초 일제사격
+  for(const b of live){ if(!isRangedT(b.ttype))continue; b.ft-=dt; if((b.rcd-=dt)>0)continue;
+    let to=null,td=ZRANGE*ZRANGE; for(const o of live){ if(o.side===b.side)continue; const d=(o.x-b.x)**2+(o.y-b.y)**2; if(d<td){td=d;to=o;} }
+    if(b.side===1&&Lu.alive){ const dl=(Z.lx-b.x)**2+(Z.ly-b.y)**2; if(dl<td){td=dl;to='LORD';} }
+    if(to==null) continue; b.rcd=7;
+    if(to==='LORD'){ const raw=zoneDamage(b.ttype,Lu.ttype,b.troops,Lu.troops,false,false)*Z.terrDef; Lu.troops-=raw*42*COMBAT_RATE*3.5; if(Lu.troops<0)Lu.troops=0; b.fx=Z.lx;b.fy=Z.ly;b.ft=0.4; }
+    else { const raw=zoneDamage(b.ttype,to.ttype,b.troops,to.troops,to.stationary,to.surr)*Z.terrDef; to.troops-=raw*42*COMBAT_RATE*3.5; if(to.troops<0)to.troops=0; b.fx=to.x;b.fy=to.y;b.ft=0.4; } }
+  if(Lu.alive){ let lx=Z.lx,ly=Z.ly; let tx,ty;
+    if(Z.ltx!=null){ tx=Z.ltx; ty=Z.lty; } else { let bx=lx,by=ly,bd=1e18; for(const b of live){ if(b.side===1){ const dd=(b.x-lx)**2+(b.y-ly)**2; if(dd<bd){bd=dd;bx=b.x;by=b.y;} } } tx=bx; ty=by; } // 명령 없으면 자동 교전
+    const dx=tx-lx,dy=ty-ly,d=Math.hypot(dx,dy);
+    if(d>2){ let ls=ZSPD*1.5*Z.terrSpd; if(Z.seaY>0&&ly<Z.seaY) ls*=0.5; lx+=dx/d*ls*dt; ly+=dy/d*ls*dt; }
+    for(const b of live){ if(b.side===0)continue; const ddx=lx-b.x,ddy=ly-b.y,dd=Math.hypot(ddx,ddy)||1; if(dd<ZLR+ZBR){ const p=(ZLR+ZBR-dd)/dd; lx+=ddx*p; ly+=ddy*p;
+      const r1=zoneDamage(Lu.ttype,b.ttype,Lu.troops,b.troops,b.stationary,b.surr); b.troops-=r1*42*COMBAT_RATE*dt*0.55*Z.terrDef; if(b.troops<0)b.troops=0;
+      if(!isRangedT(b.ttype)){ const r2=zoneDamage(b.ttype,Lu.ttype,b.troops,Lu.troops,false,false); Lu.troops-=r2*42*COMBAT_RATE*dt*0.55*Z.terrDef; if(Lu.troops<0)Lu.troops=0; } } }
     Z.lx=Math.max(ZLR,Math.min(W-ZLR,lx)); Z.ly=Math.max(ZLR,Math.min(H-ZLR,ly)); }
   if(Lu.troops<=0){ exitZone(); return; }
-  if(!live.some(b=>b.side===1&&b.troops>0)) exitZone(); }
+  if(!live.some(b=>b.side===1&&b.troops>0)){ exitZone(); return; }
+  if(Z.t>80) exitZone(); } // 교착 방지 안전장치(80초 초과 시 양측 이탈)
 function exitZone(){ const Z=zone; if(!Z) return;
   const sync=(u)=>{ if(u===playerUnit||!u._zb) return; let s=0; for(const b of u._zb)s+=Math.max(0,b.troops); u._zb=null;
     if(s<1){ if(u.alive) destroy(u, u.team===playerUnit.team?(Z.foes.find(f=>f.alive)||playerUnit):playerUnit); } else u.troops=s; };
@@ -688,20 +717,27 @@ function exitZone(){ const Z=zone; if(!Z) return;
   if(playerUnit.troops<1 && playerUnit.alive) destroy(playerUnit, Z.foes.find(f=>f.alive)||Z.foes[0]||playerUnit);
   zone=null; zoneCD=3.5; if(state==='play'){ document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden'); } }
 function zoneTap(sx,sy){ const b=zone.btn; if(b&&sx>=b.x&&sx<=b.x+b.w&&sy>=b.y&&sy<=b.y+b.h){ exitZone(); return; } zone.ltx=sx; zone.lty=sy; }
-function drawZone(){ const W=cv.width,H=cv.height,Lu=playerUnit; ctx.setTransform(1,0,0,1,0,0);
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2e22'); g.addColorStop(1,'#26301f'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  for(const b of zone.blocks){ if(b.troops<=0)continue; const col=teamColor(b.team);
+function zoneBG(ti){ return [['#1f2b3a','#16202c'],['#22303f','#1a2632'],['#6b5836','#574629'],['#5a5a32','#444d28'],['#2f4a2a','#23381e'],['#4a4030','#39332650'.slice(0,7)],['#474b53','#363a41'],['#69727e','#525a64']][ti]||['#3a2e22','#26301f']; }
+function drawZone(){ const W=cv.width,H=cv.height,Lu=playerUnit,Z=zone; ctx.setTransform(1,0,0,1,0,0);
+  const bg=zoneBG(Z.terr); const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,bg[0]); g.addColorStop(1,bg[1]); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  if(Z.seaY>0){ const sg=ctx.createLinearGradient(0,0,0,Z.seaY); sg.addColorStop(0,'#1d4e6b'); sg.addColorStop(1,'#2a6f8e'); ctx.fillStyle=sg; ctx.fillRect(0,0,W,Z.seaY);
+    ctx.strokeStyle='rgba(220,240,255,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,Z.seaY); ctx.lineTo(W,Z.seaY); ctx.stroke(); // 해안선
+    for(let s=0;s<3;s++){ const hx=W*(0.2+0.3*s), hy=Z.seaY*0.5; ctx.fillStyle='#3a2c1e'; ctx.beginPath(); ctx.ellipse(hx,hy,20,7,0,0,7); ctx.fill(); ctx.fillStyle='#cbd5e1'; ctx.fillRect(hx-1,hy-12,2,12); } // 상륙 함선
+    ctx.fillStyle='rgba(220,240,255,0.7)'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText('🌊 상륙 해안', W/2, 12); }
+  for(const b of Z.blocks){ if(b.troops<=0)continue; const col=teamColor(b.team);
+    if(b.ft>0){ ctx.strokeStyle='rgba(255,240,150,'+(b.ft*2)+')'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.fx,b.fy); ctx.stroke(); } // 사격선
     ctx.globalAlpha=0.26; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(b.x,b.y,ZBR,0,7); ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=ZTCOL[b.ttype]||'#fff'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(b.x,b.y,ZBR-1,0,7); ctx.stroke();
     const cnt=Math.min(10,Math.max(3,Math.round(b.troops/55)));
-    for(let k=0;k<cnt;k++){ const a=k*2.39+zone.t*2.2, rr=ZBR*(0.35+0.5*((k*7%5)/5)); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(b.x+Math.cos(a)*rr,b.y+Math.sin(a*1.27)*rr,2.1,0,7); ctx.fill(); } }
-  if(Lu.alive){ if(zone.ltx!=null){ ctx.setLineDash([5,5]); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(zone.lx,zone.ly); ctx.lineTo(zone.ltx,zone.lty); ctx.stroke(); ctx.setLineDash([]); }
-    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(zone.lx,zone.ly,ZLR+3,0,7); ctx.fill(); ctx.fillStyle=teamColor(Lu.team); ctx.beginPath(); ctx.arc(zone.lx,zone.ly,ZLR,0,7); ctx.fill();
-    ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeText(fmt(Lu.troops),zone.lx,zone.ly-ZLR-9); ctx.fillStyle='#fff'; ctx.fillText(fmt(Lu.troops),zone.lx,zone.ly-ZLR-9); }
-  let af=Lu.alive?Lu.troops:0,ff=0; for(const b of zone.blocks){ if(b.side===0)af+=b.troops; else ff+=b.troops; }
+    for(let k=0;k<cnt;k++){ const a=k*2.39+Z.t*2.2, rr=ZBR*(0.32+0.45*((k*7%5)/5)); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(b.x+Math.cos(a)*rr,b.y+Math.sin(a*1.27)*rr,2,0,7); ctx.fill(); } }
+  if(Lu.alive){ if(Z.ltx!=null){ ctx.setLineDash([5,5]); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(Z.lx,Z.ly); ctx.lineTo(Z.ltx,Z.lty); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(Z.lx,Z.ly,ZLR+3,0,7); ctx.fill(); ctx.fillStyle=teamColor(Lu.team); ctx.beginPath(); ctx.arc(Z.lx,Z.ly,ZLR,0,7); ctx.fill();
+    ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeText(fmt(Lu.troops),Z.lx,Z.ly-ZLR-9); ctx.fillStyle='#fff'; ctx.fillText(fmt(Lu.troops),Z.lx,Z.ly-ZLR-9); }
+  let af=Lu.alive?Lu.troops:0,ff=0; for(const b of Z.blocks){ if(b.side===0)af+=b.troops; else ff+=b.troops; }
   ctx.textBaseline='middle'; ctx.font='bold 14px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#9be7a0'; ctx.fillText('아군 '+fmt(af),12,22);
   ctx.textAlign='right'; ctx.fillStyle='#fca5a5'; ctx.fillText('적 '+fmt(ff),W-12,22);
-  ctx.textAlign='center'; ctx.fillStyle='#ffd966'; ctx.font='bold 12px sans-serif'; ctx.fillText('⚔ 전술 전투 · 탭=이동',W/2,22);
-  const bw=88,bh=30,bx=W/2-bw/2,by=H-bh-8; zone.btn={x:bx,y:by,w:bw,h:bh}; ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(bx,by,bw,bh); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh); ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textBaseline='middle'; ctx.fillText('⮜ 후퇴',W/2,by+bh/2); }
+  ctx.textAlign='center'; ctx.fillStyle='#ffd966'; ctx.font='bold 12px sans-serif'; ctx.fillText('⚔ '+Z.terrName+(Z.coastal?' 상륙전':' 전투')+' · 탭=이동',W/2,22);
+  const bw=88,bh=30,bx=W/2-bw/2,by=H-bh-8; Z.btn={x:bx,y:by,w:bw,h:bh}; ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(bx,by,bw,bh); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh); ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textBaseline='middle'; ctx.fillText('⮜ 후퇴',W/2,by+bh/2); }
 function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
   if(state==='play'){ if(zone){ updateZone(dt); } else { update(dt); updateHUD(); } }
   draw(); if(state!=='end') requestAnimationFrame(loop); }
