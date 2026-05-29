@@ -235,8 +235,15 @@ function destroy(dead,killer){ dead.alive=false; dead.troops=0;
   if(dead===lord){ endGame(false); } }
 
 // ===== 업데이트 =====
-let aiT=0,terrT=0,navalT=0;
-function update(dt){ now+=dt; aiT-=dt; navalT-=dt;
+let aiT=0,terrT=0,navalT=0,upT=0;
+function aiUpgrade(){ for(let t=0;t<NF;t++){ if(t===playerIdx||t===RISE||!isPower(t))continue; let g=gold[t]||0; const towns=castles.filter(c=>c.owner===t); if(!towns.length)continue;
+  for(const c of towns){ if(g>=COST.farm(c.farm)&&c.farm<=c.barr){g-=COST.farm(c.farm);c.farm++;} else if(g>=COST.barr(c.barr)){g-=COST.barr(c.barr);c.barr++;} }
+  const coast=towns.find(c=>c.coastal&&!c.port); if(coast&&g>=COST.port&&Math.random()<.5){g-=COST.port;coast.port=true;}
+  const ps=towns.find(c=>c.port&&!c.shipyard); if(ps&&g>=COST.shipyard&&Math.random()<.4){g-=COST.shipyard;ps.shipyard=true;}
+  const np=towns.find(c=>!c.tradePost); if(np&&g>=COST.post&&Math.random()<.4){g-=COST.post;np.tradePost=true;}
+  const lf=towns.find(c=>c.fort<7); if(lf&&g>=COST.fort(lf.fort+1)&&Math.random()<.3){g-=COST.fort(lf.fort+1);lf.fort++;}
+  gold[t]=g; } }
+function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiUpgrade();}
   for(const u of units){ if(u.alive)moveUnit(u,dt); }
   if(aiT<=0){ aiT=0.5; for(const u of units)if(u.alive)ai(u); }
   for(const u of units)u._eng=0;
