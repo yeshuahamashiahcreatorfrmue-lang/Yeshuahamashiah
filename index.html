@@ -91,6 +91,7 @@ const NF=FACTIONS.length;                                  // 세력 슬롯 수(
 const RISE_FACTION=NF-1;                                   // 7번=궐기 세력: 시작 선택·배치 없음, 개인 궐기로만 편입
 const FACTION_EMBLEM={};                                   // 텍스트 엠블럼(현재 없음)
 const FACTION_CREST={0:true, 7:true};                      // 예슈아하마쉬앟 성표를 쓰는 예슈아 진영
+function factionTag(team){ return (team>=0&&team<NF&&FACTIONS[team])?FACTIONS[team].name.slice(0,2):''; } // 세력 깃발=이름 앞 두 글자
 function starPts(cx,cy,R,r,sp){ const a=[]; for(let i=0;i<sp*2;i++){ const rad=(i%2?r:R), t=Math.PI/sp*i-Math.PI/2; a.push([cx+Math.cos(t)*rad,cy+Math.sin(t)*rad]); } return a; }
 function drawCrest(g,x,y,R,color){ const p=starPts(x,y,R,R*0.44,8); g.beginPath(); p.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])); g.closePath();
   g.fillStyle=color; g.fill(); g.lineWidth=Math.max(0.8,R*0.13); g.strokeStyle='#fff8c0'; g.stroke(); g.beginPath(); g.arc(x,y,R*0.3,0,7); g.fillStyle='#fff8c0'; g.fill(); }
@@ -683,7 +684,7 @@ function draw(){
       ctx.fillStyle='#cfe'; let tag=''; if(c.port)tag+='⚓'; if(c.shipyard)tag+='🚢'; if(c.tradePost)tag+='🐎';
       ctx.fillText(TIER_NAME[c.tier]+' B'+c.barracks+tag, c.x, c.y+ir+9);
       if(FACTION_CREST[c.owner]){ drawCrest(ctx, c.x, c.y+ir+20, 5.5, teamColor(c.owner)); } // 예슈아하마쉬앟 성표
-      else { const em=FACTION_EMBLEM[c.owner]; if(em){ ctx.font='bold 9px sans-serif'; ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillText(em, c.x+0.6, c.y+ir+20.6); ctx.fillStyle=teamColor(c.owner); ctx.fillText(em, c.x, c.y+ir+20); } } } }
+      else { const tag=factionTag(c.owner); if(tag){ ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillText(tag, c.x+0.6, c.y+ir+20.6); ctx.fillStyle=teamColor(c.owner); ctx.fillText(tag, c.x, c.y+ir+20); } } } }
   for(const u of units){ if(u.alive&&u.capC&&u.capProg>0){ const c=u.capC, nd=2.2+c.fort*1.2, ir=Math.max(13,c.r*0.55); ctx.beginPath(); ctx.arc(c.x,c.y,ir+5,-Math.PI/2,-Math.PI/2+Math.min(1,u.capProg/nd)*Math.PI*2); ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
   if(playerUnit.alive){ const u=playerUnit; if(Math.abs(u.tx-u.x)>3||Math.abs(u.ty-u.y)>3){ ctx.setLineDash([7,7]); ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(u.tx,u.ty); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); } }
   // 유닛 (군집 간소화 = 크기 + 위의 명확한 수치)
@@ -701,7 +702,7 @@ function draw(){
       if(isArmy(u)&&isPower(u.team)){ ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(u.x,u.y-r); ctx.lineTo(u.x,u.y-r-11); ctx.stroke();
         ctx.fillStyle=teamColor(u.team); ctx.beginPath(); ctx.moveTo(u.x,u.y-r-11); ctx.lineTo(u.x+9,u.y-r-8.5); ctx.lineTo(u.x,u.y-r-6); ctx.closePath(); ctx.fill();
         if(FACTION_CREST[u.team]&&cam.zoom>0.5){ drawCrest(ctx,u.x+13,u.y-r-8.5,4.2,teamColor(u.team)); } // 예슈아하마쉬앟 성표
-        else { const em=FACTION_EMBLEM[u.team]; if(em&&cam.zoom>0.55){ ctx.font='bold 8px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillText(em,u.x+11,u.y-r-8); ctx.fillStyle=teamColor(u.team); ctx.fillText(em,u.x+10.5,u.y-r-8.5); } } }
+        else { const tag=factionTag(u.team); if(tag&&cam.zoom>0.55){ ctx.font='bold 8px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillText(tag,u.x+11,u.y-r-8); ctx.fillStyle=teamColor(u.team); ctx.fillText(tag,u.x+10.5,u.y-r-8.5); } } }
     }
     // 명확한 수치 (흰 글자 + 외곽선), 교역선 제외
     if(cam.zoom>0.3 && !isCarrier(u)){ ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
