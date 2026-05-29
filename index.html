@@ -9,7 +9,6 @@
   html,body { width:100%; height:100%; overflow:hidden; background:#05070c;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
   #game { display:block; position:absolute; left:0; top:0; touch-action:none; }
-
   .overlay { position:absolute; inset:0; display:flex; flex-direction:column;
     align-items:center; justify-content:center; gap:14px; padding:22px;
     background:rgba(5,7,12,0.94); color:#eef; text-align:center; z-index:10; overflow:auto; }
@@ -22,15 +21,14 @@
   .fbtn small { display:block; font-size:10px; font-weight:400; opacity:0.85; margin-top:2px; }
   .btn { padding:13px 28px; border:none; border-radius:13px; background:#3b82f6;
     color:#fff; font-size:16px; font-weight:700; cursor:pointer; box-shadow:0 3px 0 #1d4ed8; }
-
   #hud { position:absolute; left:0; top:0; right:0; padding:7px 10px;
     display:flex; justify-content:space-between; align-items:flex-start;
     color:#fff; font-size:12px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; }
   #hud .panel { background:rgba(8,12,20,0.6); padding:6px 9px; border-radius:9px; }
   .bar { width:118px; height:6px; background:#333; border-radius:4px; margin-top:3px; overflow:hidden; }
   .lab { color:#9ab; font-size:10px; }
-  #hint { position:absolute; left:0; right:0; bottom:12px; text-align:center;
-    color:#cde; font-size:11px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; }
+  #hint { position:absolute; left:10px; bottom:12px;
+    color:#cde; font-size:11px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; max-width:55%; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -43,6 +41,7 @@
     <div class="lab">HP</div><div class="bar"><div id="hpBar" style="height:100%;width:100%;background:#34d399"></div></div>
     <div class="lab" style="margin-top:2px">EXP (Lv <span id="lvl">1</span>)</div>
     <div class="bar"><div id="xpBar" style="height:100%;width:0;background:#fbbf24"></div></div>
+    <div id="terr" class="lab" style="margin-top:3px"></div>
   </div>
   <div class="panel" style="text-align:right">
     <div>⚔️ 병사 <span id="troops">0</span></div>
@@ -51,12 +50,12 @@
     <div id="clock" style="color:#9ab"></div>
   </div>
 </div>
-<div id="hint" class="hidden">한 손가락 드래그=지도 이동 · 두 손가락=확대 · 탭=이동/적 탭=공격</div>
+<div id="hint" class="hidden">드래그=지도이동 · 두손가락=확대 · 탭=이동/공격 · 미니맵 탭=점프</div>
 
 <div id="startScreen" class="overlay">
   <h1>⚔️ 7세력 전쟁 · 월드맵 ⚔️</h1>
-  <p>7세력 · 충성 개인 7 · 무소속 7, 총 <b>21명의 플레이어</b>가 한 대륙에서 패권을 다툰다.<br>
-     무소속은 누구의 편도 아니다 — 스스로 성을 차지하는 독립 군주.</p>
+  <p>7세력 · 충성 개인 7 · 무소속 7, 총 <b>21명의 군주</b>가 한 대륙에서 패권을 다툰다.<br>
+     무소속은 누구의 편도 아닌 독립 군주 — 스스로 성을 차지한다.</p>
   <p style="color:#cde">플레이할 세력을 고르세요</p>
   <div class="factions" id="factionList"></div>
 </div>
@@ -84,174 +83,183 @@ const FACTIONS = [
 const LOYAL_NAMES = ["근위대장 로엔","흑기사 가웨인","화염장군 드라코","서리검 한","대지수호 메이","해적두목 발드","강철검성 유리"];
 const INDEP_NAMES = ["떠돌이검객 카인","현상금사냥꾼 리라","방랑술사 오브","용병대장 그렌","그림자도적 시프","야만전사 보르","점성술사 셀레네"];
 const INDEP_COLORS= ["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
+const REGION_PREFIX=["여명","흑요","북풍","비취","철광","안개","선혈","황금","적막"];
+
+// 지형: 0바다 1강 2사막 3평지 4초원 5진흙 6산맥 7설산  (이동속도 / 전투방어:피해배율)
+const TERR=[
+  {spd:0.40,def:1.30,name:"바다"},
+  {spd:0.60,def:1.20,name:"강"},
+  {spd:0.85,def:1.00,name:"사막"},
+  {spd:1.18,def:1.12,name:"평지"},
+  {spd:1.00,def:0.90,name:"초원/숲"},
+  {spd:0.58,def:0.95,name:"진흙"},
+  {spd:0.55,def:0.66,name:"산맥"},
+  {spd:0.70,def:0.74,name:"설산"},
+];
 
 // 월드
-const WORLD_W=1120, WORLD_H=1680;
-const CELL=20, COLS=Math.ceil(WORLD_W/CELL), ROWS=Math.ceil(WORLD_H/CELL);
-
-// 지형 정의 (색 / 이동속도 배율 / 이름)
-const TERR=[
-  {c:"#163a5c",spd:0.40}, //0 바다
-  {c:"#2a6f9e",spd:0.60}, //1 강/얕은물
-  {c:"#d6bf78",spd:0.85}, //2 사막
-  {c:"#aebd6e",spd:1.18}, //3 평지
-  {c:"#5a9a4f",spd:1.00}, //4 초원
-  {c:"#6a5c3c",spd:0.58}, //5 진흙
-  {c:"#7c746a",spd:0.55}, //6 산맥
-  {c:"#cdd7e2",spd:0.70}, //7 설산
-];
+const WORLD_W=1280, WORLD_H=1920;
+const GCELL=24, GCOLS=Math.ceil(WORLD_W/GCELL), GROWS=Math.ceil(WORLD_H/GCELL);
+const RS=8; // 렌더 타일 (사전 렌더 1회)
 
 // ============================================================
 // 캔버스 & 카메라
 // ============================================================
 const cv=document.getElementById('game'), ctx=cv.getContext('2d');
-let cam={x:0,y:0,zoom:1}, minZoom=0.2, maxZoom=2.6;
+let cam={x:0,y:0,zoom:1}, minZoom=0.2, maxZoom=3;
 function resize(){ cv.width=window.innerWidth; cv.height=window.innerHeight;
   minZoom=Math.min(cv.width/WORLD_W, cv.height/WORLD_H); clampCam(); }
 window.addEventListener('resize',resize);
-function clampCam(){
-  cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom));
+function clampCam(){ cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom));
   const vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
   cam.x = vw>=WORLD_W ? (WORLD_W-vw)/2 : Math.max(0,Math.min(WORLD_W-vw,cam.x));
-  cam.y = vh>=WORLD_H ? (WORLD_H-vh)/2 : Math.max(0,Math.min(WORLD_H-vh,cam.y));
-}
+  cam.y = vh>=WORLD_H ? (WORLD_H-vh)/2 : Math.max(0,Math.min(WORLD_H-vh,cam.y)); }
 function s2w(sx,sy){ return { x:sx/cam.zoom+cam.x, y:sy/cam.zoom+cam.y }; }
 
 // ============================================================
-// 지형 생성 (값 노이즈) + 오프스크린 렌더 (최적화 핵심)
+// 노이즈
 // ============================================================
 function hash2(ix,iy){ let n=(Math.imul(ix,374761393)+Math.imul(iy,668265263))|0;
   n=Math.imul(n^(n>>>13),1274126177); return ((n^(n>>>16))>>>0)/4294967295; }
 function smooth(t){ return t*t*(3-2*t); }
-function vnoise(x,y){
-  const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0;
+function vnoise(x,y){ const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0;
   const a=hash2(x0,y0),b=hash2(x0+1,y0),c=hash2(x0,y0+1),d=hash2(x0+1,y0+1);
   const u=smooth(fx),v=smooth(fy);
-  return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;
-}
+  return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v; }
 function fbm(x,y){ let s=0,a=0.5,f=1; for(let i=0;i<4;i++){ s+=a*vnoise(x*f,y*f); f*=2; a*=0.5; } return s/0.9375; }
 function smoothstep(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
 
-let grid=new Uint8Array(COLS*ROWS);
+let nOX=0,nOY=0,nMX=0,nMY=0;
+function sample(wx,wy){
+  let e=fbm(wx/360+nOX, wy/360+nOY);
+  const ex=Math.abs(wx/WORLD_W*2-1), ey=Math.abs(wy/WORLD_H*2-1);
+  e -= smoothstep(0.5,1.0,Math.max(ex,ey))*0.62;        // 가장자리 = 바다
+  const m=fbm(wx/250+nMX, wy/250+nMY);
+  return {e,m};
+}
+function typeEM(e,m){
+  if(e<0.30) return 0; if(e<0.345) return 1; if(e<0.375) return 2;
+  if(e>0.80) return 7; if(e>0.70) return 6;
+  if(m<0.33) return 2; if(m<0.47) return 3; if(m<0.70) return 4; return 5;
+}
+
+// ============================================================
+// 색 & 사전 렌더 지형 + 장식 + 지역경계
+// ============================================================
+function lerp(a,b,t){ return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t]; }
+const C={ deep:[15,42,74],sea:[28,86,140],shal:[52,132,170],beach:[214,196,142],
+  desert:[206,184,116],plains:[176,188,112],grass:[92,156,80],grassD:[58,116,62],
+  mud:[104,92,58],rock:[122,114,104],rockD:[88,82,74],snow:[212,222,234] };
+function colEM(e,m){ let c;
+  if(e<0.30) c=lerp(C.deep,C.sea,e/0.30);
+  else if(e<0.345) c=lerp(C.sea,C.shal,(e-0.30)/0.045);
+  else if(e<0.375) c=lerp(C.shal,C.beach,(e-0.345)/0.03);
+  else if(e>0.80) c=C.snow;
+  else if(e>0.70) c=lerp(C.rock,C.rockD,(e-0.70)/0.10);
+  else if(m<0.33) c=lerp(C.beach,C.desert,m/0.33);
+  else if(m<0.47) c=lerp(C.desert,C.plains,(m-0.33)/0.14);
+  else if(m<0.70) c=lerp(C.plains,C.grass,(m-0.47)/0.23);
+  else c=lerp(C.grass,C.mud,(m-0.70)/0.30);
+  return c;
+}
+
+let grid=new Uint8Array(GCOLS*GROWS);
 let bg=document.createElement('canvas'); bg.width=WORLD_W; bg.height=WORLD_H;
+let mm=document.createElement('canvas'); const MMW=110, MMH=Math.round(MMW*WORLD_H/WORLD_W);
+mm.width=MMW; mm.height=MMH;
+let regions=[]; // {x,y,name}
+
+function regionAt(wx,wy){ let bi=0,bd=1e18; for(let i=0;i<regions.length;i++){
+  const dx=regions[i].x-wx,dy=regions[i].y-wy,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=i;} } return bi; }
 
 function genWorld(){
-  const ox=Math.random()*1000, oy=Math.random()*1000;
+  nOX=Math.random()*1000; nOY=Math.random()*1000; nMX=Math.random()*1000+50; nMY=Math.random()*1000+50;
+  // 게임플레이 그리드
+  for(let cy=0;cy<GROWS;cy++) for(let cx=0;cx<GCOLS;cx++){
+    const s=sample(cx*GCELL+GCELL/2, cy*GCELL+GCELL/2);
+    grid[cy*GCOLS+cx]=typeEM(s.e,s.m);
+  }
+  // 지역 시드 (땅 위, 멀리 분산)
+  regions=[]; const pts=[]; for(let i=0;i<300;i++){ const p=randLand(); pts.push(p); }
+  const chosen=[0];
+  while(chosen.length<7){ let bi=0,bd=-1;
+    for(let i=0;i<pts.length;i++){ if(chosen.includes(i))continue; let md=1e18;
+      for(const c of chosen) md=Math.min(md,Math.hypot(pts[i].x-pts[c].x,pts[i].y-pts[c].y));
+      if(md>bd){bd=md;bi=i;} } chosen.push(bi); }
+  const used=new Set();
+  chosen.forEach((ci,k)=>{ const p=pts[ci];
+    // 주변 지형의 최빈값으로 지역 성격 결정
+    const cnt={}; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const tt=terrAt(p.x+dx*GCELL,p.y+dy*GCELL); if(tt<2)continue; cnt[tt]=(cnt[tt]||0)+1; }
+    let dom=4,mx=-1; for(const k2 in cnt){ if(cnt[k2]>mx){mx=cnt[k2];dom=+k2;} }
+    let pre; do{ pre=REGION_PREFIX[(Math.random()*REGION_PREFIX.length)|0]; }while(used.has(pre)); used.add(pre);
+    regions.push({x:p.x,y:p.y,name:pre+' '+biomeName(dom)}); });
+
+  // 사전 렌더
   const bx=bg.getContext('2d');
-  for(let cy=0;cy<ROWS;cy++) for(let cx=0;cx<COLS;cx++){
-    const wx=cx*CELL+CELL/2, wy=cy*CELL+CELL/2;
-    let e=fbm(wx/300+ox, wy/300+oy);
-    const m=fbm(wx/210+oy+50, wy/210+ox+50);
-    // 가장자리는 바다로 가라앉힘 → 대륙 형태
-    const ex=Math.abs(wx/WORLD_W*2-1), ey=Math.abs(wy/WORLD_H*2-1);
-    e -= smoothstep(0.52,1.0,Math.max(ex,ey))*0.6;
-    let t;
-    if(e<0.30) t=0;            // 바다
-    else if(e<0.355) t=1;      // 강/물가
-    else if(e>0.80) t=7;       // 설산
-    else if(e>0.69) t=6;       // 산맥
-    else if(m<0.33) t=2;       // 사막
-    else if(m<0.46) t=3;       // 평지
-    else if(m<0.70) t=4;       // 초원
-    else t=5;                  // 진흙
-    grid[cy*COLS+cx]=t;
-    // 셀별 밝기 지터로 자연스러운 질감
-    const base=TERR[t].c, j=(hash2(cx*7+1,cy*13+3)-0.5)*22;
-    bx.fillStyle=shade(base,j);
-    bx.fillRect(cx*CELL,cy*CELL,CELL+1,CELL+1);
+  for(let y=0;y<WORLD_H;y+=RS) for(let x=0;x<WORLD_W;x+=RS){
+    const cx=x+RS/2, cy=y+RS/2, s=sample(cx,cy), c=colEM(s.e,s.m);
+    const j=(hash2(x*3+1,y*3+7)-0.5)*18;
+    bx.fillStyle=`rgb(${clamp255(c[0]+j)},${clamp255(c[1]+j)},${clamp255(c[2]+j)})`;
+    bx.fillRect(x,y,RS+1,RS+1);
+    const t=typeEM(s.e,s.m), h=hash2(x*7+3,y*5+11);
+    if(t>=6 && h<0.55) deco_mtn(bx,cx,cy,t);
+    else if(t===4 && h<0.12) deco_tree(bx,cx,cy);
+    else if(t===2 && s.e>0.375 && h<0.07) deco_dune(bx,cx,cy);
+    // 지역 경계선 (땅에서만, 얇게)
+    if(t>=2){ const r0=regionAt(cx,cy);
+      if(regionAt(cx+RS,cy)!==r0){ bx.fillStyle='rgba(25,18,12,0.30)'; bx.fillRect(x+RS-1,y,2,RS+1); }
+      if(regionAt(cx,cy+RS)!==r0){ bx.fillStyle='rgba(25,18,12,0.30)'; bx.fillRect(x,y+RS-1,RS+1,2); } }
   }
-  // 강줄기 한두 개 (얇게)
-  drawRiver(bx,ox,oy);
+  // 미니맵 사전 렌더
+  mm.getContext('2d').drawImage(bg,0,0,MMW,MMH);
 }
-function shade(hex,d){
-  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  r=Math.max(0,Math.min(255,r+d)); g=Math.max(0,Math.min(255,g+d)); b=Math.max(0,Math.min(255,b+d));
-  return `rgb(${r|0},${g|0},${b|0})`;
-}
-function drawRiver(bx,ox,oy){
-  bx.strokeStyle=TERR[1].c; bx.lineWidth=10; bx.lineCap='round';
-  for(let k=0;k<2;k++){
-    let x=WORLD_W*(0.3+0.4*Math.random()), y=20; bx.beginPath(); bx.moveTo(x,y);
-    while(y<WORLD_H){ y+=24; x+=Math.sin((y+k*300)/120+ox)*16; x=Math.max(20,Math.min(WORLD_W-20,x));
-      bx.lineTo(x,y);
-      const cx=Math.floor(x/CELL),cy=Math.floor(y/CELL);
-      if(cx>=0&&cx<COLS&&cy>=0&&cy<ROWS&&grid[cy*COLS+cx]!==0) grid[cy*COLS+cx]=1;
-    }
-    bx.stroke();
-  }
-}
-function terrAt(wx,wy){
-  const cx=Math.max(0,Math.min(COLS-1,Math.floor(wx/CELL)));
-  const cy=Math.max(0,Math.min(ROWS-1,Math.floor(wy/CELL)));
-  return grid[cy*COLS+cx];
-}
-function isLand(wx,wy){ return terrAt(wx,wy)>=2; }
-function randLand(){
-  for(let i=0;i<400;i++){ const x=40+Math.random()*(WORLD_W-80), y=40+Math.random()*(WORLD_H-80);
-    if(terrAt(x,y)>=2) return {x,y}; }
-  return {x:WORLD_W/2,y:WORLD_H/2};
-}
+function clamp255(v){ return v<0?0:v>255?255:v|0; }
+function biomeName(t){ return t<2?'해안':t===2?'사막':t===3?'평원':t===4?'삼림':t===5?'늪지':t===6?'산맥':'설원'; }
+function deco_mtn(bx,cx,cy,t){ const s=RS*0.85;
+  bx.fillStyle='#5e574e'; bx.beginPath(); bx.moveTo(cx-s,cy+s*0.7); bx.lineTo(cx,cy-s); bx.lineTo(cx+s,cy+s*0.7); bx.closePath(); bx.fill();
+  bx.fillStyle='rgba(255,255,255,0.18)'; bx.beginPath(); bx.moveTo(cx-s,cy+s*0.7); bx.lineTo(cx,cy-s); bx.lineTo(cx-s*0.2,cy+s*0.7); bx.closePath(); bx.fill();
+  if(t===7){ bx.fillStyle='#eef3fa'; bx.beginPath(); bx.moveTo(cx-s*0.35,cy-s*0.2); bx.lineTo(cx,cy-s); bx.lineTo(cx+s*0.35,cy-s*0.2); bx.closePath(); bx.fill(); } }
+function deco_tree(bx,cx,cy){ bx.fillStyle='#5b4327'; bx.fillRect(cx-1,cy,2,RS*0.4);
+  bx.fillStyle='#3c6b37'; bx.beginPath(); bx.arc(cx,cy-RS*0.15,RS*0.5,0,7); bx.fill();
+  bx.fillStyle='rgba(255,255,255,0.10)'; bx.beginPath(); bx.arc(cx-RS*0.12,cy-RS*0.25,RS*0.22,0,7); bx.fill(); }
+function deco_dune(bx,cx,cy){ bx.strokeStyle='rgba(232,216,162,0.45)'; bx.lineWidth=1.4;
+  bx.beginPath(); bx.arc(cx,cy+RS*0.4,RS*0.7,Math.PI*1.15,Math.PI*1.85); bx.stroke(); }
+
+function terrAt(wx,wy){ const cx=Math.max(0,Math.min(GCOLS-1,(wx/GCELL)|0)), cy=Math.max(0,Math.min(GROWS-1,(wy/GCELL)|0)); return grid[cy*GCOLS+cx]; }
+function randLand(){ for(let i=0;i<500;i++){ const x=50+Math.random()*(WORLD_W-100), y=50+Math.random()*(WORLD_H-100); if(terrAt(x,y)>=2) return {x,y}; } return {x:WORLD_W/2,y:WORLD_H/2}; }
 
 // ============================================================
 // 게임 상태
 // ============================================================
 let state='select', playerIdx=0, units=[], castles=[], playerUnit=null;
 let elapsed=0, lastT=0, aiTimer=0, ended=false;
-
-// 팀 규칙: 0~6 = 세력(소속 충성개인도 같은 팀). 100+i = 무소속(각자 단독 팀)
 function teamColor(team){ if(team<0) return '#8a93a3'; if(team<7) return FACTIONS[team].color; return INDEP_COLORS[team-100]; }
-
-function makeUnit(o){ return Object.assign({
-  x:0,y:0,tx:0,ty:0, alive:true, troops:20, lvl:1,xp:0,xpNeed:100,
-  hp:100,maxHp:100,atk:10, targetU:null, capProg:0, capC:null, capMax:250
-},o); }
-
-function pickHomes(list,n){ // 가장 멀리 퍼진 n개 (farthest-point)
-  const chosen=[0];
-  while(chosen.length<n){
-    let bi=-1,bd=-1;
-    for(let i=0;i<list.length;i++){ if(chosen.includes(i))continue;
-      let md=1e9; for(const c of chosen) md=Math.min(md,Math.hypot(list[i].x-list[c].x,list[i].y-list[c].y));
-      if(md>bd){bd=md;bi=i;} }
-    chosen.push(bi);
-  }
-  return chosen;
-}
+function makeUnit(o){ return Object.assign({ x:0,y:0,tx:0,ty:0, alive:true, troops:20, lvl:1,xp:0,xpNeed:100,
+  hp:100,maxHp:100,atk:10, targetU:null, capProg:0, capC:null, capMax:250 },o); }
 
 function startGame(idx){
   playerIdx=idx; genWorld();
-  // 성 배치: 후보 땅 셀에서 최소거리 유지하며 그리디 선택
-  castles=[]; const cand=[];
-  for(let i=0;i<600;i++){ const p=randLand(); cand.push(p); }
-  for(const p of cand){ if(castles.length>=17)break;
-    if(castles.every(c=>Math.hypot(c.x-p.x,c.y-p.y)>200)) castles.push({x:p.x,y:p.y,r:30,owner:-1}); }
-  // 세력 본성 7개 (멀리 퍼진 것)
-  const homeIdx=pickHomes(castles,7);
+  castles=[]; const cand=[]; for(let i=0;i<700;i++) cand.push(randLand());
+  for(const p of cand){ if(castles.length>=18)break;
+    if(castles.every(c=>Math.hypot(c.x-p.x,c.y-p.y)>210)) castles.push({x:p.x,y:p.y,r:30,owner:-1}); }
+  const homeIdx=[0]; while(homeIdx.length<7){ let bi=0,bd=-1;
+    for(let i=0;i<castles.length;i++){ if(homeIdx.includes(i))continue; let md=1e18;
+      for(const c of homeIdx) md=Math.min(md,Math.hypot(castles[i].x-castles[c].x,castles[i].y-castles[c].y));
+      if(md>bd){bd=md;bi=i;} } homeIdx.push(bi); }
   homeIdx.forEach((ci,f)=>castles[ci].owner=f);
 
-  // 유닛 생성
   units=[];
-  // 세력 군대 7 + 충성 개인 7
-  homeIdx.forEach((ci,f)=>{
-    const h=castles[ci];
-    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,
-      color:FACTIONS[f].color, x:h.x,y:h.y,tx:h.x,ty:h.y,
-      troops:38,hp:150,maxHp:150,atk:15,capMax:250}));
-    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,
-      color:FACTIONS[f].color, x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,
-      troops:16,hp:85,maxHp:85,atk:9,capMax:130}));
-  });
-  // 무소속 7 (각자 단독, 땅 위 랜덤)
+  homeIdx.forEach((ci,f)=>{ const h=castles[ci];
+    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,color:FACTIONS[f].color,
+      x:h.x,y:h.y,tx:h.x,ty:h.y, troops:38,hp:150,maxHp:150,atk:15,capMax:250}));
+    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,color:FACTIONS[f].color,
+      x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45, troops:16,hp:85,maxHp:85,atk:9,capMax:130})); });
   for(let i=0;i<7;i++){ const p=randLand();
-    units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',
-      color:INDEP_COLORS[i], x:p.x,y:p.y,tx:p.x,ty:p.y,
-      troops:20,hp:95,maxHp:95,atk:11,capMax:150})); }
+    units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',color:INDEP_COLORS[i],
+      x:p.x,y:p.y,tx:p.x,ty:p.y, troops:20,hp:95,maxHp:95,atk:11,capMax:150})); }
 
   playerUnit=units.find(u=>u.kind==='faction'&&u.team===idx);
-  // 카메라: 플레이어 중심, 살짝 확대
-  cam.zoom=Math.min(maxZoom,minZoom*1.7);
-  cam.x=playerUnit.x-cv.width/cam.zoom/2; cam.y=playerUnit.y-cv.height/cam.zoom/2; clampCam();
-
+  cam.zoom=Math.min(maxZoom,minZoom*1.8); cam.x=playerUnit.x-cv.width/cam.zoom/2; cam.y=playerUnit.y-cv.height/cam.zoom/2; clampCam();
   elapsed=0; ended=false; state='play'; lastT=performance.now();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -262,190 +270,144 @@ function startGame(idx){
 }
 
 // ============================================================
-// 입력 (드래그=이동, 핀치/휠=줌, 탭=명령)
+// 입력 (드래그 이동 / 핀치·휠 줌 / 탭 명령 / 미니맵 점프)
 // ============================================================
-let drag={on:false,moved:false,lx:0,ly:0,sx:0,sy:0,st:0};
-let pinch={on:false,d:0};
+let drag={on:false,moved:false,lx:0,ly:0,sx:0,sy:0,st:0}, pinch={on:false,d:0}, mmDrag=false;
 function dist2(a,b){ return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); }
+function mmRect(){ return {x:cv.width-MMW-8, y:cv.height-MMH-8, w:MMW, h:MMH}; }
+function inMM(sx,sy){ const r=mmRect(); return sx>=r.x&&sx<=r.x+r.w&&sy>=r.y&&sy<=r.y+r.h; }
+function mmJump(sx,sy){ const r=mmRect(); const wx=(sx-r.x)/r.w*WORLD_W, wy=(sy-r.y)/r.h*WORLD_H;
+  cam.x=wx-cv.width/cam.zoom/2; cam.y=wy-cv.height/cam.zoom/2; clampCam(); }
 
 cv.addEventListener('touchstart',e=>{ e.preventDefault();
   if(e.touches.length===1){ const t=e.touches[0];
+    if(inMM(t.clientX,t.clientY)){ mmDrag=true; mmJump(t.clientX,t.clientY); return; }
     drag={on:true,moved:false,lx:t.clientX,ly:t.clientY,sx:t.clientX,sy:t.clientY,st:performance.now()}; pinch.on=false; }
-  else if(e.touches.length===2){ pinch={on:true,d:dist2(e.touches[0],e.touches[1])}; drag.on=false; }
+  else if(e.touches.length===2){ pinch={on:true,d:dist2(e.touches[0],e.touches[1])}; drag.on=false; mmDrag=false; }
 },{passive:false});
 cv.addEventListener('touchmove',e=>{ e.preventDefault();
+  if(mmDrag && e.touches.length===1){ mmJump(e.touches[0].clientX,e.touches[0].clientY); return; }
   if(pinch.on && e.touches.length>=2){ const nd=dist2(e.touches[0],e.touches[1]);
-    const fx=(e.touches[0].clientX+e.touches[1].clientX)/2, fy=(e.touches[0].clientY+e.touches[1].clientY)/2;
-    zoomAt(fx,fy, nd/pinch.d); pinch.d=nd; }
+    zoomAt((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2, nd/pinch.d); pinch.d=nd; }
   else if(drag.on && e.touches.length===1){ const t=e.touches[0]; panBy(t.clientX-drag.lx,t.clientY-drag.ly);
     if(Math.hypot(t.clientX-drag.sx,t.clientY-drag.sy)>10) drag.moved=true; drag.lx=t.clientX; drag.ly=t.clientY; }
 },{passive:false});
 cv.addEventListener('touchend',e=>{ e.preventDefault();
   if(drag.on && !drag.moved && performance.now()-drag.st<320 && e.touches.length===0) tap(drag.sx,drag.sy);
-  if(e.touches.length===0){ drag.on=false; pinch.on=false; }
+  if(e.touches.length===0){ drag.on=false; pinch.on=false; mmDrag=false; }
 },{passive:false});
-
-// 데스크톱
-cv.addEventListener('mousedown',e=>{ drag={on:true,moved:false,lx:e.clientX,ly:e.clientY,sx:e.clientX,sy:e.clientY,st:performance.now()}; });
-cv.addEventListener('mousemove',e=>{ if(drag.on){ panBy(e.clientX-drag.lx,e.clientY-drag.ly);
-  if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6) drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY; } });
-cv.addEventListener('mouseup',e=>{ if(drag.on && !drag.moved) tap(e.clientX,e.clientY); drag.on=false; });
+cv.addEventListener('mousedown',e=>{ if(inMM(e.clientX,e.clientY)){ mmDrag=true; mmJump(e.clientX,e.clientY); return; }
+  drag={on:true,moved:false,lx:e.clientX,ly:e.clientY,sx:e.clientX,sy:e.clientY,st:performance.now()}; });
+cv.addEventListener('mousemove',e=>{ if(mmDrag){ mmJump(e.clientX,e.clientY); return; }
+  if(drag.on){ panBy(e.clientX-drag.lx,e.clientY-drag.ly); if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6) drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY; } });
+cv.addEventListener('mouseup',e=>{ if(!mmDrag && drag.on && !drag.moved) tap(e.clientX,e.clientY); drag.on=false; mmDrag=false; });
 cv.addEventListener('wheel',e=>{ e.preventDefault(); zoomAt(e.clientX,e.clientY, e.deltaY<0?1.12:0.89); },{passive:false});
 
 function panBy(dx,dy){ cam.x-=dx/cam.zoom; cam.y-=dy/cam.zoom; clampCam(); }
-function zoomAt(fx,fy,factor){ const w=s2w(fx,fy); cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom*factor));
+function zoomAt(fx,fy,f){ const w=s2w(fx,fy); cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom*f));
   cam.x=w.x-fx/cam.zoom; cam.y=w.y-fy/cam.zoom; clampCam(); }
-
-function tap(sx,sy){ if(state!=='play'||!playerUnit.alive) return;
-  const w=s2w(sx,sy);
+function tap(sx,sy){ if(state!=='play'||!playerUnit.alive) return; const w=s2w(sx,sy);
   let target=null,best=40/cam.zoom;
-  for(const u of units){ if(!u.alive||u.team===playerUnit.team) continue;
-    const d=Math.hypot(u.x-w.x,u.y-w.y); if(d<best){best=d;target=u;} }
+  for(const u of units){ if(!u.alive||u.team===playerUnit.team) continue; const d=Math.hypot(u.x-w.x,u.y-w.y); if(d<best){best=d;target=u;} }
   if(target){ playerUnit.targetU=target; playerUnit.tx=target.x; playerUnit.ty=target.y; }
-  else { playerUnit.targetU=null; playerUnit.tx=Math.max(10,Math.min(WORLD_W-10,w.x)); playerUnit.ty=Math.max(10,Math.min(WORLD_H-10,w.y)); }
-}
+  else { playerUnit.targetU=null; playerUnit.tx=Math.max(10,Math.min(WORLD_W-10,w.x)); playerUnit.ty=Math.max(10,Math.min(WORLD_H-10,w.y)); } }
 
 // ============================================================
 // 시뮬레이션
 // ============================================================
 function radius(u){ return 9+Math.min(15,u.troops/9); }
 function power(u){ return u.troops+u.atk+u.lvl*4; }
+function ai(u){ if(u===playerUnit) return;
+  if(u.targetU && u.targetU.alive && u.targetU.team!==u.team && Math.hypot(u.targetU.x-u.x,u.targetU.y-u.y)<70){ u.tx=u.targetU.x; u.ty=u.targetU.y; return; }
+  u.targetU=null; let weak=null,wd=300;
+  for(const o of units){ if(!o.alive||o.team===u.team) continue; const d=Math.hypot(o.x-u.x,o.y-u.y); if(d<wd && power(o)<power(u)*1.1){ wd=d; weak=o; } }
+  let tc=null,cd=1e9; for(const c of castles){ if(c.owner===u.team) continue; const d=Math.hypot(c.x-u.x,c.y-u.y); if(d<cd){cd=d;tc=c;} }
+  if(weak && wd<180){ u.targetU=weak; u.tx=weak.x; u.ty=weak.y; } else if(tc){ u.tx=tc.x; u.ty=tc.y; } }
 
-function ai(u){
-  if(u===playerUnit) return;
-  // 교전 중이면 유지
-  if(u.targetU && u.targetU.alive && u.targetU.team!==u.team && Math.hypot(u.targetU.x-u.x,u.targetU.y-u.y)<70){
-    u.tx=u.targetU.x; u.ty=u.targetU.y; return; }
-  u.targetU=null;
-  // 근처 약한 적 공격
-  let weak=null,wd=300;
-  for(const o of units){ if(!o.alive||o.team===u.team) continue;
-    const d=Math.hypot(o.x-u.x,o.y-u.y);
-    if(d<wd && power(o)<power(u)*1.1){ wd=d; weak=o; } }
-  // 내 팀 소유 아닌 가장 가까운 성
-  let tc=null,cd=1e9;
-  for(const c of castles){ if(c.owner===u.team) continue;
-    const d=Math.hypot(c.x-u.x,c.y-u.y); if(d<cd){cd=d;tc=c;} }
-  if(weak && wd<180){ u.targetU=weak; u.tx=weak.x; u.ty=weak.y; }
-  else if(tc){ u.tx=tc.x; u.ty=tc.y; }
-}
-
-function update(dt){
-  elapsed+=dt; aiTimer-=dt;
+function update(dt){ elapsed+=dt; aiTimer-=dt;
   if(aiTimer<=0){ aiTimer=0.5; for(const u of units) ai(u); }
-
-  // 이동 (지형 속도 반영)
-  for(const u of units){ if(!u.alive) continue;
-    const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy);
-    if(d>2){ const sp=82*dt*TERR[terrAt(u.x,u.y)].spd, m=Math.min(sp,d);
-      u.x+=dx/d*m; u.y+=dy/d*m; } }
-
-  // 전투 (다른 팀끼리 근접 시)
+  for(const u of units){ if(!u.alive) continue; const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy);
+    if(d>2){ const sp=86*dt*TERR[terrAt(u.x,u.y)].spd, m=Math.min(sp,d); u.x+=dx/d*m; u.y+=dy/d*m; } }
   for(let i=0;i<units.length;i++){ const A=units[i]; if(!A.alive)continue;
     for(let j=i+1;j<units.length;j++){ const B=units[j]; if(!B.alive||B.team===A.team)continue;
       if(Math.hypot(A.x-B.x,A.y-B.y)<radius(A)+radius(B)+8){ fight(A,B,dt); fight(B,A,dt); } } }
-
-  // 성 점령 + 병력/HP 보충
-  for(const u of units){ if(!u.alive) continue;
-    let onC=null;
-    for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r && c.owner!==u.team){
-      let contested=false;
-      for(const o of units){ if(o.alive&&o.team!==u.team&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){contested=true;break;} }
-      if(!contested){ onC=c; break; } } }
-    if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt;
-      if(u.capProg>=1.8){ onC.owner=u.team; u.capProg=0; u.capC=null; } }
-    else { u.capC=null; u.capProg=0; }
-  }
-  // 팀 소유 성 1개당 보충
-  for(const u of units){ if(!u.alive) continue;
-    let owned=0; for(const c of castles) if(c.owner===u.team) owned++;
-    u.troops=Math.min(u.capMax,u.troops+owned*0.55*dt);
-    if(u.hp<u.maxHp) u.hp=Math.min(u.maxHp,u.hp+owned*1.2*dt); }
-
+  for(const u of units){ if(!u.alive) continue; let onC=null;
+    for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r && c.owner!==u.team){ let cont=false;
+      for(const o of units){ if(o.alive&&o.team!==u.team&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){cont=true;break;} }
+      if(!cont){ onC=c; break; } } }
+    if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt; if(u.capProg>=1.8){ onC.owner=u.team; u.capProg=0; u.capC=null; } }
+    else { u.capC=null; u.capProg=0; } }
+  for(const u of units){ if(!u.alive) continue; let owned=0; for(const c of castles) if(c.owner===u.team) owned++;
+    u.troops=Math.min(u.capMax,u.troops+owned*0.55*dt); if(u.hp<u.maxHp) u.hp=Math.min(u.maxHp,u.hp+owned*1.2*dt); }
   checkEnd();
 }
-
-function fight(att,def,dt){
-  const dmg=power(att)*0.42*dt*(0.85+Math.random()*0.3);
-  if(def.troops>0.5){ def.troops-=dmg; if(def.troops<0){ def.hp+=def.troops*4; def.troops=0; } }
-  else def.hp-=dmg*4;
-  if(def.hp<=0) destroy(def,att);
-}
-function destroy(dead,killer){
-  dead.alive=false; dead.troops=0;
+function fight(att,def,dt){ let dmg=power(att)*0.42*dt*(0.85+Math.random()*0.3);
+  dmg*=TERR[terrAt(def.x,def.y)].def;              // 방어 지형 = 피해 감소
+  if(terrAt(att.x,att.y)<2) dmg*=0.8;              // 물에서 공격 = 약화
+  if(def.troops>0.5){ def.troops-=dmg; if(def.troops<0){ def.hp+=def.troops*4; def.troops=0; } } else def.hp-=dmg*4;
+  if(def.hp<=0) destroy(def,att); }
+function destroy(dead,killer){ dead.alive=false; dead.troops=0;
   killer.xp+=50; killer.troops=Math.min(killer.capMax,killer.troops+12);
   while(killer.xp>=killer.xpNeed){ killer.xp-=killer.xpNeed; killer.lvl++; killer.xpNeed=Math.round(killer.xpNeed*1.4);
-    killer.maxHp+=35; killer.hp=killer.maxHp; killer.atk+=5; }
-  killer.targetU=null;
-}
-
-function checkEnd(){
-  if(!playerUnit.alive){ endGame(false,"당신의 영웅이 쓰러졌습니다…"); return; }
+    killer.maxHp+=35; killer.hp=killer.maxHp; killer.atk+=5; } killer.targetU=null; }
+function checkEnd(){ if(!playerUnit.alive){ endGame(false,"당신의 영웅이 쓰러졌습니다…"); return; }
   let mine=0; for(const c of castles) if(c.owner===playerIdx) mine++;
-  if(mine===castles.length){ endGame(true,`${FACTIONS[playerIdx].name}이(가) 대륙을 통일했습니다!`); }
-}
+  if(mine===castles.length){ endGame(true,`${FACTIONS[playerIdx].name}이(가) 대륙을 통일했습니다!`); } }
 function endGame(win,msg){ if(ended)return; ended=true; state='end';
   document.getElementById('endScreen').classList.remove('hidden');
   document.getElementById('endTitle').textContent=win?"🏆 승리!":"💀 패배";
-  document.getElementById('endMsg').textContent=msg+` (생존 ${elapsed.toFixed(0)}초)`;
-}
+  document.getElementById('endMsg').textContent=msg+` (생존 ${elapsed.toFixed(0)}초)`; }
 
 // ============================================================
 // 렌더
 // ============================================================
+function poly(cx,cy,r,n,rot){ ctx.beginPath(); for(let i=0;i<n;i++){ const a=rot+i/n*Math.PI*2,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.closePath(); }
 function draw(){
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle='#05070c'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#05070c'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(cam.zoom,0,0,cam.zoom,-cam.x*cam.zoom,-cam.y*cam.zoom);
-  // 지형 (오프스크린 1장)
   ctx.drawImage(bg,0,0);
-  // 화면 영역 (컬링용)
   const vx=cam.x, vy=cam.y, vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
-
   // 성
-  for(const c of castles){
-    if(c.x< vx-40||c.x>vx+vw+40||c.y<vy-40||c.y>vy+vh+40) continue;
-    const col=teamColor(c.owner);
+  for(const c of castles){ if(c.x<vx-40||c.x>vx+vw+40||c.y<vy-40||c.y>vy+vh+40) continue; const col=teamColor(c.owner);
     ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,7); ctx.fillStyle='rgba(15,20,30,0.85)'; ctx.fill();
     ctx.lineWidth=4; ctx.strokeStyle=col; ctx.stroke();
-    ctx.fillStyle=col; ctx.font='18px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('🏰',c.x,c.y+1);
-  }
-  // 점령 게이지
+    ctx.fillStyle=col; ctx.font='18px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏰',c.x,c.y+1); }
   for(const u of units){ if(u.alive&&u.capC&&u.capProg>0){ const c=u.capC;
-    ctx.beginPath(); ctx.arc(c.x,c.y,c.r+5,-Math.PI/2,-Math.PI/2+(u.capProg/1.8)*Math.PI*2);
-    ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
-
-  // 플레이어 목표선
-  if(playerUnit.alive){ const u=playerUnit;
-    if(Math.abs(u.tx-u.x)>3||Math.abs(u.ty-u.y)>3){ ctx.setLineDash([7,7]);
-      ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(u.tx,u.ty);
-      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); } }
-
+    ctx.beginPath(); ctx.arc(c.x,c.y,c.r+5,-Math.PI/2,-Math.PI/2+(u.capProg/1.8)*Math.PI*2); ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
+  if(playerUnit.alive){ const u=playerUnit; if(Math.abs(u.tx-u.x)>3||Math.abs(u.ty-u.y)>3){ ctx.setLineDash([7,7]);
+    ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(u.tx,u.ty); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); } }
   // 유닛
-  for(const u of units){ if(!u.alive) continue;
-    if(u.x<vx-30||u.x>vx+vw+30||u.y<vy-30||u.y>vy+vh+30) continue;
+  for(const u of units){ if(!u.alive) continue; if(u.x<vx-30||u.x>vx+vw+30||u.y<vy-30||u.y>vy+vh+30) continue;
     const r=radius(u), me=(u===playerUnit);
     ctx.lineWidth=me?3:1.5; ctx.strokeStyle=me?'#fff':'rgba(0,0,0,0.5)'; ctx.fillStyle=u.color;
     if(u.kind==='faction'){ ctx.beginPath(); ctx.arc(u.x,u.y,r,0,7); ctx.fill(); ctx.stroke(); }
     else if(u.kind==='loyal'){ poly(u.x,u.y,r,3,-Math.PI/2); ctx.fill(); ctx.stroke(); }
-    else { poly(u.x,u.y,r,4,0); ctx.fill(); ctx.stroke(); } // 무소속 = 다이아
-    // 병사 수
-    ctx.fillStyle='#0a0e16'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(Math.ceil(u.troops),u.x,u.y);
-    // HP 바
-    const bw=r*2,hp=u.hp/u.maxHp;
-    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(u.x-bw/2,u.y-r-7,bw,3.5);
+    else { poly(u.x,u.y,r,4,0); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle='#0a0e16'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(Math.ceil(u.troops),u.x,u.y);
+    const bw=r*2,hp=u.hp/u.maxHp; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(u.x-bw/2,u.y-r-7,bw,3.5);
     ctx.fillStyle=hp>0.4?'#34d399':'#f87171'; ctx.fillRect(u.x-bw/2,u.y-r-7,bw*hp,3.5);
-    // 이름 (확대 시에만 → 최적화)
-    if(cam.zoom>0.55){ ctx.fillStyle='#dbeafe'; ctx.font='9px sans-serif';
-      ctx.fillText('Lv'+u.lvl+' '+u.name,u.x,u.y+r+9); }
-  }
+    if(cam.zoom>0.55){ ctx.fillStyle='#dbeafe'; ctx.font='9px sans-serif'; ctx.fillText('Lv'+u.lvl+' '+u.name,u.x,u.y+r+9); } }
+  // 지역 이름 (스크린 공간, 화면 안만)
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const rg of regions){ const sx=(rg.x-cam.x)*cam.zoom, sy=(rg.y-cam.y)*cam.zoom;
+    if(sx<0||sx>cv.width||sy<0||sy>cv.height) continue;
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillText(rg.name,sx+1,sy+1);
+    ctx.fillStyle='rgba(245,240,225,0.55)'; ctx.fillText(rg.name,sx,sy); }
+  drawMinimap();
 }
-function poly(cx,cy,r,n,rot){ ctx.beginPath();
-  for(let i=0;i<n;i++){ const a=rot+i/n*Math.PI*2; const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r;
-    i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.closePath(); }
-
+function drawMinimap(){ const r=mmRect();
+  ctx.drawImage(mm,r.x,r.y,r.w,r.h);
+  ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.strokeRect(r.x-1,r.y-1,r.w+2,r.h+2);
+  const sx=r.w/WORLD_W, sy=r.h/WORLD_H;
+  for(const c of castles){ ctx.fillStyle=teamColor(c.owner); ctx.fillRect(r.x+c.x*sx-1.5,r.y+c.y*sy-1.5,3,3); }
+  for(const u of units){ if(!u.alive)continue; ctx.fillStyle=u.color;
+    const s=(u===playerUnit)?2.6:1.6; ctx.fillRect(r.x+u.x*sx-s/2,r.y+u.y*sy-s/2,s,s); }
+  // 뷰포트 박스
+  const vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,0.9)';
+  ctx.strokeRect(r.x+cam.x*sx, r.y+cam.y*sy, vw*sx, vh*sy);
+}
 function updateHUD(){ const u=playerUnit;
   document.getElementById('hpBar').style.width=Math.max(0,u.hp/u.maxHp*100)+'%';
   document.getElementById('xpBar').style.width=(u.xp/u.xpNeed*100)+'%';
@@ -453,27 +415,22 @@ function updateHUD(){ const u=playerUnit;
   document.getElementById('troops').textContent=Math.ceil(u.troops);
   let mine=0; for(const c of castles) if(c.owner===playerIdx) mine++;
   document.getElementById('castles').textContent=mine;
-  const fac=units.filter(x=>x.alive&&x.kind==='faction').length;
-  const ind=units.filter(x=>x.alive&&x.kind==='indep').length;
-  document.getElementById('alive').textContent=`세력 ${fac} · 무소속 ${ind}`;
+  document.getElementById('alive').textContent=`세력 ${units.filter(x=>x.alive&&x.kind==='faction').length} · 무소속 ${units.filter(x=>x.alive&&x.kind==='indep').length}`;
   document.getElementById('clock').textContent=elapsed.toFixed(0)+'s';
+  const t=TERR[terrAt(u.x,u.y)]; const adv=t.def<0.95?'🛡엄폐':t.def>1.05?'⚠노출':'·';
+  document.getElementById('terr').textContent=`지형: ${t.name} ${adv}`;
 }
 
 // ============================================================
 // 루프
 // ============================================================
 function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
-  if(state==='play'){ update(dt); updateHUD(); }
-  draw();
-  if(state!=='end') requestAnimationFrame(loop); }
+  if(state==='play'){ update(dt); updateHUD(); } draw(); if(state!=='end') requestAnimationFrame(loop); }
 
-// 세력 선택 UI
 const list=document.getElementById('factionList');
-FACTIONS.forEach((f,i)=>{ const b=document.createElement('button');
-  b.className='fbtn'; b.style.background=f.color;
+FACTIONS.forEach((f,i)=>{ const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color;
   b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';
-  b.innerHTML=f.name+'<small>영웅: '+f.hero+'</small>'; b.onclick=()=>startGame(i);
-  list.appendChild(b); });
+  b.innerHTML=f.name+'<small>영웅: '+f.hero+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
 resize();
 </script>
 </body>
