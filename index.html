@@ -267,6 +267,8 @@ function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiU
       for(const o of units)if(o.alive&&o.team!==u.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){blk=true;break;} if(!blk){on=c;break;} } }
     if(on){ if(u.capC!==on){u.capC=on;u.capProg=0;} u.capProg+=dt; if(u.capProg>=2.2+on.fort*1.1){ const was=isPower(u.team); if(!was)riseIntoTruth(u); on.owner=u.team; if(!was)on.capital=true; u.capProg=0;u.capC=null; terrT=0.01; } }
     else u.capC=null; }
+  // 거점 주둔 보급: 아군 성 근처 부대 서서히 충원
+  for(const u of units){ if(!u.alive||isShip(u)||isCarrier(u)||!isArmy(u)&&u.kind!=='lord')continue; for(const c of castles){ if(c.owner===u.team&&Math.hypot(c.x-u.x,c.y-u.y)<c.r+12){ u.troops=Math.min(capMax(u.team),u.troops+(8+c.barr*4)*dt); break; } } }
   // 경제: 농지 수익 + 인력 + AI 양성 + 예슈아화 발행
   for(let f=0;f<NF;f++){ let farm=0; for(const c of castles)if(c.owner===f)farm+=c.farm; gold[f]=(gold[f]||0)+farm*2.2*dt; }
   for(const c of castles){ if(c.owner<0)continue; c.reserve=Math.min(2000+c.barr*1500,c.reserve+c.barr*9*dt);
