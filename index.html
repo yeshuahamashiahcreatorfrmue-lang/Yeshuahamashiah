@@ -88,6 +88,10 @@ const INDEP_NAMES=["떠돌이검객 카인","현상금사냥꾼 리라","방랑�
 const INDEP_COLORS=["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
 const REGION_PREFIX=["여명","흑요","북풍","비취","철광","안개","선혈","황금","적막"];
 const TIER_COLOR=["#b08d57","#cbd5e1","#fcd34d","#fca5a5","#c084fc","#fb7185"]; // 병력 규모 등급색
+// 정착지 등급: 촌락→도시. 도시는 성곽포인트 기본 1(최대 7)
+const TIER_NAME=["촌락","마을","중규모 마을","대규모 마을","도시"];
+const TIER_R=[18,22,27,33,40], TIER_ICON=["🛖","🏠","🏘️","🏯","🏰"];
+const FORT_MAX=7;
 // 지형: 0바다1강2사막3평지4초원5진흙6산맥7설산 (이동속도/방어:피해배율/이름) — 0,1은 도보 불가
 const TERR=[ {spd:0.40,def:1.30,name:"바다"},{spd:0.60,def:1.20,name:"강"},{spd:0.85,def:1.00,name:"사막"},
   {spd:1.18,def:1.12,name:"평지"},{spd:1.00,def:0.90,name:"초원/숲"},{spd:0.58,def:0.95,name:"진흙"},
@@ -136,7 +140,23 @@ let grid=new Uint8Array(GCOLS*GROWS);
 let landId=new Int16Array(GCOLS*GROWS);
 let bg=document.createElement('canvas'); bg.width=WORLD_W; bg.height=WORLD_H;
 let mm=document.createElement('canvas'); const MMW=110, MMH=Math.round(MMW*WORLD_H/WORLD_W); mm.width=MMW; mm.height=MMH;
+const TLS=0.5; // 영역 레이어 해상도(오프스크린, 점령 시에만 갱신)
+let terrLayer=document.createElement('canvas'); terrLayer.width=Math.round(WORLD_W*TLS); terrLayer.height=Math.round(WORLD_H*TLS);
+let terrCell=new Int16Array(GCOLS*GROWS); // 각 땅 셀이 속한 정착지 인덱스
 let regions=[];
+// 정착지별 영역(보로노이) 구축 + 영역 레이어 렌더(소유색 틴트 + 국경)
+function buildTerritories(){ for(let cy=0;cy<GROWS;cy++)for(let cx=0;cx<GCOLS;cx++){ const i=cy*GCOLS+cx;
+  if(grid[i]<2){ terrCell[i]=-1; continue; } const wx=cx*GCELL+GCELL/2, wy=cy*GCELL+GCELL/2;
+  let bi=-1,bd=1e18; for(let k=0;k<castles.length;k++){ const dx=castles[k].x-wx,dy=castles[k].y-wy,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=k;} } terrCell[i]=bi; }
+  renderTerritories(); }
+function renderTerritories(){ const g=terrLayer.getContext('2d'); g.clearRect(0,0,terrLayer.width,terrLayer.height); const cs=GCELL*TLS;
+  for(let cy=0;cy<GROWS;cy++)for(let cx=0;cx<GCOLS;cx++){ const i=cy*GCOLS+cx, s=terrCell[i]; if(s<0)continue; const ow=castles[s].owner;
+    if(ow>=0){ g.globalAlpha=0.17; g.fillStyle=teamColor(ow); g.fillRect(cx*cs,cy*cs,cs+1,cs+1); g.globalAlpha=1; }
+    const ri=(cx+1<GCOLS)?terrCell[i+1]:-2, di=(cy+1<GROWS)?terrCell[i+GCOLS]:-2;
+    g.fillStyle='rgba(18,12,8,0.55)';
+    if(ri!==s&&ri!==-1) g.fillRect((cx+1)*cs-1,cy*cs,1.5,cs+1);
+    if(di!==s&&di!==-1) g.fillRect(cx*cs,(cy+1)*cs-1,cs+1,1.5); }
+  g.globalAlpha=1; }
 function regionAt(wx,wy){ let bi=0,bd=1e18; for(let i=0;i<regions.length;i++){ const dx=regions[i].x-wx,dy=regions[i].y-wy,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=i;} } return bi; }
 function terrAt(wx,wy){ const cx=Math.max(0,Math.min(GCOLS-1,(wx/GCELL)|0)), cy=Math.max(0,Math.min(GROWS-1,(wy/GCELL)|0)); return grid[cy*GCOLS+cx]; }
 function landAt(wx,wy){ const cx=Math.max(0,Math.min(GCOLS-1,(wx/GCELL)|0)), cy=Math.max(0,Math.min(GROWS-1,(wy/GCELL)|0)); return landId[cy*GCOLS+cx]; }
@@ -169,7 +189,7 @@ function genWorld(){
     bx.fillStyle=`rgb(${clamp255(c[0]+j)},${clamp255(c[1]+j)},${clamp255(c[2]+j)})`; bx.fillRect(x,y,RS+1,RS+1);
     const t=typeEM(s.e,s.m), h=hash2(x*7+3,y*5+11);
     if(t>=6&&h<0.55) deco_mtn(bx,cx,cy,t); else if(t===4&&h<0.12) deco_tree(bx,cx,cy); else if(t===2&&s.e>0.375&&h<0.07) deco_dune(bx,cx,cy);
-    if(t>=2){ const r0=regionAt(cx,cy); if(regionAt(cx+RS,cy)!==r0){ bx.fillStyle='rgba(25,18,12,0.30)'; bx.fillRect(x+RS-1,y,2,RS+1); } if(regionAt(cx,cy+RS)!==r0){ bx.fillStyle='rgba(25,18,12,0.30)'; bx.fillRect(x,y+RS-1,RS+1,2); } }
+    // (정착지 영역 국경은 terrLayer에서 그림)
   }
   mm.getContext('2d').drawImage(bg,0,0,MMW,MMH);
 }
@@ -202,13 +222,17 @@ function capMaxOf(team){ const s=TS[team]; return s? 2000+s.barr*4000 : 1500; }
 function startGame(idx){
   playerIdx=idx; genWorld();
   castles=[]; const cand=[]; for(let i=0;i<700;i++) cand.push(randLand());
-  for(const p of cand){ if(castles.length>=18)break; if(castles.every(c=>Math.hypot(c.x-p.x,c.y-p.y)>210)){
+  for(const p of cand){ if(castles.length>=20)break; if(castles.every(c=>Math.hypot(c.x-p.x,c.y-p.y)>200)){
     const cx=(p.x/GCELL)|0, cy=(p.y/GCELL)|0;
-    castles.push({x:p.x,y:p.y,r:30,owner:-1,barracks:1,farm:1,port:false,shipyard:false,coastal:isCoastalCell(cx,cy),land:landAt(p.x,p.y),
+    // 정착지 등급(촌락~도시) 가중 랜덤. 도시는 성곽 1
+    const rr=Math.random(); let tier= rr<0.30?0: rr<0.58?1: rr<0.80?2: rr<0.93?3:4;
+    castles.push({x:p.x,y:p.y,r:TIER_R[tier],owner:-1,tier, fort:(tier===4?1:0),
+      barracks:1+((tier/2)|0),farm:1+((tier/2)|0),port:false,shipyard:false,coastal:isCoastalCell(cx,cy),land:landAt(p.x,p.y),
       embarkMode:'transport', passengerMax:1, tradePost:false, route:null, pCD:0, cCD:0}); } }
   const homeIdx=[0]; while(homeIdx.length<7){ let bi=0,bd=-1; for(let i=0;i<castles.length;i++){ if(homeIdx.includes(i))continue; let md=1e18;
     for(const c of homeIdx) md=Math.min(md,Math.hypot(castles[i].x-castles[c].x,castles[i].y-castles[c].y)); if(md>bd){bd=md;bi=i;} } homeIdx.push(bi); }
-  homeIdx.forEach((ci,f)=>castles[ci].owner=f);
+  homeIdx.forEach((ci,f)=>{ const c=castles[ci]; c.owner=f; c.tier=4; c.r=TIER_R[4]; c.fort=Math.max(c.fort,1); c.barracks=3; c.farm=2; }); // 본거지=도시
+  buildTerritories();
   gold={}; for(let i=0;i<7;i++) gold[i]=120; for(let i=0;i<7;i++) gold[100+i]=40; warCD={}; navalTimer=0; selFleet=null;
 
   units=[];
@@ -275,8 +299,10 @@ function openTown(c){ openC=c; renderTown(); tp.classList.remove('hidden'); }
 function closeTown(){ openC=null; tp.classList.add('hidden'); }
 function renderTown(){ const c=openC; if(!c){ closeTown(); return; } const g=Math.floor(gold[playerIdx]||0);
   const canPort=c.coastal&&!c.port, canShip=c.port&&!c.shipyard;
+  const fortCost=80*(c.fort+1);
   tp.innerHTML=`<button class="close" onclick="closeTown()">✕</button>
-   <h3>🏰 마을 관리 · 금 ${g}</h3>
+   <h3>${TIER_ICON[c.tier]} ${TIER_NAME[c.tier]} · 금 ${g}</h3>
+   <div class="row"><span>🛡 성곽 ${c.fort}/${FORT_MAX} (방어·점령지연)</span>${c.fort>=FORT_MAX?'<b>MAX</b>':`<button ${g<fortCost?'disabled':''} onclick="upg('fort')">축성 ${fortCost}</button>`}</div>
    <div class="row"><span>🏹 병영 Lv${c.barracks} (병력생산↑)</span><button ${g<COST.barracks(c.barracks)?'disabled':''} onclick="upg('b')">강화 ${COST.barracks(c.barracks)}</button></div>
    <div class="row"><span>🌾 농지 Lv${c.farm} (금 수익↑)</span><button ${g<COST.farm(c.farm)?'disabled':''} onclick="upg('f')">강화 ${COST.farm(c.farm)}</button></div>
    <div class="row"><span>⚓ 항구 ${c.port?'✔ 도하':(c.coastal?'':'(해안 아님)')}</span>${c.port?'':`<button ${(!canPort||g<COST.port)?'disabled':''} onclick="upg('p')">건설 ${COST.port}</button>`}</div>
@@ -285,7 +311,8 @@ function renderTown(){ const c=openC; if(!c){ closeTown(); return; } const g=Mat
    <div class="row"><span>🚢 조선소 ${c.shipyard?'✔ 전함건조':''}</span>${c.shipyard?'':`<button ${(!canShip||g<COST.shipyard)?'disabled':''} onclick="upg('s')">건조 ${COST.shipyard}</button>`}</div>
    <div class="row"><span>🐎 기마무역소 ${c.tradePost?'✔ 육상교역':''}</span>${c.tradePost?'':`<button ${g<COST.post?'disabled':''} onclick="upg('tp')">건설 ${COST.post}</button>`}</div>`; }
 function upg(t){ const c=openC; if(!c) return; let cost=0;
-  if(t==='b'){ cost=COST.barracks(c.barracks); if(gold[playerIdx]>=cost){ gold[playerIdx]-=cost; c.barracks++; } }
+  if(t==='fort'){ cost=80*(c.fort+1); if(c.fort<FORT_MAX&&gold[playerIdx]>=cost){ gold[playerIdx]-=cost; c.fort++; } }
+  else if(t==='b'){ cost=COST.barracks(c.barracks); if(gold[playerIdx]>=cost){ gold[playerIdx]-=cost; c.barracks++; } }
   else if(t==='f'){ cost=COST.farm(c.farm); if(gold[playerIdx]>=cost){ gold[playerIdx]-=cost; c.farm++; } }
   else if(t==='p'){ if(c.coastal&&!c.port&&gold[playerIdx]>=COST.port){ gold[playerIdx]-=COST.port; c.port=true; } }
   else if(t==='s'){ if(c.port&&!c.shipyard&&gold[playerIdx]>=COST.shipyard){ gold[playerIdx]-=COST.shipyard; c.shipyard=true; } }
@@ -407,16 +434,19 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt;
   for(const u of units){ if(!u.alive||isShip(u)||u.kind==='courier') continue; let onC=null;
     for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r&&c.owner!==u.team){ let cont=false;
       for(const o of units){ if(o.alive&&o.team!==u.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){cont=true;break;} } if(!cont){onC=c;break;} } }
-    if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt; if(u.capProg>=2.2){ onC.owner=u.team; u.capProg=0; u.capC=null;
-        if(gold[u.team]===undefined) gold[u.team]=0; TS=computeTS(); if(openC===onC) renderTown(); } }
+    if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt; const need=2.2+onC.fort*1.2; // 성곽이 높을수록 점령 지연
+      if(u.capProg>=need){ onC.owner=u.team; u.capProg=0; u.capC=null;
+        if(gold[u.team]===undefined) gold[u.team]=0; TS=computeTS(); renderTerritories(); if(openC===onC) renderTown(); } }
     else { u.capC=null; u.capProg=0; } }
   // 병력 생산 (궐기=성소유 시에만, 육상 군주만)
   for(const u of units){ if(!u.alive||isShip(u)||u.kind==='courier') continue; const s=TS[u.team];
     if(s){ const cap=capMaxOf(u.team); u.troops=Math.min(cap, u.troops+s.barr*BR*dt); } }
   checkEnd();
 }
+function fortAt(u){ for(const c of castles){ if(c.owner===u.team&&c.fort>0&&Math.hypot(c.x-u.x,c.y-u.y)<c.r){ return c.fort; } } return 0; }
 function fight(att,def,dt){ let dmg=effPower(att)*KILL*dt*(0.85+Math.random()*0.3); if(dmg<=0) return;
   if(!def.naval) dmg*=TERR[terrAt(def.x,def.y)].def;                 // 육상 방어지형
+  const f=def.naval?0:fortAt(def); if(f>0) dmg*=Math.max(0.4,1-f*0.08); // 아군 성곽 방어 보너스
   if(terrAt(att.x,att.y)<2 && !(att.shipType==='warship'&&att.crew==='navy')) dmg*=0.85; // 물 위 비-해군 약화
   def.troops-=dmg; if(def.troops<=0){ def.troops=0; destroy(def,att); } }
 function destroy(dead,killer){ dead.alive=false; dead.troops=0; dead.targetU=null;
@@ -452,14 +482,22 @@ function draw(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#05070c'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(cam.zoom,0,0,cam.zoom,-cam.x*cam.zoom,-cam.y*cam.zoom);
   ctx.drawImage(bg,0,0);
+  ctx.drawImage(terrLayer,0,0,WORLD_W,WORLD_H);   // 정착지 영역 틴트 + 국경
   const vx=cam.x, vy=cam.y, vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
-  // 성 (건물 표시)
-  for(const c of castles){ if(c.x<vx-40||c.x>vx+vw+40||c.y<vy-40||c.y>vy+vh+40) continue; const col=teamColor(c.owner);
-    ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,7); ctx.fillStyle='rgba(15,20,30,0.85)'; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle=col; ctx.stroke();
-    ctx.fillStyle=col; ctx.font='17px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🏰',c.x,c.y);
-    if(cam.zoom>0.5){ ctx.font='9px sans-serif'; ctx.fillStyle='#cfe'; let tag=''; if(c.port)tag+='⚓'; if(c.shipyard)tag+='🚢';
-      ctx.fillText('B'+c.barracks+' F'+c.farm+tag, c.x, c.y+c.r+8); } }
-  for(const u of units){ if(u.alive&&u.capC&&u.capProg>0){ const c=u.capC; ctx.beginPath(); ctx.arc(c.x,c.y,c.r+5,-Math.PI/2,-Math.PI/2+(u.capProg/2.2)*Math.PI*2); ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
+  // 정착지 (등급별 크기/아이콘 + 소유 깃발 + 성곽포인트)
+  for(const c of castles){ if(c.x<vx-c.r-20||c.x>vx+vw+c.r+20||c.y<vy-c.r-20||c.y>vy+vh+c.r+20) continue; const col=teamColor(c.owner);
+    const ir=Math.max(13,c.r*0.55);
+    ctx.beginPath(); ctx.arc(c.x,c.y,ir,0,7); ctx.fillStyle='rgba(15,20,30,0.85)'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke();
+    ctx.font=(ir*1.1|0)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(TIER_ICON[c.tier],c.x,c.y);
+    // 소유 깃발
+    if(c.owner>=0){ ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(c.x+ir*0.7,c.y-ir*0.5); ctx.lineTo(c.x+ir*0.7,c.y-ir*0.5-13); ctx.stroke();
+      ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(c.x+ir*0.7,c.y-ir*0.5-13); ctx.lineTo(c.x+ir*0.7+10,c.y-ir*0.5-10.5); ctx.lineTo(c.x+ir*0.7,c.y-ir*0.5-8); ctx.closePath(); ctx.fill(); }
+    if(cam.zoom>0.45){ ctx.font='9px sans-serif'; ctx.textAlign='center';
+      // 성곽 포인트 핍
+      if(c.fort>0){ ctx.fillStyle='#fcd34d'; ctx.fillText('🛡'+c.fort, c.x, c.y-ir-7); }
+      ctx.fillStyle='#cfe'; let tag=''; if(c.port)tag+='⚓'; if(c.shipyard)tag+='🚢'; if(c.tradePost)tag+='🐎';
+      ctx.fillText(TIER_NAME[c.tier]+' B'+c.barracks+tag, c.x, c.y+ir+9); } }
+  for(const u of units){ if(u.alive&&u.capC&&u.capProg>0){ const c=u.capC, nd=2.2+c.fort*1.2, ir=Math.max(13,c.r*0.55); ctx.beginPath(); ctx.arc(c.x,c.y,ir+5,-Math.PI/2,-Math.PI/2+Math.min(1,u.capProg/nd)*Math.PI*2); ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
   if(playerUnit.alive){ const u=playerUnit; if(Math.abs(u.tx-u.x)>3||Math.abs(u.ty-u.y)>3){ ctx.setLineDash([7,7]); ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(u.tx,u.ty); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); } }
   // 유닛 (군집 간소화 = 크기 + 위의 명확한 수치)
   const selSet = selFleet?new Set(selFleet):null;
