@@ -60,9 +60,10 @@
 <button id="shopBtn" class="hidden" onclick="tryOpenShop()">🛒 상점</button>
 
 <div id="startScreen" class="overlay">
-  <h1>⚔️ 8세력 전쟁 · 월드맵 ⚔️</h1>
-  <p>8세력 · 충성 개인 8 · 무소속 7, 총 <b>23명의 군주</b>가 대륙을 다툰다.<br>
+  <h1>⚔️ 예슈아 월드맵 전쟁 ⚔️</h1>
+  <p>7세력 · 충성 개인 7 · 무소속 7, 총 <b>21명의 군주</b>가 대륙을 다툰다.<br>
      <b>성을 가진 자만</b> 병력을 생산하는 '세력'이 되고, 성을 모두 잃으면 다시 떠도는 '개인'이 된다.<br>
+     <b>개인</b>이 첫 성을 점령해 <b>궐기</b>하면 <b>예슈아한민족진리단일국가</b>로 거듭난다.<br>
      물은 <b>항구</b>가 있어야 건넌다.</p>
   <p style="color:#cde">플레이할 세력을 고르세요</p>
   <div class="factions" id="factionList"></div>
@@ -86,7 +87,8 @@ const FACTIONS = [
   { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8", desc:"강철 규율로 무장한 군사 제국." },
   { name:"예슈아한민족진리단일국가", hero:"예슈아하마쉬앟아버지랍비멜렉우앟엘로힘", color:"#14b8a6", desc:"예슈아의 진리로 한민족을 하나로 묶은 단일 국가." }, // 7세력
 ];
-const NF=FACTIONS.length;                                  // 플레이 가능 세력 수(8)
+const NF=FACTIONS.length;                                  // 세력 슬롯 수(8)
+const RISE_FACTION=NF-1;                                   // 7번=궐기 세력: 시작 선택·배치 없음, 개인 궐기로만 편입
 const FACTION_EMBLEM={0:'예슈아한민족', 7:'예슈아진리'};       // 텍스트 엠블럼
 // 적대세력 목록 — 플레이 불가·현재 미배치. 추후 NPC 적으로 투입 예정.
 const HOSTILE=[
@@ -247,7 +249,7 @@ function startGame(idx){
     castles.push({x:p.x,y:p.y,r:TIER_R[tier],owner:-1,tier, fort:TIER_FORT[tier], capital:tier>=5, reserve:0, aiAcc:0,
       barracks:1+((tier/2)|0),farm:1+((tier/2)|0),port:false,shipyard:false,coastal:isCoastalCell(cx,cy),land:landAt(p.x,p.y),
       embarkMode:'transport', passengerMax:1, tradePost:false, route:null, pCD:0, cCD:0}); } }
-  const homeIdx=[0]; while(homeIdx.length<NF){ let bi=0,bd=-1; for(let i=0;i<castles.length;i++){ if(homeIdx.includes(i))continue; let md=1e18;
+  const homeIdx=[0]; while(homeIdx.length<RISE_FACTION){ let bi=0,bd=-1; for(let i=0;i<castles.length;i++){ if(homeIdx.includes(i))continue; let md=1e18;
     for(const c of homeIdx) md=Math.min(md,Math.hypot(castles[i].x-castles[c].x,castles[i].y-castles[c].y)); if(md>bd){bd=md;bi=i;} } homeIdx.push(bi); }
   homeIdx.forEach((ci,f)=>{ const c=castles[ci]; c.owner=f; c.tier=Math.max(c.tier,4); c.r=TIER_R[c.tier]; c.fort=Math.max(c.fort,TIER_FORT[c.tier]); c.barracks=Math.max(3,c.barracks); c.farm=Math.max(2,c.farm); c.capital=true; }); // 본거지=수도성
   buildTerritories();
@@ -475,6 +477,10 @@ function updateTrade(dt){
   }
 }
 
+function riseIntoTruth(u){ const T=RISE_FACTION;          // 개인 궐기 → 예슈아한민족진리단일국가 편입
+  if(u.team===T) return; if(u===playerUnit) playerIdx=T;
+  u.team=T; u.fac=FACTIONS[T].name; u.color=FACTIONS[T].color;
+  if(gold[T]===undefined) gold[T]=120; if(coinPool[T]===undefined) coinPool[T]=0; }
 function moveUnit(u,dt){ const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy); if(d<=2) return;
   if(u.naval){ // 해상: 물 위만, 목표가 육지면 상륙군은 하선
     let sp=MOVE*(u.shipType==='warship'&&u.crew==='navy'?NAVY_BONUS:(u.shipType==='passenger'?0.6:0.65));
@@ -521,7 +527,8 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt; if(z
     for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r&&c.owner!==u.team){ let cont=false;
       for(const o of units){ if(o.alive&&o.team!==u.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){cont=true;break;} } if(!cont){onC=c;break;} } }
     if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt; const need=2.2+onC.fort*1.2; // 성곽이 높을수록 점령 지연
-      if(u.capProg>=need){ const wasPower=isPower(u.team); onC.owner=u.team; u.capProg=0; u.capC=null;
+      if(u.capProg>=need){ const wasPower=isPower(u.team); if(!wasPower) riseIntoTruth(u); // 궐기→예슈아한민족진리단일국가 편입
+        onC.owner=u.team; u.capProg=0; u.capC=null;
         if(gold[u.team]===undefined) gold[u.team]=0; if(coinPool[u.team]===undefined) coinPool[u.team]=0;
         TS=computeTS(); if(!wasPower) onC.capital=true; // 궐기: 첫 점령성=수도성
         renderTerritories(); if(openC===onC) renderTown(); } }
@@ -810,7 +817,7 @@ function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
   if(state==='play'){ if(zone){ updateZone(dt); } else { update(dt); updateHUD(); } }
   draw(); if(state!=='end') requestAnimationFrame(loop); }
 const list=document.getElementById('factionList');
-FACTIONS.forEach((f,i)=>{ const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color; b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff'; const em=FACTION_EMBLEM[i]; b.innerHTML=(em?'<b>'+em+'</b> · ':'')+f.name+'<small>영웅: '+f.hero+(f.desc?' — '+f.desc:'')+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
+FACTIONS.forEach((f,i)=>{ if(i>=RISE_FACTION) return; const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color; b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff'; const em=FACTION_EMBLEM[i]; b.innerHTML=(em?'<b>'+em+'</b> · ':'')+f.name+'<small>영웅: '+f.hero+(f.desc?' — '+f.desc:'')+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
 resize();
 </script>
 </body>
