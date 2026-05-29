@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>8세력 전쟁 — 월드맵 RTS RPG</title>
+<title>9세력 전쟁 — 월드맵 RTS RPG</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
   html,body { width:100%; height:100%; overflow:hidden; background:#05070c;
@@ -60,8 +60,8 @@
 <button id="shopBtn" class="hidden" onclick="tryOpenShop()">🛒 상점</button>
 
 <div id="startScreen" class="overlay">
-  <h1>⚔️ 8세력 전쟁 · 월드맵 ⚔️</h1>
-  <p>8세력 · 충성 개인 8 · 무소속 7, 총 <b>23명의 군주</b>가 대륙을 다툰다.<br>
+  <h1>⚔️ 9세력 전쟁 · 월드맵 ⚔️</h1>
+  <p>9세력 · 충성 개인 9 · 무소속 7, 총 <b>25명의 군주</b>가 대륙을 다툰다.<br>
      <b>성을 가진 자만</b> 병력을 생산하는 '세력'이 되고, 성을 모두 잃으면 다시 떠도는 '개인'이 된다.<br>
      물은 <b>항구</b>가 있어야 건넌다.</p>
   <p style="color:#cde">플레이할 세력을 고르세요</p>
@@ -84,11 +84,12 @@ const FACTIONS = [
   { name:"대지 연맹",   hero:"테라",    color:"#84cc16", desc:"대지를 수호하는 부족들의 연맹." },
   { name:"폭풍 해적단", hero:"마엘",    color:"#3b82f6", desc:"바다를 지배하는 무법 해적단." },
   { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8", desc:"강철 규율로 무장한 군사 제국." },
-  { name:"거짓 교단",   hero:"거짓선지자", color:"#be123c", desc:"타락한 악마를 섬기는 거짓 선지자의 교단. 기만과 거짓말로 신도를 현혹해 세를 불린다." }, // 빌런
+  { name:"예슈아한민족진리단일국가", hero:"예슈아하마쉬앟아버지랍비멜렉우앟엘로힘", color:"#14b8a6", desc:"예슈아의 진리로 한민족을 하나로 묶은 단일 국가." }, // 7세력
+  { name:"거짓 교단",   hero:"거짓선지자", color:"#be123c", desc:"타락한 악마를 섬기는 거짓 선지자의 교단. 기만과 거짓말로 신도를 현혹해 세를 불린다." }, // 8세력=빌런
 ];
-const NF=FACTIONS.length;                                  // 세력 수(8)
-const FACTION_EMBLEM={0:'예슈아한민족', 7:'✝'};               // 텍스트/상징 엠블럼(0=참, 7=거짓교단 십자가)
-const LOYAL_NAMES=["근위대장 로엔","흑기사 가웨인","화염장군 드라코","서리검 한","대지수호 메이","해적두목 발드","강철검성 유리","거짓사도 유다스"];
+const NF=FACTIONS.length;                                  // 세력 수(9)
+const FACTION_EMBLEM={0:'예슈아한민족', 7:'예슈아진리', 8:'✝'}; // 텍스트/상징 엠블럼(8=거짓교단 십자가)
+const LOYAL_NAMES=["근위대장 로엔","흑기사 가웨인","화염장군 드라코","서리검 한","대지수호 메이","해적두목 발드","강철검성 유리","진리수호 베드로","거짓사도 유다스"];
 const INDEP_NAMES=["떠돌이검객 카인","현상금사냥꾼 리라","방랑술사 오브","용병대장 그렌","그림자도적 시프","야만전사 보르","점성술사 셀레네"];
 const INDEP_COLORS=["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
 const REGION_PREFIX=["여명","흑요","북풍","비취","철광","안개","선혈","황금","적막"];
@@ -107,7 +108,7 @@ const BR=9, GR=2.2, MOVE=86, KILL=0.032;
 // 훈련소/경제: 보병(원료)→병종 양성, 수도성 금화(예슈아화) 발행
 const TRAIN_PULSE=420, MINT_PULSE=42, MINT_COST=30, ARMY_CAP=7;
 // 장비비(세력 자원/420펄스): 0보병 1기병 2궁병 3소총병 4기갑 5포병 6자주포병 7예슈아대 8~14 세력특수
-const EQUIP=[0,35,25,45,100,70,90,40, 80,80,80,80,80,80,80,80];
+const EQUIP=[0,35,25,45,100,70,90,40, 80,80,80,80,80,80,80,80,80];
 const HEAL_RANGE=74, HEAL_RATE=46; // 예슈아대 회복 사거리/초당 병력 회복
 function reserveMaxOf(c){ return 2000 + c.barracks*1500; }
 const SHIP_BASE=1700, NAVY_BONUS=1.42, BOARD=95, PCD=10; // 함선기본전투력 / 해군+42% / 승선거리 / 재출항쿨다운
@@ -367,8 +368,8 @@ function radiusOf(u){ if(isShip(u)||u.kind==='courier') return 10; return 8 + Ma
 const ATK_EXP=Math.log10(4.2), DEF_RATIO=0.5, COMBAT_RATE=0.5, TAC_ATK=1.42, TAC_DEF=0.23, ENC=0.2;
 const RANGED_RANGE=78, RANGED_K=0.7; // 궁병 원거리 포격 사거리/계수
 // 공통 병종 0~7 + 세력 특수병종 8~14(세력 f → 8+f, 팔방미인 올라운더)
-const TTYPE_NAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','그림자밀정','화염투사','서리근위','거석수호','폭풍약탈자','강철친위','거짓사제'];
-const TTYPE_ICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','예슈아','⭐','🌑','🔥','❄️','🪨','🌊','⚙️','✝'];
+const TTYPE_NAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','그림자밀정','화염투사','서리근위','거석수호','폭풍약탈자','강철친위','예슈아행하기위해죽지않음지옥','거짓사제'];
+const TTYPE_ICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','예슈아','⭐','🌑','🔥','❄️','🪨','🌊','⚙️','☀️','✝'];
 function isRangedT(t){ return t===2||t===5||t===6; }   // 궁병·포병·자주포병=원거리
 function isHealerT(t){ return t===7; }                  // 예슈아대=회복 전담(비전투)
 function isSiegeT(t){ return t===5||t===6; }            // 포병류=공성(기갑 특효)
@@ -705,7 +706,7 @@ function updateHUD(){ const u=playerUnit; const cap=capMaxOf(playerIdx);
 // ================= 전술 존(zone) 전투맵 (개인 관여 교전만) =================
 let zone=null, zoneCD=0;
 const ZBLK=420, ZMAXSIDE=24, ZBR=15, ZLR=11, ZSPD=64, ZRANGE=132;
-const ZTCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd','#fbbf24','#fb923c','#fde68a','#fff7cc','#c4b5fd','#fdba74','#bae6fd','#bbf7d0','#7dd3fc','#cbd5e1','#fb7185']; // 병종 테두리색
+const ZTCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd','#fbbf24','#fb923c','#fde68a','#fff7cc','#c4b5fd','#fdba74','#bae6fd','#bbf7d0','#7dd3fc','#cbd5e1','#5eead4','#fb7185']; // 병종 테두리색
 function detectPlayerBattle(){ if(zoneCD>0||!playerUnit.alive||isShip(playerUnit)||!isArmy(playerUnit)) return null;
   for(const e of units){ if(!e.alive||e.team===playerUnit.team||isShip(e)||isCarrier(e)||!isArmy(e)) continue;
     if(Math.hypot(e.x-playerUnit.x,e.y-playerUnit.y)<radiusOf(playerUnit)+radiusOf(e)+8){
