@@ -174,7 +174,7 @@ function buildBorder(){ const ow=i=>{const o=owId[i];return o<0?-1:castles[o].ow
   borderPath=pa; }
 
 // ===== 유닛/경제 상태 =====
-let units=[],playerIdx=0,lord=null,state='menu',gold=[],coinPool=[],sel=null;
+let units=[],playerIdx=0,lord=null,state='menu',gold=[],coinPool=[],sel=null,aiTrait=[];
 function isShip(u){return u.naval;}
 function isCarrier(u){return u.shipType==='passenger'||u.kind==='courier';}
 function isArmy(u){return u.kind==='faction'||u.kind==='loyal'||u.kind==='indep';}
@@ -202,6 +202,7 @@ function startGame(idx){ playerIdx=idx; state='play'; units=[]; gold=new Array(N
       units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:2800}));
       let nx=-1,nd=1e9; for(let i=0;i<castles.length;i++){if(castles[i].owner>=0)continue;const d=(castles[i].x-c.x)**2+(castles[i].y-c.y)**2;if(d<nd){nd=d;nx=i;}}
       if(nx>=0){castles[nx].owner=EVIL;castles[nx].fort=Math.max(castles[nx].fort,2);} } }
+  aiTrait=[]; for(let f=0;f<NF;f++)aiTrait[f]=['aggro','eco','turtle'][Math.floor(Math.random()*3)]; aiTrait[EVIL]='aggro';
   lord=units.find(u=>u.team===idx&&u.kind==='faction'); lord.kind='lord'; gStart=now;
   buildTerritory();
   document.getElementById('start').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden');
@@ -242,11 +243,12 @@ function destroy(dead,killer){ dead.alive=false; dead.troops=0;
 // ===== 업데이트 =====
 let aiT=0,terrT=0,navalT=0,upT=0,gStart=0;
 function aiUpgrade(){ for(let t=0;t<NF;t++){ if(t===playerIdx||t===RISE||!isPower(t))continue; let g=gold[t]||0; const towns=castles.filter(c=>c.owner===t); if(!towns.length)continue;
+  const tr=aiTrait[t]||'aggro', eco=tr==='eco'?1.6:1, def=tr==='turtle'?2.2:1;
   for(const c of towns){ if(g>=COST.farm(c.farm)&&c.farm<=c.barr){g-=COST.farm(c.farm);c.farm++;} else if(g>=COST.barr(c.barr)){g-=COST.barr(c.barr);c.barr++;} }
-  const coast=towns.find(c=>c.coastal&&!c.port); if(coast&&g>=COST.port&&Math.random()<.5){g-=COST.port;coast.port=true;}
+  const coast=towns.find(c=>c.coastal&&!c.port); if(coast&&g>=COST.port&&Math.random()<.5*eco){g-=COST.port;coast.port=true;}
   const ps=towns.find(c=>c.port&&!c.shipyard); if(ps&&g>=COST.shipyard&&Math.random()<.4){g-=COST.shipyard;ps.shipyard=true;}
-  const np=towns.find(c=>!c.tradePost); if(np&&g>=COST.post&&Math.random()<.4){g-=COST.post;np.tradePost=true;}
-  const lf=towns.find(c=>c.fort<7); if(lf&&g>=COST.fort(lf.fort+1)&&Math.random()<.3){g-=COST.fort(lf.fort+1);lf.fort++;}
+  const np=towns.find(c=>!c.tradePost); if(np&&g>=COST.post&&Math.random()<.4*eco){g-=COST.post;np.tradePost=true;}
+  const lf=towns.find(c=>c.fort<7); if(lf&&g>=COST.fort(lf.fort+1)&&Math.random()<.3*def){g-=COST.fort(lf.fort+1);lf.fort++;}
   gold[t]=g; } }
 function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiUpgrade();}
   for(const u of units){ if(u.alive)moveUnit(u,dt); }
@@ -305,7 +307,7 @@ function ai(u){ if(u===lord)return; if(isCarrier(u))return; if(u.shipType==='war
   // 위협받는 아군 성 방어
   let df=null,dd=400*400; for(const c of castles){if(c.owner!==u.team)continue;let en=false;for(const o of units)if(o.alive&&o.team!==u.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r+70){en=true;break;}if(!en)continue;const d=(c.x-u.x)**2+(c.y-u.y)**2;if(d<dd){dd=d;df=c;}}
   if(df){u.tx=df.x;u.ty=df.y;return;}
-  let we=null,wd=340;for(const o of units){if(!o.alive||o.team===u.team||isCarrier(o))continue;if(!reachable(u,o.x,o.y))continue;const d=Math.hypot(o.x-u.x,o.y-u.y);if(d<wd&&effP(o)<my*1.05){wd=d;we=o;}}
+  const tr=aiTrait[u.team]||'aggro'; let we=null,wd=tr==='aggro'?460:tr==='turtle'?240:340;for(const o of units){if(!o.alive||o.team===u.team||isCarrier(o))continue;if(!reachable(u,o.x,o.y))continue;const d=Math.hypot(o.x-u.x,o.y-u.y);if(d<wd&&effP(o)<my*(tr==='aggro'?1.2:1.05)){wd=d;we=o;}}
   if(we&&wd<220){u.target=we;u.tx=we.x;u.ty=we.y;return;}
   let tc=null,best=1e18;for(const c of castles){if(c.owner===u.team||!reachable(u,c.x,c.y))continue;let sc=Math.hypot(c.x-u.x,c.y-u.y);if(c.owner<0)sc-=120;if(sc<best){best=sc;tc=c;}}
   if(tc){u.tx=tc.x;u.ty=tc.y;return;} const h=nearestOwn(u); if(h){u.tx=h.x;u.ty=h.y;} }
