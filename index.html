@@ -253,18 +253,21 @@ function tap(sx,sy){ if(state!=='play'||!playerUnit.alive) return; const w=s2w(s
   // 내 성 → 마을 관리
   for(const c of castles){ if(c.owner===playerIdx && Math.hypot(c.x-w.x,c.y-w.y)<c.r+6){ openTown(c); return; } }
   closeTown();
-  // 내 본대 탭 → 함대 선택 해제(본대 조종)
-  if(Math.hypot(playerUnit.x-w.x,playerUnit.y-w.y)<radiusOf(playerUnit)+10/cam.zoom){ selFleet=null; return; }
-  // 내 함선 탭 → 함대 선택(전함+유람선 묶음)
-  for(const u of units){ if(u.alive&&u.team===playerIdx&&(u.shipType==='warship'||u.shipType==='passenger')&&Math.hypot(u.x-w.x,u.y-w.y)<radiusOf(u)+12/cam.zoom){
-    selFleet=units.filter(o=>o.alive&&o.team===playerIdx&&(o.shipType==='warship'||o.shipType==='passenger')&&Math.hypot(o.x-u.x,o.y-u.y)<150); return; } }
-  // 함대 선택 중이면 함대에 명령(전함=이동/교전, 유람선=경로 수정)
-  if(selFleet&&selFleet.length){ let k=0; for(const s of selFleet){ if(!s.alive)continue; const off=k*14; s.manualTarget={x:Math.max(10,Math.min(WORLD_W-10,w.x+off)),y:w.y}; s.tx=s.manualTarget.x; s.ty=s.manualTarget.y; k++; } return; }
-  // 본대 명령
+  // 내 영주(영웅) 탭 → 선택 해제(영주 직접 조종 = RPG)
+  if(Math.hypot(playerUnit.x-w.x,playerUnit.y-w.y)<radiusOf(playerUnit)+12/cam.zoom){ selFleet=null; return; }
+  // 내 다른 병력(육상 부대/전함/유람선) 탭 → 인접 병력 묶어 선택 (RTS 지휘)
+  for(const u of units){ if(u.alive&&u!==playerUnit&&u.team===playerIdx&&!isCarrierTradeOnly(u)&&Math.hypot(u.x-w.x,u.y-w.y)<radiusOf(u)+12/cam.zoom){
+    selFleet=units.filter(o=>o.alive&&o!==playerUnit&&o.team===playerIdx&&!o.homePost&&Math.hypot(o.x-u.x,o.y-u.y)<160); return; } }
+  // 선택 부대에 명령 (전함=이동/교전, 유람선=경로 수정, 육군=이동/상륙)
+  if(selFleet&&selFleet.length){ let k=0; for(const s of selFleet){ if(!s.alive)continue; const off=(k%5-2)*16, off2=(((k/5)|0))*16;
+    const gx=Math.max(10,Math.min(WORLD_W-10,w.x+off)), gy=Math.max(10,Math.min(WORLD_H-10,w.y+off2));
+    if(s.shipType==='passenger') s.manualTarget={x:gx,y:gy}; s.targetU=null; s.tx=gx; s.ty=gy; k++; } return; }
+  // 영주 명령 (탭 이동 + 적 탭 공격, 근처 적 자동교전)
   let target=null,best=40/cam.zoom;
   for(const u of units){ if(!u.alive||u.team===playerUnit.team||isCarrier(u)) continue; const d=Math.hypot(u.x-w.x,u.y-w.y); if(d<best){best=d;target=u;} }
   if(target){ playerUnit.targetU=target; playerUnit.tx=target.x; playerUnit.ty=target.y; }
   else { playerUnit.targetU=null; playerUnit.tx=Math.max(10,Math.min(WORLD_W-10,w.x)); playerUnit.ty=Math.max(10,Math.min(WORLD_H-10,w.y)); } }
+function isCarrierTradeOnly(u){ return u.shipType==='passenger'?false:(u.kind==='courier'); } // 기마병참원은 직접선택 제외(자동무역)
 
 // ============================================================ 마을 관리 UI
 const tp=document.getElementById('townPanel'); let openC=null;
