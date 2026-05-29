@@ -473,7 +473,10 @@ function drawZone(){ const Z=zone,W=VW(),H=VH(),Lu=lord; ctx.setTransform(DPR,0,
   ctx.font='bold 13px sans-serif';ctx.textAlign='left';ctx.fillStyle='#9be7a0';ctx.fillText('아군 '+fmt(af),10,20);ctx.textAlign='right';ctx.fillStyle='#fca5a5';ctx.fillText('적 '+fmt(ff),W-10,20);
   ctx.textAlign='center';ctx.fillStyle='#ffd966';ctx.font='bold 12px sans-serif';ctx.fillText('⚔ '+Z.terrName+(Z.coastal?' 상륙전':' 전투')+' · 탭=이동',W/2,20);
   const bw=80,bh=28,bx=W/2-bw/2,by=H-bh-8;Z.btn={x:bx,y:by,w:bw,h:bh};ctx.fillStyle='#000a';ctx.fillRect(bx,by,bw,bh);ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.strokeRect(bx,by,bw,bh);ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';ctx.textBaseline='middle';ctx.fillText('⮜ 후퇴',W/2,by+bh/2); }
-function drawMinimap(){ ctx.setTransform(DPR,0,0,DPR,0,0); const mw=88,mh=mw*WH/WW,mx=VW()-mw-8,my=VH()-mh-20,sx=mw/WW,sy=mh/WH;
+function mmRect(){ const mw=88,mh=mw*WH/WW; return {mx:VW()-mw-8,my:VH()-mh-20,mw,mh}; }
+function mmJump(x,y){ const r=mmRect(); const wx=(x-r.mx)/r.mw*WW, wy=(y-r.my)/r.mh*WH; cam.x=wx-VW()/cam.zoom/2; cam.y=wy-VH()/cam.zoom/2; clampCam(); }
+function inMM(x,y){ const r=mmRect(); return x>=r.mx&&x<=r.mx+r.mw&&y>=r.my&&y<=r.my+r.mh; }
+function drawMinimap(){ ctx.setTransform(DPR,0,0,DPR,0,0); const R=mmRect(),mw=R.mw,mh=R.mh,mx=R.mx,my=R.my,sx=mw/WW,sy=mh/WH;
   ctx.globalAlpha=.85;ctx.drawImage(land,mx,my,mw,mh);ctx.globalAlpha=.55;ctx.drawImage(tintC,mx,my,mw,mh);ctx.globalAlpha=1;
   ctx.strokeStyle='#fff9';ctx.lineWidth=1;ctx.strokeRect(mx,my,mw,mh);
   for(const c of castles){if(c.owner<0)continue;ctx.fillStyle=tcolor(c.owner);ctx.fillRect(mx+c.x*sx-1,my+c.y*sy-1,2.4,2.4);}
@@ -487,18 +490,19 @@ function updateHUD(){ if(playerIdx<0||!FACTIONS[playerIdx])return; const f=FACTI
 const el=id=>document.getElementById(id);
 
 // ===== 입력 =====
-let drag=null,pinch=null,moved=false,downC=null,pressT=0;
+let drag=null,pinch=null,moved=false,downC=null,pressT=0,mmDrag=false;
 function onDown(x,y){ if(zone){ return; }
   if(state!=='play')return; moved=false;
+  if(inMM(x,y)){ mmDrag=true; mmJump(x,y); return; }
   // 내 성?
   const w=s2w(x,y); downC=null;
   for(const c of castles){ if(c.owner===playerIdx&&Math.hypot(c.x-w.x,c.y-w.y)<c.r+6){downC=c;pressT=now;break;} }
   drag={x,y,cx:cam.x,cy:cam.y}; }
-function onMove(x,y){ if(zone)return; if(pinch)return;
+function onMove(x,y){ if(zone)return; if(pinch)return; if(mmDrag){ mmJump(x,y); return; }
   if(downC&&!train.on){ const d=Math.hypot(x-drag.x,y-drag.y); if(d>14){ train.on=true;train.c=downC;train.accum=0; } }
   if(train.on){ train.sx=x;train.sy=y; return; }
   if(drag){const dx=x-drag.x,dy=y-drag.y;if(Math.abs(dx)+Math.abs(dy)>6)moved=true;cam.x=drag.cx-dx/cam.zoom;cam.y=drag.cy-dy/cam.zoom;clampCam();} }
-function onUp(x,y){ if(zone){ if(zone.btn&&x>=zone.btn.x&&x<=zone.btn.x+zone.btn.w&&y>=zone.btn.y&&y<=zone.btn.y+zone.btn.h){exitZone();return;} zone.ltx=x;zone.lty=y; return; }
+function onUp(x,y){ if(mmDrag){mmDrag=false;return;} if(zone){ if(zone.btn&&x>=zone.btn.x&&x<=zone.btn.x+zone.btn.w&&y>=zone.btn.y&&y<=zone.btn.y+zone.btn.h){exitZone();return;} zone.ltx=x;zone.lty=y; return; }
   if(train.on){train.on=false;downC=null;drag=null;return;}
   if(drag&&!moved&&state==='play'){ const w=s2w(x,y);
     if(downC){ openTown(downC); downC=null;drag=null;return; }
