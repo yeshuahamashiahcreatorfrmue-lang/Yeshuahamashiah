@@ -77,14 +77,14 @@
 "use strict";
 // ============================================================ 데이터
 const FACTIONS = [
-  { name:"예슈아한민족국", hero:"세라핌",  color:"#f5d442" },
-  { name:"어둠의 결사", hero:"녹스",    color:"#a855f7" },
-  { name:"불꽃 부족",   hero:"이그니스",color:"#f97316" },
-  { name:"서리 왕국",   hero:"글라키",  color:"#38bdf8" },
-  { name:"대지 연맹",   hero:"테라",    color:"#84cc16" },
-  { name:"폭풍 해적단", hero:"마엘",    color:"#3b82f6" },
-  { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8" },
-  { name:"거짓 교단",   hero:"위선자",  color:"#be123c" }, // 천주교=거짓 선지자·사기꾼 빌런 세력
+  { name:"예슈아한민족국", hero:"예슈아",  color:"#f5d442", desc:"참 선지자 예슈아의 백성. 빛으로 대륙을 통일한다." },
+  { name:"어둠의 결사", hero:"녹스",    color:"#a855f7", desc:"그림자에서 음모를 꾸미는 비밀 결사." },
+  { name:"불꽃 부족",   hero:"이그니스",color:"#f97316", desc:"화염을 숭배하는 호전적 전사 부족." },
+  { name:"서리 왕국",   hero:"글라키",  color:"#38bdf8", desc:"얼어붙은 북방의 오래된 왕국." },
+  { name:"대지 연맹",   hero:"테라",    color:"#84cc16", desc:"대지를 수호하는 부족들의 연맹." },
+  { name:"폭풍 해적단", hero:"마엘",    color:"#3b82f6", desc:"바다를 지배하는 무법 해적단." },
+  { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8", desc:"강철 규율로 무장한 군사 제국." },
+  { name:"거짓 교단",   hero:"거짓선지자", color:"#be123c", desc:"타락한 악마를 섬기는 거짓 선지자의 교단. 기만과 거짓말로 신도를 현혹해 세를 불린다." }, // 빌런
 ];
 const NF=FACTIONS.length;                                  // 세력 수(8)
 const FACTION_EMBLEM={0:'예슈아한민족', 7:'✝'};               // 텍스트/상징 엠블럼(0=참, 7=거짓교단 십자가)
@@ -806,7 +806,7 @@ function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
   if(state==='play'){ if(zone){ updateZone(dt); } else { update(dt); updateHUD(); } }
   draw(); if(state!=='end') requestAnimationFrame(loop); }
 const list=document.getElementById('factionList');
-FACTIONS.forEach((f,i)=>{ const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color; b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff'; const em=FACTION_EMBLEM[i]; b.innerHTML=(em?'<b>'+em+'</b> · ':'')+f.name+'<small>영웅: '+f.hero+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
+FACTIONS.forEach((f,i)=>{ const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color; b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff'; const em=FACTION_EMBLEM[i]; b.innerHTML=(em?'<b>'+em+'</b> · ':'')+f.name+'<small>영웅: '+f.hero+(f.desc?' — '+f.desc:'')+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
 resize();
 </script>
 </body>
