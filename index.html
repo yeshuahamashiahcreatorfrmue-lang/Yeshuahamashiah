@@ -192,9 +192,11 @@ function startGame(idx){ playerIdx=idx; state='play'; units=[]; gold=new Array(N
   for(let i=0;i<7;i++){ let p=randLand(); units.push(mk({kind:'indep',team:100+i,ttype:i%5,x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,hero:INDEP[i]})); }
   // 적대세력 거짓 교단(플레이 불가, 모든 세력과 적대) — 플레이어에게서 가장 먼 중립 성에 거점
   { let ci=-1,bd=-1; for(let i=0;i<castles.length;i++){ if(castles[i].owner>=0)continue; let md=1e9; for(const u of units)if(u.kind==='faction')md=Math.min(md,(castles[i].x-u.x)**2+(castles[i].y-u.y)**2); if(md>bd){bd=md;ci=i;} }
-    if(ci>=0){ const c=castles[ci]; c.owner=EVIL; c.t=Math.max(c.t,4); c.r=TIER[c.t].r; c.fort=Math.max(c.fort,2); c.barr=Math.max(3,c.barr); c.capital=true;
-      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:3800,hero:FACTIONS[EVIL].hero}));
-      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:1700})); } }
+    if(ci>=0){ const c=castles[ci]; c.owner=EVIL; c.t=Math.max(c.t,5); c.r=TIER[c.t].r; c.fort=Math.max(c.fort,4); c.barr=Math.max(4,c.barr); c.capital=true;
+      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:6000,hero:FACTIONS[EVIL].hero}));
+      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:2800}));
+      let nx=-1,nd=1e9; for(let i=0;i<castles.length;i++){if(castles[i].owner>=0)continue;const d=(castles[i].x-c.x)**2+(castles[i].y-c.y)**2;if(d<nd){nd=d;nx=i;}}
+      if(nx>=0){castles[nx].owner=EVIL;castles[nx].fort=Math.max(castles[nx].fort,2);} } }
   lord=units.find(u=>u.team===idx&&u.kind==='faction'); lord.kind='lord';
   buildTerritory();
   document.getElementById('start').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden');
@@ -412,6 +414,7 @@ function draw(){ ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#05070c'; ctx
   if(borderPath){ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=3/cam.zoom;ctx.strokeStyle='rgba(248,244,228,.5)';ctx.stroke(borderPath);ctx.lineWidth=1.3/cam.zoom;ctx.strokeStyle='rgba(28,20,12,.9)';ctx.stroke(borderPath);}
   if(cam.zoom<1.5){ ctx.font=`italic ${13/cam.zoom}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';for(const r of regions){ctx.fillStyle='rgba(15,12,8,.5)';ctx.fillText(r.name,r.x+1.2/cam.zoom,r.y+1.2/cam.zoom);ctx.fillStyle='rgba(245,240,225,.72)';ctx.fillText(r.name,r.x,r.y);} }
   for(const c of castles){ const col=tcolor(c.owner); ctx.fillStyle='#0d1320';ctx.strokeStyle=col;ctx.lineWidth=2.4/cam.zoom;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.5,0,7);ctx.fill();ctx.stroke();ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.26,0,7);ctx.fill();
+    let cp=null;for(const u of units){if(u.alive&&u.capC===c&&u.capProg>0){cp=u;break;}} if(cp){const need=2.2+c.fort*1.1,fr=Math.min(1,cp.capProg/need);ctx.strokeStyle=tcolor(cp.team);ctx.lineWidth=2.6/cam.zoom;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.62,-1.57,-1.57+6.283*fr);ctx.stroke();}
     if(c.capital){ctx.font=`${11/cam.zoom}px sans-serif`;ctx.textAlign='center';ctx.fillText('👑',c.x,c.y-c.r*.5-6/cam.zoom);}
     if(cam.zoom>0.5){ ctx.font=`${8.5/cam.zoom}px sans-serif`;ctx.textAlign='center'; if(c.fort>0){ctx.fillStyle='#fcd34d';ctx.fillText('🛡'+c.fort,c.x,c.y+2/cam.zoom);}
       if(c.owner>=0){ctx.fillStyle='#cfe';let tag=(c.port?'⚓':'')+(c.tradePost?'🐎':'');ctx.fillText(tag,c.x,c.y+c.r*.5+8/cam.zoom);
