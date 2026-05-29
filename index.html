@@ -91,7 +91,7 @@ const NF=FACTIONS.length;                                  // 세력 슬롯 수(
 const RISE_FACTION=NF-1;                                   // 7번=궐기 세력: 시작 선택·배치 없음, 개인 궐기로만 편입
 const FACTION_EMBLEM={};                                   // 텍스트 엠블럼(현재 없음)
 const FACTION_CREST={0:true, 7:true};                      // 예슈아하마쉬앟 성표를 쓰는 예슈아 진영
-function factionTag(team){ return (team>=0&&team<NF&&FACTIONS[team])?FACTIONS[team].name.slice(0,2):''; } // 세력 깃발=이름 앞 두 글자
+function factionTag(team){ return (team>=0&&team<NF&&FACTIONS[team])?FACTIONS[team].name.slice(0,3):''; } // 세력 깃발=이름 앞 세 글자
 function starPts(cx,cy,R,r,sp){ const a=[]; for(let i=0;i<sp*2;i++){ const rad=(i%2?r:R), t=Math.PI/sp*i-Math.PI/2; a.push([cx+Math.cos(t)*rad,cy+Math.sin(t)*rad]); } return a; }
 function drawCrest(g,x,y,R,color){ const p=starPts(x,y,R,R*0.44,8); g.beginPath(); p.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])); g.closePath();
   g.fillStyle=color; g.fill(); g.lineWidth=Math.max(0.8,R*0.13); g.strokeStyle='#fff8c0'; g.stroke(); g.beginPath(); g.arc(x,y,R*0.3,0,7); g.fillStyle='#fff8c0'; g.fill(); }
