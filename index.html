@@ -457,7 +457,9 @@ function draw(){ ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#05070c'; ctx
     if(cam.zoom>0.45){ctx.fillStyle='#fff';ctx.font=`bold ${8.5/cam.zoom}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3/cam.zoom;ctx.strokeStyle='#000a';ctx.strokeText(fmt(u.troops),u.x,u.y-R-4/cam.zoom);ctx.fillText(fmt(u.troops),u.x,u.y-R-4/cam.zoom);} }
   if(lord&&lord.alive){const d=Math.hypot(lord.tx-lord.x,lord.ty-lord.y);if(d>4){ctx.setLineDash([5/cam.zoom,5/cam.zoom]);ctx.strokeStyle='#fff8';ctx.lineWidth=1.5/cam.zoom;ctx.beginPath();ctx.moveTo(lord.x,lord.y);ctx.lineTo(lord.tx,lord.ty);ctx.stroke();ctx.setLineDash([]);}}
   if(train.on)drawRadial();
-  drawMinimap(); updateHUD();
+  drawMinimap();
+  if(state==='play'&&lord&&lord.alive){ const s=w2s(lord.x,lord.y); if(s.x<10||s.y<40||s.x>VW()-10||s.y>VH()-30){ ctx.setTransform(DPR,0,0,DPR,0,0); const px=clamp(s.x,16,VW()-16),py=clamp(s.y,48,VH()-34); ctx.fillStyle=tcolor(lord.team);ctx.beginPath();ctx.arc(px,py,8,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#10151f';ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('영주',px,py); } }
+  updateHUD();
 }
 function drawRadial(){ const c=train.c;if(!c)return;const sc=w2s(c.x,c.y);ctx.setTransform(DPR,0,0,DPR,0,0);const p=train.cur||trainPick(c);
   ctx.setLineDash([6,6]);ctx.strokeStyle='#fff8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sc.x,sc.y);ctx.lineTo(train.sx,train.sy);ctx.stroke();ctx.setLineDash([]);
