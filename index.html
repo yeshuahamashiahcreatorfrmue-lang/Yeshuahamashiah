@@ -238,9 +238,9 @@ function startGame(idx){
 
   units=[];
   homeIdx.forEach((ci,f)=>{ const h=castles[ci];
-    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x,y:h.y,tx:h.x,ty:h.y,troops:4200,atk:18,ttype:f%4,lastLand:h.land}));
-    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,troops:840,atk:11,ttype:(f+2)%4,lastLand:h.land})); });
-  for(let i=0;i<7;i++){ const p=randLand(); units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',color:INDEP_COLORS[i],x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,atk:12,ttype:i%4,lastLand:landAt(p.x,p.y)})); }
+    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x,y:h.y,tx:h.x,ty:h.y,troops:4200,atk:18,ttype:f%5,lastLand:h.land}));
+    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,troops:840,atk:11,ttype:(f+2)%5,lastLand:h.land})); });
+  for(let i=0;i<7;i++){ const p=randLand(); units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',color:INDEP_COLORS[i],x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,atk:12,ttype:i%5,lastLand:landAt(p.x,p.y)})); }
   TS=computeTS();
   playerUnit=units.find(u=>u.kind==='faction'&&u.team===idx);
   cam.zoom=Math.min(maxZoom,minZoom*1.8); cam.x=playerUnit.x-cv.width/cam.zoom/2; cam.y=playerUnit.y-cv.height/cam.zoom/2; clampCam();
@@ -328,9 +328,9 @@ function radiusOf(u){ if(isShip(u)||u.kind==='courier') return 10; return 8 + Ma
 // 공격력: 병력 42명=1, 10배마다 ×4.2  ⇒ power=(troops/42)^0.6232 (42명 블록 단위)
 const ATK_EXP=Math.log10(4.2), DEF_RATIO=0.5, COMBAT_RATE=0.5, TAC_ATK=1.42, TAC_DEF=0.23, ENC=0.2;
 const RANGED_RANGE=78, RANGED_K=0.7; // 궁병 원거리 포격 사거리/계수
-const TTYPE_NAME=['보병','기병','궁병','소총병'];
-// 전술 상성 순환: 보병▶소총병▶기병▶보병 (궁병은 상성 밖, 원거리 전담). 기병은 이동속도↑
-const TBEAT={0:3, 3:1, 1:0}; // a가 제압하는 상대
+const TTYPE_NAME=['보병','기병','궁병','소총병','기갑'];
+// 전술 상성 순환: 기갑▶소총병▶기병▶기갑 (보병=저렴/효과없음, 궁병=원거리 전담은 순환 밖)
+const TBEAT={4:3, 3:1, 1:4}; // a가 제압하는 상대
 function counters(a,b){ return TBEAT[a]===b; }
 function atkBlocks(t){ return Math.pow(Math.max(1,t)/42, ATK_EXP); }
 // 근접 공격력(블록): 궁병은 근접 약함(×0.6, 대신 별도 원거리 포격). 전함 해군 ×1.42 / 육군승선전함=함선고정 / 수송선 약함 / 교역선 0
@@ -338,7 +338,7 @@ function unitPower(u){
   if(u.shipType==='warship') return u.crew==='navy' ? atkBlocks(u.troops)*NAVY_BONUS : atkBlocks(2000);
   if(u.shipType==='transport') return atkBlocks(u.troops)*0.35;
   if(isCarrier(u)) return 0;
-  return atkBlocks(u.troops) * (u.ttype===2?0.6:1);
+  return atkBlocks(u.troops) * (u.ttype===2?0.6 : u.ttype===4?1.25 : 1); // 궁병 근접약화 / 기갑 중장갑 강력
 }
 function effPower(u){ return unitPower(u); } // AI 강약 비교용
 function teamHasPort(team){ return !!(TS[team]&&TS[team].port); }
@@ -419,8 +419,8 @@ function moveUnit(u,dt){ const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy); if(d
     else if(isArmy(u)){ u.naval=false; u.shipType=null; u.crew='land'; u.x=nx; u.y=ny; } // 해안 상륙
     else if(terrAt(nx,u.y)<2){ u.x=nx; } else if(terrAt(u.x,ny)<2){ u.y=ny; }
     u.atSea=u.naval&&terrAt(u.x,u.y)<2;
-  } else { // 육상: 물 막힘, 육군은 아군항구/페리로 승선. 기병=이동속도 보너스
-    const here=terrAt(u.x,u.y), sp=MOVE*(here>=2?TERR[here].spd:0.6)*(u.ttype===1?1.3:1);
+  } else { // 육상: 물 막힘, 육군은 아군항구/페리로 승선. 기병=빠름, 기갑=느림
+    const here=terrAt(u.x,u.y), sp=MOVE*(here>=2?TERR[here].spd:0.6)*(u.ttype===1?1.3: u.ttype===4?0.8 : 1);
     const step=Math.min(sp*dt,d), nx=u.x+dx/d*step, ny=u.y+dy/d*step;
     if(terrAt(nx,ny)>=2){ u.x=nx; u.y=ny; }
     else if(isArmy(u)){ const bt=boardType(u); if(bt){ u.naval=true; u.shipType=bt; u.crew='land'; u.x=nx; u.y=ny; u.atSea=true; return; }
@@ -477,6 +477,7 @@ function fight(att,def,dt){ const ap=unitPower(att); if(ap<=0) return;
   if(def.troops<=0){ def.troops=0; destroy(def,att); } }
 // 원거리 포격 병력차감 (궁병 전용, 근접과 별도 채널): 공격력×계수, 대상 방어 무시·지형엄폐만 적용
 function rangedHit(att,def,dt){ let raw=atkBlocks(att.troops)*RANGED_K; raw*=coverMul(def);
+  if(def.ttype===4) raw*=0.5;                                       // 기갑=중장갑, 포격 피해 절감
   def.troops -= raw*42*COMBAT_RATE*dt;
   if(def.troops<=0){ def.troops=0; destroy(def,att); } }
 function destroy(dead,killer){ dead.alive=false; dead.troops=0; dead.targetU=null;
