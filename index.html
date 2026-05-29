@@ -132,7 +132,12 @@ function genWorld(){ const sc=120,ox=hash(7,3)*1000,oy=hash(11,5)*1000,mx=hash(2
       if(le<0.02){r=r*.5+100;g=g*.5+95;b=b*.5+75;} if(le>0.6){const sp=Math.max(0,(sh-1.05)*1.6);r+=sp*70;g+=sp*70;b+=sp*72;} }
     else { const w=Math.sin((x*0.9+y)*0.22+vnoise(x/22,y/22)*6)*4; r+=w;g+=w;b+=w; if(e>SEA-0.018){const s=(e-(SEA-0.018))/0.018;r+=s*55;g+=s*60;b+=s*45;} }
     const p=i*4; d[p]=r;d[p+1]=g;d[p+2]=b;d[p+3]=255; }
-  land.getContext('2d').putImageData(img,0,0); }
+  const lg=land.getContext('2d'); lg.putImageData(img,0,0); lg.lineCap='round'; lg.lineJoin='round';
+  for(let n=0;n<22;n++){ let x=(Math.random()*LW)|0,y=(Math.random()*LH)|0; if(E[y*LW+x]<SEA+0.20)continue; const path=[[x,y]]; let st=0;
+    while(st++<500){ let bx=x,by=y,be=E[y*LW+x]; for(const d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){const nx=x+d[0],ny=y+d[1];if(nx<0||ny<0||nx>=LW||ny>=LH)continue;const e=E[ny*LW+nx];if(e<be){be=e;bx=nx;by=ny;}} if(bx===x&&by===y)break; x=bx;y=by; path.push([x,y]); if(E[y*LW+x]<SEA)break; }
+    if(path.length<10)continue;
+    lg.strokeStyle='rgba(36,84,116,0.55)'; lg.lineWidth=2.4; lg.beginPath(); lg.moveTo(path[0][0],path[0][1]); for(let i=1;i<path.length;i++)lg.lineTo(path[i][0],path[i][1]); lg.stroke();
+    lg.strokeStyle='rgba(120,178,208,0.72)'; lg.lineWidth=1.1; lg.stroke(); } }
 
 // ===== 정착지/영역 =====
 const GC=20,GX=Math.ceil(WW/GC),GY=Math.ceil(WH/GC);
