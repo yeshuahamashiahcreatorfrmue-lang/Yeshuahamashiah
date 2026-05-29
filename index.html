@@ -34,6 +34,17 @@
   #hint{position:fixed;left:0;right:0;bottom:0;padding:5px;text-align:center;font-size:10.5px;color:#9fb2c8;background:linear-gradient(#0a0f1800,#0a0f18cc);pointer-events:none;z-index:5}
   #over{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#05070ce6}
   #over h2{font-size:30px;margin-bottom:8px}#over button{margin-top:14px;padding:11px 26px;border:none;border-radius:11px;background:#2563eb;color:#fff;font-size:15px;font-weight:800}
+  #edBtn{margin-top:14px;padding:9px 16px;border:none;border-radius:10px;background:#334155;color:#cfe;font-size:12.5px;font-weight:700;cursor:pointer}
+  #editor{position:fixed;inset:0;z-index:25;overflow:auto;background:#070b12f7;padding:16px}
+  #editor .ew{max-width:520px;margin:0 auto}
+  #editor h3{font-size:18px;margin-bottom:2px}#editor h4{font-size:13px;margin:13px 0 5px;color:#9fb2c8}
+  #editor .er{display:flex;gap:5px;align-items:center;margin:4px 0}
+  #editor input[type=text]{flex:1;min-width:0;background:#111a28;border:1px solid #ffffff22;color:#e8eef5;border-radius:7px;padding:6px;font-size:12px}
+  #editor input[type=color]{width:32px;height:30px;border:none;background:none;padding:0;flex:0 0 auto}
+  #editor .tg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  #editor .eb{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;position:sticky;bottom:0;background:#070b12;padding:8px 0}
+  #editor .eb button{padding:9px 13px;border:none;border-radius:9px;color:#fff;font-weight:700;font-size:12.5px;background:#2563eb}
+  #editor small{color:#7e8da0;font-size:10.5px;display:block;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -52,7 +63,9 @@
   <p>7세력 · 충성 7 · 무소속 7, 총 21 군주가 대륙을 다툰다.<br>성을 가진 자만 병력을 만들고, 모두 잃으면 떠도는 개인이 된다.<br>개인이 첫 성을 점령해 궐기하면 <b>예슈아한민족진리단일국가</b>로 거듭난다.</p>
   <p style="color:#cfe;margin-top:8px">플레이할 세력을 고르세요</p>
   <div id="fl"></div>
+  <button id="edBtn" onclick="openEditor()">⚙️ 데이터 편집기</button>
 </div></div>
+<div id="editor" class="hidden"></div>
 <div id="over" class="hidden"><h2 id="overT">⚑</h2><div id="overD" style="color:#9fb2c8"></div><button onclick="location.reload()">다시 하기</button></div>
 <script>
 "use strict";
@@ -65,7 +78,7 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
 // ===== 데이터 =====
 const WW=1200, WH=1800;
-const FACTIONS=[
+let FACTIONS=[
   {name:"예슈아한민족국",hero:"예슈아",color:"#f5d442",crest:true,desc:"참 선지자 예슈아의 백성"},
   {name:"밤마루 겨레",hero:"검불",color:"#a855f7",desc:"밤 골짜기를 내달리는 겨레"},
   {name:"노을 누리",hero:"한별",color:"#f97316",desc:"붉은 노을의 떠돌이 겨레"},
@@ -81,7 +94,7 @@ const LOYAL=["한벼리","밤쇠","노올","눈메","푸르미","가람","쇠돌
 const INDEP=["떠돌이 한새","활잡이 나래","들바람 노루","그늘 살손","외돌이 검돌","달안개 다래","비바리 솔뫼"];
 const INDEPC=["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
 // 병종 0~7 공통 / 8~14 세력특수(8+f) / 15 궐기특수 / 16 거짓사제
-const TNAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','밤기마','노을활잡이','눈보라꾼','들풀지기','물너울대','무쇠벼리','예슈아행하기위해죽지않음지옥','거짓사제'];
+let TNAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','밤기마','노을활잡이','눈보라꾼','들풀지기','물너울대','무쇠벼리','예슈아행하기위해죽지않음지옥','거짓사제'];
 const TICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','✦','⭐','🌑','🌅','❄️','🌿','🌊','⚙️','☀️','✝'];
 const EQUIP=[0,35,25,45,100,70,90,40,80,80,80,80,80,80,80,80,80];
 const TCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd','#fbbf24','#fb923c','#fde68a','#fff7cc','#c4b5fd','#fdba74','#bae6fd','#bbf7d0','#7dd3fc','#cbd5e1','#5eead4','#fb7185'];
@@ -549,12 +562,25 @@ el('riseBtn').addEventListener('click',()=>{const c=el('riseBtn')._c;if(!c||!lor
 function endGame(win){ if(state==='over')return; state='over'; const secs=Math.round(now-gStart); el('overT').textContent=win?'👑 통일':'💀 패배'; el('overD').textContent=(win?'대륙을 통일했습니다!':'영주가 쓰러졌습니다…')+` · 생존 ${secs}초 · 보유 성 ${ownedCount(playerIdx)}`; el('over').classList.remove('hidden'); el('hud').classList.add('hidden'); el('shopBtn').classList.add('hidden'); el('riseBtn').classList.add('hidden'); closePanel(); }
 
 // ===== 시작화면 / 루프 =====
-function buildMenu(){ const fl=el('fl'); for(let i=0;i<PLAY;i++){const f=FACTIONS[i];const b=document.createElement('button');b.className='fb';b.style.background=f.color;b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';b.innerHTML=(f.crest?'✦ ':'')+f.name+'<small>영웅 '+f.hero+' — '+f.desc+'</small>';b.onclick=()=>startGame(i);fl.appendChild(b);} }
+function buildMenu(){ const fl=el('fl'); fl.innerHTML=''; for(let i=0;i<PLAY;i++){const f=FACTIONS[i];const b=document.createElement('button');b.className='fb';b.style.background=f.color;b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';b.innerHTML=(f.crest?'✦ ':'')+esc(f.name)+'<small>영웅 '+esc(f.hero)+' — '+esc(f.desc||'')+'</small>';b.onclick=()=>startGame(i);fl.appendChild(b);} }
+const editor=el('editor');
+function esc(s){return (''+s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function openEditor(){ let h='<div class="ew"><h3>⚙️ 데이터 편집기</h3><small>세력·영웅·색·병종 이름 편집 → 적용. 저장 시 이 기기에 유지됩니다.</small>';
+  h+='<h4>세력 (0~6 플레이 · 7 궐기 · 8 적대)</h4>';
+  FACTIONS.forEach((f,i)=>{ h+=`<div class="er"><input type="text" data-f="${i}" data-k="name" value="${esc(f.name)}" placeholder="세력명"><input type="text" data-f="${i}" data-k="hero" value="${esc(f.hero)}" placeholder="영웅"><input type="color" data-f="${i}" data-k="color" value="${f.color}"></div>`; });
+  h+='<h4>병종 이름</h4><div class="tg">'; TNAME.forEach((n,i)=>{ h+=`<input type="text" data-t="${i}" value="${esc(n)}">`; }); h+='</div>';
+  h+='<div class="eb"><button onclick="applyEditor()">✔ 적용·저장</button><button onclick="resetCfg()" style="background:#7c2d2d">기본값 복원</button><button onclick="closeEditor()" style="background:#475569">닫기</button></div></div>';
+  editor.innerHTML=h; editor.classList.remove('hidden'); }
+function closeEditor(){ editor.classList.add('hidden'); }
+function applyEditor(){ editor.querySelectorAll('[data-f]').forEach(inp=>{const i=+inp.dataset.f,k=inp.dataset.k; if(FACTIONS[i])FACTIONS[i][k]=inp.value;}); editor.querySelectorAll('[data-t]').forEach(inp=>{TNAME[+inp.dataset.t]=inp.value;}); saveCfg(); buildMenu(); closeEditor(); }
+function saveCfg(){ try{ localStorage.setItem('yh_cfg',JSON.stringify({factions:FACTIONS.map(f=>({name:f.name,hero:f.hero,color:f.color,desc:f.desc})),tnames:TNAME})); }catch(e){} }
+function loadCfg(){ try{ const s=localStorage.getItem('yh_cfg'); if(!s)return; const c=JSON.parse(s); if(c.factions)c.factions.forEach((f,i)=>{if(FACTIONS[i])Object.assign(FACTIONS[i],f);}); if(c.tnames)c.tnames.forEach((n,i)=>{if(i<TNAME.length&&n)TNAME[i]=n;}); }catch(e){} }
+function resetCfg(){ try{localStorage.removeItem('yh_cfg');}catch(e){} location.reload(); }
 let last=0;
 function loop(t){ const dt=Math.min(0.05,(t-last)/1000)||0; last=t;
   if(state==='play'){ if(zoneCD>0)zoneCD-=dt; if(!zone){const tb=detectBattle();if(tb)enterZone(tb);} if(zone)updateZone(dt); else update(dt); }
   draw(); requestAnimationFrame(loop); }
-genWorld(); placeCastles(); computeLand(); buildRegions(); buildTerritory(); buildMenu();
+genWorld(); placeCastles(); computeLand(); buildRegions(); buildTerritory(); loadCfg(); buildMenu();
 cam.x=0;cam.y=0;cam.zoom=camMin(); requestAnimationFrame(loop);
 </script>
 </body>
