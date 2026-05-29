@@ -280,8 +280,8 @@ function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiU
   if(terrT>0){terrT-=dt;if(terrT<=0)refreshTerr();}
   // 승패
   if(!lord||!lord.alive){ return; }
-  const own=ownedCount(playerIdx); const totalC=castles.length;
-  let mine=0;for(const c of castles)if(c.owner===playerIdx)mine++; if(mine===totalC){ endGame(true); } }
+  let enemyC=0,enemyU=0; for(const c of castles)if(c.owner>=0&&c.owner!==playerIdx)enemyC++; for(const u of units)if(u.alive&&u.team!==playerIdx&&isArmy(u)){enemyU++;break;}
+  if(enemyC===0&&enemyU===0&&ownedCount(playerIdx)>0)endGame(true); }
 function ownedCount(t){ let n=0;for(const c of castles)if(c.owner===t)n++; return n; }
 function riseIntoTruth(u){ const T=RISE; if(u.team===T)return; if(u===lord)playerIdx=T; u.team=T; if(u.ttype<8)u.ttype=8+0; if(gold[T]===undefined)gold[T]=120; if(coinPool[T]===undefined)coinPool[T]=0; }
 function deposit(team,type,c,amt){ const cap=capMax(team); let best=null,bd=1e18,cnt=0;
