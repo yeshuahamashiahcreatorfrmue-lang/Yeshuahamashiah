@@ -23,6 +23,7 @@
   #panel .grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   #panel .grid button{flex:0 0 auto}
   #shopBtn{position:fixed;left:8px;bottom:42px;z-index:7;padding:8px 11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-size:12.5px;font-weight:800;box-shadow:0 3px 10px #0008}
+  #riseBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:44px;z-index:7;padding:10px 18px;border:none;border-radius:11px;background:#16a34a;color:#fff;font-size:14px;font-weight:800;box-shadow:0 3px 12px #0009}
   #start{position:fixed;inset:0;z-index:20;overflow:auto;background:radial-gradient(120% 80% at 50% 0%,#13233a,#05070c)}
   #start .wrap{max-width:460px;margin:0 auto;padding:34px 16px 60px;text-align:center}
   #start h1{font-size:23px;margin-bottom:6px;letter-spacing:1px}
@@ -44,6 +45,7 @@
 </div>
 <div id="hint" class="hidden">탭=이동/선택 · 내 성 탭=운영 · 내 성 꾹+드래그=양성 · 끌기=지도 · 두손가락=확대</div>
 <button id="shopBtn" class="hidden">🛒 상점</button>
+<button id="riseBtn" class="hidden">⚑ 궐기</button>
 <div id="panel" class="hidden"></div>
 <div id="start"><div class="wrap">
   <h1>⚔️ 예슈아 월드맵 전쟁</h1>
@@ -150,7 +152,7 @@ function placeCastles(){ castles=[]; let tries=0;
     const e=elevAt(x,y); if(e<SEA+0.03||e>SEA+0.5)continue; let ok=true; for(const c of castles)if(Math.hypot(c.x-x,c.y-y)<92){ok=false;break;}
     if(!ok)continue; const rr=Math.random(),t=rr<.28?0:rr<.5?1:rr<.68?2:rr<.82?3:rr<.92?4:rr<.975?5:6;
     castles.push({x,y,t,r:TIER[t].r,owner:-1,fort:t>=4?t-3:0,capC:null,capProg:0,barr:1+(t/2|0),farm:1+(t/2|0),reserve:0,aiAcc:0,
-      port:false,shipyard:false,tradePost:false,coastal:isCoastal(x,y),embark:'transport',pmax:1,pCD:0,cCD:0,escort:0,capital:false}); } }
+      port:false,shipyard:false,tradePost:false,coastal:isCoastal(x,y),embark:'transport',pmax:1,pCD:0,cCD:0,escort:0,capital:false,tradeMode:'auto'}); } }
 function tcolor(t){ return t<0?'#9aa':t<NF?FACTIONS[t].color:(t>=100?INDEPC[t-100]:'#fb7185'); }
 let regions=[]; const RNAMES=['한벌','검산골','노을 들','눈마루','푸른벌','큰물가','무쇠재','달여울','솔메','아라 갯벌','벼리골','한울 고원'];
 function buildRegions(){ regions=[]; let tries=0; while(regions.length<10&&tries<2000){tries++;const p=randLand();let ok=true;for(const r of regions)if(Math.hypot(r.x-p.x,r.y-p.y)<250){ok=false;break;}if(ok)regions.push({x:p.x,y:p.y,name:RNAMES[regions.length%RNAMES.length]});} }
@@ -326,7 +328,9 @@ function spawnNaval(dt){
     if(have<desired&&warCD[t]<=0){const w=nearWater(yards[0].x,yards[0].y);if(w){units.push(mk({kind:'warship',shipType:'warship',crew:'navy',naval:true,team:t,x:w.x,y:w.y,tx:w.x,ty:w.y,troops:1100,homePort:yards[0],ttype:null}));warCD[t]=15;}} } }
 function updateTrade(dt){
   for(const u of units){ if(!u.alive||!isCarrier(u))continue; const sea=u.shipType==='passenger'; const nodes=sea?castles.filter(c=>c.port):castles.filter(c=>c.tradePost);
-    if(!u.laden){ let best=null,bd=1e9; for(const c of nodes){if(c===(u.homePort||u.homePost))continue;const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
+    if(!u.laden){ const home=u.homePort||u.homePost, mode=home?home.tradeMode:'auto'; let best=null,bd=1e9;
+      for(const c of nodes){if(c===home)continue; if(mode==='raid'&&!(c.owner>=0&&c.owner!==u.team))continue; if(mode==='safe'&&!(c.owner===u.team||c.owner<0))continue; const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
+      if(!best){for(const c of nodes){if(c===home)continue;const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}}
       if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){const raid=best.owner!==u.team?1.6:1.0;const esc=(u.homePost&&u.homePost.escort)||0;const cmul=u.kind==='courier'?1+Math.min(41,Math.floor(esc/100)*0.1):1;u.cargo=(20+Math.hypot(best.x-(u.homePort||u.homePost).x,best.y-(u.homePort||u.homePost).y)*0.05)*raid*cmul;u.laden=true;u.cargoType=raid>1?'약탈물':['곡물','장비','무기'][Math.floor(Math.random()*3)];}} }
     else { const own=nodes.filter(c=>c.owner===u.team); let best=null,bd=1e9; for(const c of own){const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
       if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){gold[u.team]=(gold[u.team]||0)+u.cargo;u.cargo=0;u.laden=false;}} else u.laden=false; }
@@ -369,6 +373,7 @@ function openTown(c){ shopC=null; const g=Math.floor(gold[playerIdx]||0);
     h+=`<div class="row"><span>🛥 유람선 ${c.pmax}/7</span><button ${(c.pmax>=7||g<COST.pmax)?'disabled':''} onclick="upg('pmax')">증선 ${COST.pmax}</button></div>`;}
   h+=`<div class="row"><span>🚢 조선소 ${c.shipyard?'✔':''}</span>${c.shipyard?'':`<button ${(!c.port||g<COST.shipyard)?'disabled':''} onclick="upg('ship')">건조 ${COST.shipyard}</button>`}</div>`;
   h+=`<div class="row"><span>🐎 기마무역소 ${c.tradePost?'✔':''}</span>${c.tradePost?'':`<button ${g<COST.post?'disabled':''} onclick="upg('post')">건설 ${COST.post}</button>`}</div>`;
+  if(c.tradePost||c.port){const m=c.tradeMode||'auto';h+=`<div class="row"><span>🧭 무역로: <b>${m==='auto'?'자동':m==='raid'?'약탈(적 거점)':'교역(우방)'}</b></span><button onclick="upg('trademode')">전환</button></div>`;}
   panel.innerHTML=h; panel.classList.remove('hidden'); panel._c=c; }
 function upg(t){ const c=panel._c; if(!c)return; const g=gold[playerIdx];
   if(t==='fort'&&c.fort<7&&g>=COST.fort(c.fort+1)){gold[playerIdx]-=COST.fort(c.fort+1);c.fort++;}
@@ -379,6 +384,7 @@ function upg(t){ const c=panel._c; if(!c)return; const g=gold[playerIdx];
   else if(t==='post'&&!c.tradePost&&g>=COST.post){gold[playerIdx]-=COST.post;c.tradePost=true;}
   else if(t==='mode'){c.embark=c.embark==='warship'?'transport':'warship';}
   else if(t==='pmax'&&c.pmax<7&&g>=COST.pmax){gold[playerIdx]-=COST.pmax;c.pmax++;}
+  else if(t==='trademode'){c.tradeMode=c.tradeMode==='auto'?'raid':c.tradeMode==='raid'?'safe':'auto';}
   openTown(c); }
 
 // ===== 전술 존 =====
@@ -393,7 +399,7 @@ function enterZone(t){ const W=VW(),H=VH(); const ti=terrCode(elevAt(t.cx,t.cy),
   const mk2=list=>{const out=[];for(const u of list){if(u===lord)continue;u._zb=[];const n=Math.max(1,Math.min(ZMAX,Math.round(u.troops/ZBLK))),per=u.troops/n;for(let i=0;i<n;i++){const b={src:u,team:u.team,ttype:u.ttype,troops:per,side:u.team===lord.team?0:1,x:0,y:0,rcd:Math.random()*7,ft:0};out.push(b);u._zb.push(b);}}return out;};
   const aB=mk2(t.al),fB=mk2(t.fo),seaY=coastal?H*0.2:-1; placeSide(fB,coastal?34:60,1,W);placeSide(aB,H-90,-1,W);
   zone={al:t.al,fo:t.fo,blocks:aB.concat(fB),lx:W/2,ly:H-50,ltx:null,lty:null,terr:ti,terrName:TERRNAME[ti],terrDef:TERRDEF[ti],terrSpd:clamp(TERRSPD[ti],.55,1.25),coastal,seaY,t:0};
-  train.on=false; closePanel(); el('hud').classList.add('hidden'); el('hint').classList.add('hidden'); el('shopBtn').classList.add('hidden'); }
+  train.on=false; closePanel(); el('hud').classList.add('hidden'); el('hint').classList.add('hidden'); el('shopBtn').classList.add('hidden'); el('riseBtn').classList.add('hidden'); }
 function placeSide(arr,yS,dir,W){ const n=arr.length;if(!n)return;const cols=Math.max(1,Math.ceil(Math.sqrt(n*1.6))),sx=W/(cols+1);arr.forEach((b,i)=>{const r=i/cols|0,c=i%cols;b.x=sx*(c+1)+(r%2?sx*.3:0);b.y=yS+dir*r*28;b.x=clamp(b.x,ZBR,W-ZBR);}); }
 function zRange(t){return t===5?ZRANGE*1.35:t===6?ZRANGE:t===2?ZRANGE*.85:0;}
 function zdmg(aT,dT,aTr,dTr,stat,sur){ let raw=atkB(aTr)-0.5*atkB(dTr);if(raw<0.05)raw=0.05; raw*=tacAtk(aT,dT)*tacDef(dT,aT);
@@ -498,7 +504,8 @@ function updateHUD(){ if(playerIdx<0||!FACTIONS[playerIdx])return; const f=FACTI
   el('hFac').textContent=(f.crest?'✦ ':'')+f.name; el('hTroops').textContent='⚔'+fmt(lord?lord.troops:0);
   el('hType').textContent=lord?TICON[lord.ttype]+TNAME[lord.ttype]:''; el('hGold').textContent='💰'+Math.floor(gold[playerIdx]||0);
   el('hCoin').textContent='✦'+Math.floor(lord?lord.coin:0); el('hCastle').textContent='🏰'+ownedCount(playerIdx);
-  const sb=el('shopBtn'),ns=nearestShop(),townOpen=!panel.classList.contains('hidden'); sb.classList.toggle('hidden',!ns||!!shopC||townOpen); if(ns&&!shopC&&!townOpen)sb.textContent='🛒 '+(ns.owner<NF?FACTIONS[ns.owner].name:'무소속'); }
+  const sb=el('shopBtn'),ns=nearestShop(),townOpen=!panel.classList.contains('hidden'); sb.classList.toggle('hidden',!ns||!!shopC||townOpen); if(ns&&!shopC&&!townOpen)sb.textContent='🛒 '+(ns.owner<NF?FACTIONS[ns.owner].name:'무소속');
+  const rb=el('riseBtn'); let cap=null; if(lord&&lord.alive&&!isPower(playerIdx)){ for(const c of castles){ if(c.owner===lord.team||Math.hypot(c.x-lord.x,c.y-lord.y)>=c.r)continue; let en=false; for(const o of units)if(o.alive&&o.team!==lord.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){en=true;break;} if(!en){cap=c;break;} } } rb._c=cap; rb.classList.toggle('hidden',!cap); }
 const el=id=>document.getElementById(id);
 
 // ===== 입력 =====
@@ -536,9 +543,10 @@ addEventListener('mousemove',e=>{if(mdn)onMove(e.clientX,e.clientY);});
 addEventListener('mouseup',e=>{if(mdn){mdn=false;onUp(e.clientX,e.clientY);}});
 addEventListener('wheel',e=>{if(zone)return;const w=s2w(e.clientX,e.clientY);cam.zoom=clamp(cam.zoom*(e.deltaY<0?1.1:.9),camMin(),3.4);cam.x=w.x-e.clientX/cam.zoom;cam.y=w.y-e.clientY/cam.zoom;clampCam();},{passive:true});
 el('shopBtn').addEventListener('click',()=>{const c=nearestShop();if(c)openShop(c);});
+el('riseBtn').addEventListener('click',()=>{const c=el('riseBtn')._c;if(!c||!lord||!lord.alive)return; riseIntoTruth(lord); c.owner=playerIdx; c.capital=true; el('riseBtn').classList.add('hidden'); refreshTerr();});
 
 // ===== 게임오버 =====
-function endGame(win){ if(state==='over')return; state='over'; const secs=Math.round(now-gStart); el('overT').textContent=win?'👑 통일':'💀 패배'; el('overD').textContent=(win?'대륙을 통일했습니다!':'영주가 쓰러졌습니다…')+` · 생존 ${secs}초 · 보유 성 ${ownedCount(playerIdx)}`; el('over').classList.remove('hidden'); el('hud').classList.add('hidden'); el('shopBtn').classList.add('hidden'); closePanel(); }
+function endGame(win){ if(state==='over')return; state='over'; const secs=Math.round(now-gStart); el('overT').textContent=win?'👑 통일':'💀 패배'; el('overD').textContent=(win?'대륙을 통일했습니다!':'영주가 쓰러졌습니다…')+` · 생존 ${secs}초 · 보유 성 ${ownedCount(playerIdx)}`; el('over').classList.remove('hidden'); el('hud').classList.add('hidden'); el('shopBtn').classList.add('hidden'); el('riseBtn').classList.add('hidden'); closePanel(); }
 
 // ===== 시작화면 / 루프 =====
 function buildMenu(){ const fl=el('fl'); for(let i=0;i<PLAY;i++){const f=FACTIONS[i];const b=document.createElement('button');b.className='fb';b.style.background=f.color;b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';b.innerHTML=(f.crest?'✦ ':'')+f.name+'<small>영웅 '+f.hero+' — '+f.desc+'</small>';b.onclick=()=>startGame(i);fl.appendChild(b);} }
