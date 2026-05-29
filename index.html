@@ -276,7 +276,7 @@ function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiU
   for(const c of castles){ if(c.owner<0)continue; c.reserve=Math.min(2000+c.barr*1500,c.reserve+c.barr*9*dt);
     if(c.owner!==playerIdx){ c.aiAcc+=c.barr*0.18*dt; while(c.aiAcc>=1&&c.reserve>=420){ c.aiAcc-=1; const ty=aiPick(c.owner); c.reserve-=420; gold[c.owner]-=EQUIP[ty]; deposit(c.owner,ty,c,420); } } }
   if(train.on)processTrain(dt);
-  updateTrade(dt); spawnNaval(dt); shopTick(dt);
+  updateTrade(dt); if(navalT<=0){navalT=0.6;spawnNaval(0.6);} shopTick(dt);
   if(playerIdx>=0&&lord&&lord.alive){ lord.coin=(lord.coin||0)+(3+ownedCount(playerIdx))*dt; if(lord.gearRegen)lord.troops=Math.min(capMax(playerIdx),lord.troops+lord.gearRegen*dt); }
   units=units.filter(u=>u.alive);
   if(terrT>0){terrT-=dt;if(terrT<=0)refreshTerr();}
@@ -317,13 +317,14 @@ function nearWater(x,y){ for(let r=20;r<300;r+=20)for(let a=0;a<8;a++){const ang
 
 // ===== 무역/함선 =====
 let warCD={};
-function spawnNaval(dt){ for(const c of castles){ if(c.owner<0)continue;
+function spawnNaval(dt){
+  for(const c of castles){ if(!c.tradePost){c.escort=0;continue;} let e=0; for(const u of units)if(u.alive&&u.team===c.owner&&u.ttype===1&&!isShip(u)&&u.kind!=='courier'&&Math.hypot(u.x-c.x,u.y-c.y)<c.r+50)e+=u.troops; c.escort=e; } // 기마병참대(주둔 기병)
+  for(const c of castles){ if(c.owner<0)continue;
   if(c.port){ c.pCD-=dt; const have=units.filter(u=>u.alive&&u.shipType==='passenger'&&u.homePort===c).length; if(have<(c.pmax||1)&&c.pCD<=0){const w=nearWater(c.x,c.y);if(w){units.push(mk({kind:'passenger',shipType:'passenger',naval:true,team:c.owner,x:w.x,y:w.y,tx:w.x,ty:w.y,troops:320,homePort:c,ttype:null}));c.pCD=10;}} }
   if(c.tradePost){ c.cCD-=dt; const have=units.filter(u=>u.alive&&u.kind==='courier'&&u.homePost===c).length; if(have<1&&c.cCD<=0){units.push(mk({kind:'courier',shipType:'courier',team:c.owner,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:240,homePost:c,ttype:null}));c.cCD=10;} } }
   for(let t=0;t<NF;t++){ let yards=castles.filter(c=>c.owner===t&&c.shipyard); if(!yards.length)continue; const desired=Math.min(2,yards.length); const have=units.filter(u=>u.alive&&u.shipType==='warship'&&u.team===t).length; warCD[t]=Math.max(0,(warCD[t]||0)-dt);
     if(have<desired&&warCD[t]<=0){const w=nearWater(yards[0].x,yards[0].y);if(w){units.push(mk({kind:'warship',shipType:'warship',crew:'navy',naval:true,team:t,x:w.x,y:w.y,tx:w.x,ty:w.y,troops:1100,homePort:yards[0],ttype:null}));warCD[t]=15;}} } }
 function updateTrade(dt){
-  for(const c of castles){ if(!c.tradePost){c.escort=0;continue;} let e=0; for(const u of units)if(u.alive&&u.team===c.owner&&u.ttype===1&&!isShip(u)&&u.kind!=='courier'&&Math.hypot(u.x-c.x,u.y-c.y)<c.r+50)e+=u.troops; c.escort=e; } // 기마병참대(주둔 기병)
   for(const u of units){ if(!u.alive||!isCarrier(u))continue; const sea=u.shipType==='passenger'; const nodes=sea?castles.filter(c=>c.port):castles.filter(c=>c.tradePost);
     if(!u.laden){ let best=null,bd=1e9; for(const c of nodes){if(c===(u.homePort||u.homePost))continue;const d=Math.hypot(c.x-u.x,c.y-u.y);if(d<bd){bd=d;best=c;}}
       if(best){u.tx=best.x;u.ty=best.y;if(Math.hypot(u.x-best.x,u.y-best.y)<best.r+8){const raid=best.owner!==u.team?1.6:1.0;const esc=(u.homePost&&u.homePost.escort)||0;const cmul=u.kind==='courier'?1+Math.min(41,Math.floor(esc/100)*0.1):1;u.cargo=(20+Math.hypot(best.x-(u.homePort||u.homePost).x,best.y-(u.homePort||u.homePost).y)*0.05)*raid*cmul;u.laden=true;u.cargoType=raid>1?'약탈물':['곡물','장비','무기'][Math.floor(Math.random()*3)];}} }
