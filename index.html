@@ -712,7 +712,10 @@ function drawTrainOverlay(){ const c=train.c; if(!c) return; const sc=w2s(c.x,c.
   const txt=label+'  ⚡'+pick.rate.toFixed(1)+'/s';
   ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillText(txt, train.sx+1,train.sy-23); ctx.fillStyle=okp?'#86efac':'#fca5a5'; ctx.fillText(txt, train.sx,train.sy-24); }
-function drawMinimap(){ const r=mmRect(); ctx.drawImage(mm,r.x,r.y,r.w,r.h); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.strokeRect(r.x-1,r.y-1,r.w+2,r.h+2);
+function drawMinimap(){ const r=mmRect(); ctx.drawImage(mm,r.x,r.y,r.w,r.h);
+  ctx.imageSmoothingEnabled=true; ctx.globalAlpha=0.55; ctx.drawImage(tFill,r.x,r.y,r.w,r.h);   // 세력색
+  ctx.globalAlpha=0.7; ctx.drawImage(tEdge,r.x,r.y,r.w,r.h); ctx.globalAlpha=1;                  // 국경선
+  ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.strokeRect(r.x-1,r.y-1,r.w+2,r.h+2);
   const sx=r.w/WORLD_W, sy=r.h/WORLD_H;
   for(const c of castles){ ctx.fillStyle=teamColor(c.owner); ctx.fillRect(r.x+c.x*sx-1.5,r.y+c.y*sy-1.5,3,3); }
   for(const u of units){ if(!u.alive)continue; ctx.fillStyle=u.color; const s=(u===playerUnit)?2.6:1.6; ctx.fillRect(r.x+u.x*sx-s/2,r.y+u.y*sy-s/2,s,s); }
