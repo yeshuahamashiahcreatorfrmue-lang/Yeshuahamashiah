@@ -265,7 +265,7 @@ function dist2(a,b){ return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
 function mmRect(){ return {x:cv.width-MMW-8, y:cv.height-MMH-8, w:MMW, h:MMH}; }
 function inMM(sx,sy){ const r=mmRect(); return sx>=r.x&&sx<=r.x+r.w&&sy>=r.y&&sy<=r.y+r.h; }
 function mmJump(sx,sy){ const r=mmRect(); cam.x=(sx-r.x)/r.w*WORLD_W-cv.width/cam.zoom/2; cam.y=(sy-r.y)/r.h*WORLD_H-cv.height/cam.zoom/2; clampCam(); }
-function ownCastleAtScreen(sx,sy){ if(state!=='play') return null; const w=s2w(sx,sy); for(const c of castles){ if(c.owner===playerIdx && Math.hypot(c.x-w.x,c.y-w.y)<c.r+10/cam.zoom) return c; } return null; }
+function ownCastleAtScreen(sx,sy){ if(state!=='play'||zone) return null; const w=s2w(sx,sy); for(const c of castles){ if(c.owner===playerIdx && Math.hypot(c.x-w.x,c.y-w.y)<c.r+10/cam.zoom) return c; } return null; }
 cv.addEventListener('touchstart',e=>{ e.preventDefault();
   if(e.touches.length===1){ const t=e.touches[0]; if(inMM(t.clientX,t.clientY)){ mmDrag=true; mmJump(t.clientX,t.clientY); return; }
     drag={on:true,moved:false,lx:t.clientX,ly:t.clientY,sx:t.clientX,sy:t.clientY,st:performance.now(),castle:ownCastleAtScreen(t.clientX,t.clientY)}; pinch.on=false; }
@@ -287,7 +287,7 @@ cv.addEventListener('mouseup',e=>{ if(train.on){ train.on=false; train.c=null; }
 cv.addEventListener('wheel',e=>{ e.preventDefault(); zoomAt(e.clientX,e.clientY, e.deltaY<0?1.12:0.89); },{passive:false});
 function panBy(dx,dy){ cam.x-=dx/cam.zoom; cam.y-=dy/cam.zoom; clampCam(); }
 function zoomAt(fx,fy,f){ const w=s2w(fx,fy); cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom*f)); cam.x=w.x-fx/cam.zoom; cam.y=w.y-fy/cam.zoom; clampCam(); }
-function tap(sx,sy){ if(state!=='play'||!playerUnit.alive) return; const w=s2w(sx,sy);
+function tap(sx,sy){ if(state!=='play') return; if(zone){ zoneTap(sx,sy); return; } if(!playerUnit.alive) return; const w=s2w(sx,sy);
   // 내 성 → 마을 관리
   for(const c of castles){ if(c.owner===playerIdx && Math.hypot(c.x-w.x,c.y-w.y)<c.r+6){ openTown(c); return; } }
   closeTown();
@@ -443,7 +443,8 @@ function moveUnit(u,dt){ const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy); if(d
     if(terrAt(u.x,u.y)>=2) u.lastLand=landAt(u.x,u.y); u.atSea=false;
   } }
 
-function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt;
+function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt; if(zoneCD>0) zoneCD-=dt;
+  if(!zone){ const tb=detectPlayerBattle(); if(tb){ enterZone(tb); return; } } // 개인 관여 교전→존맵 진입
   if(aiTimer<=0){ aiTimer=0.5; for(const u of units) ai(u); }
   if(upTimer<=0){ upTimer=2.0; aiUpgrade(); }
   if(navalTimer<=0){ const iv=1.0; navalTimer=iv; spawnNaval(iv); }
@@ -562,6 +563,7 @@ function drawShip(u,r,hl){ const x=u.x,y=u.y,col=u.color;
   else { ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(x,y,r*1.25,r*0.7,0,0,7); ctx.fill(); ctx.stroke();   // 수송선
     ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(x-r*0.5,y-r*0.35,r,r*0.7); } }
 function draw(){
+  if(zone){ drawZone(); return; }
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#05070c'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(cam.zoom,0,0,cam.zoom,-cam.x*cam.zoom,-cam.y*cam.zoom);
   ctx.drawImage(bg,0,0);
@@ -640,7 +642,69 @@ function updateHUD(){ const u=playerUnit; const cap=capMaxOf(playerIdx);
   const t=TERR[terrAt(u.x,u.y)]; const tt=u.ttype!=null?TTYPE_NAME[u.ttype]:'-';
   document.getElementById('terr').textContent=`병종:${tt} · ${t.name}${t.def<0.95?' 🛡':t.def>1.05?' ⚠':''}${u.atSea?' ⚓':''}`;
 }
-function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t; if(state==='play'){ update(dt); updateHUD(); } draw(); if(state!=='end') requestAnimationFrame(loop); }
+// ================= 전술 존(zone) 전투맵 (개인 관여 교전만) =================
+let zone=null, zoneCD=0;
+const ZBLK=420, ZMAXSIDE=40, ZBR=15, ZLR=11, ZSPD=64;
+function detectPlayerBattle(){ if(zoneCD>0||!playerUnit.alive||isShip(playerUnit)||!isArmy(playerUnit)) return null;
+  for(const e of units){ if(!e.alive||e.team===playerUnit.team||isShip(e)||isCarrier(e)||!isArmy(e)) continue;
+    if(Math.hypot(e.x-playerUnit.x,e.y-playerUnit.y)<radiusOf(playerUnit)+radiusOf(e)+8){
+      const cx=(playerUnit.x+e.x)/2, cy=(playerUnit.y+e.y)/2, allies=[],foes=[];
+      for(const u of units){ if(!u.alive||isShip(u)||isCarrier(u)||!isArmy(u))continue; if(Math.hypot(u.x-cx,u.y-cy)>240)continue;
+        if(u.team===playerUnit.team){ if(allies.length<8) allies.push(u); } else if(foes.length<8) foes.push(u); }
+      if(allies.length&&foes.length) return {allies,foes}; } }
+  return null; }
+function placeSide(arr,yStart,dir){ const n=arr.length; if(!n)return; const cols=Math.max(1,Math.ceil(Math.sqrt(n*1.6))), sx=cv.width/(cols+1);
+  arr.forEach((b,i)=>{ const r=(i/cols)|0,c=i%cols; b.x=sx*(c+1)+(r%2?sx*0.3:0); b.y=yStart+dir*r*30; b.x=Math.max(ZBR,Math.min(cv.width-ZBR,b.x)); }); }
+function enterZone(t){ const W=cv.width,H=cv.height;
+  const mk=(list)=>{ const out=[]; for(const u of list){ if(u===playerUnit) continue; u._zb=[];
+    const n=Math.max(1,Math.min(ZMAXSIDE,Math.round(u.troops/ZBLK))), per=u.troops/n;
+    for(let i=0;i<n;i++){ const b={src:u,team:u.team,ttype:u.ttype,troops:per,side:(u.team===playerUnit.team?0:1),x:0,y:0}; out.push(b); u._zb.push(b);} } return out; };
+  const aB=mk(t.allies), fB=mk(t.foes); placeSide(fB,70,1); placeSide(aB,H-100,-1);
+  zone={allies:t.allies,foes:t.foes,blocks:aB.concat(fB),lx:W/2,ly:H-56,ltx:null,lty:null,t:0,btn:null}; closeTown(); train.on=false;
+  document.getElementById('hud').classList.add('hidden'); document.getElementById('hint').classList.add('hidden'); }
+function zfightCore(att,def,dt){ let raw=atkBlocks(att.troops)-0.5*atkBlocks(def.troops); if(raw<0.05)raw=0.05;
+  if(att.ttype!=null&&def.ttype!=null){ if(counters(att.ttype,def.ttype))raw*=TAC_ATK; if(counters(def.ttype,att.ttype))raw*=TAC_DEF; }
+  def.troops-=raw*42*COMBAT_RATE*dt*0.55; if(def.troops<0)def.troops=0; }
+function updateZone(dt){ const Z=zone,W=cv.width,H=cv.height,Lu=playerUnit; Z.t+=dt;
+  const live=Z.blocks.filter(b=>b.troops>0);
+  for(const b of live){ let bx=null,by=null,bd=1e18; for(const o of live){ if(o.side===b.side)continue; const d=(o.x-b.x)**2+(o.y-b.y)**2; if(d<bd){bd=d;bx=o.x;by=o.y;} }
+    if(b.side===1 && Lu.alive){ const dl=(Z.lx-b.x)**2+(Z.ly-b.y)**2; if(dl<bd){ bd=dl; bx=Z.lx; by=Z.ly; } } // 적은 군주(개인)에게도 밀물처럼
+    let dx,dy; if(bx!=null){ dx=bx-b.x; dy=by-b.y; } else { dx=0; dy=(b.side===0?-1:1)*40; }
+    const d=Math.hypot(dx,dy)||1; b.x+=dx/d*ZSPD*dt; b.y+=dy/d*ZSPD*dt; }
+  for(let i=0;i<live.length;i++)for(let j=i+1;j<live.length;j++){ const a=live[i],c=live[j],dx=c.x-a.x,dy=c.y-a.y,d=Math.hypot(dx,dy)||1;
+    if(a.side===c.side){ const min=ZBR*1.5; if(d<min){ const p=(min-d)/2/d; a.x-=dx*p;a.y-=dy*p;c.x+=dx*p;c.y+=dy*p; } }
+    else if(d<ZBR*1.7){ zfightCore(a,c,dt); zfightCore(c,a,dt); } }
+  if(Lu.alive){ let lx=Z.lx,ly=Z.ly; const tx=Z.ltx==null?lx:Z.ltx, ty=Z.lty==null?ly:Z.lty, dx=tx-lx,dy=ty-ly,d=Math.hypot(dx,dy);
+    if(d>2){ lx+=dx/d*ZSPD*1.5*dt; ly+=dy/d*ZSPD*1.5*dt; }
+    for(const b of live){ if(b.side===0)continue; const ddx=lx-b.x,ddy=ly-b.y,dd=Math.hypot(ddx,ddy)||1; if(dd<ZLR+ZBR){ const p=(ZLR+ZBR-dd)/dd; lx+=ddx*p; ly+=ddy*p; // 적에 막힘
+      zfightCore(Lu,b,dt); zfightCore(b,Lu,dt); } }
+    Z.lx=Math.max(ZLR,Math.min(W-ZLR,lx)); Z.ly=Math.max(ZLR,Math.min(H-ZLR,ly)); }
+  if(Lu.troops<=0){ exitZone(); return; }
+  if(!live.some(b=>b.side===1&&b.troops>0)) exitZone(); }
+function exitZone(){ const Z=zone; if(!Z) return;
+  const sync=(u)=>{ if(u===playerUnit||!u._zb) return; let s=0; for(const b of u._zb)s+=Math.max(0,b.troops); u._zb=null;
+    if(s<1){ if(u.alive) destroy(u, u.team===playerUnit.team?(Z.foes.find(f=>f.alive)||playerUnit):playerUnit); } else u.troops=s; };
+  Z.allies.forEach(sync); Z.foes.forEach(sync);
+  if(playerUnit.troops<1 && playerUnit.alive) destroy(playerUnit, Z.foes.find(f=>f.alive)||Z.foes[0]||playerUnit);
+  zone=null; zoneCD=3.5; if(state==='play'){ document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden'); } }
+function zoneTap(sx,sy){ const b=zone.btn; if(b&&sx>=b.x&&sx<=b.x+b.w&&sy>=b.y&&sy<=b.y+b.h){ exitZone(); return; } zone.ltx=sx; zone.lty=sy; }
+function drawZone(){ const W=cv.width,H=cv.height,Lu=playerUnit; ctx.setTransform(1,0,0,1,0,0);
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#3a2e22'); g.addColorStop(1,'#26301f'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  for(const b of zone.blocks){ if(b.troops<=0)continue; const col=teamColor(b.team);
+    ctx.globalAlpha=0.26; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(b.x,b.y,ZBR,0,7); ctx.fill(); ctx.globalAlpha=1;
+    const cnt=Math.min(10,Math.max(3,Math.round(b.troops/55)));
+    for(let k=0;k<cnt;k++){ const a=k*2.39+zone.t*2.2, rr=ZBR*(0.35+0.5*((k*7%5)/5)); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(b.x+Math.cos(a)*rr,b.y+Math.sin(a*1.27)*rr,2.1,0,7); ctx.fill(); } }
+  if(Lu.alive){ if(zone.ltx!=null){ ctx.setLineDash([5,5]); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(zone.lx,zone.ly); ctx.lineTo(zone.ltx,zone.lty); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(zone.lx,zone.ly,ZLR+3,0,7); ctx.fill(); ctx.fillStyle=teamColor(Lu.team); ctx.beginPath(); ctx.arc(zone.lx,zone.ly,ZLR,0,7); ctx.fill();
+    ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineWidth=3; ctx.strokeStyle='#000'; ctx.strokeText(fmt(Lu.troops),zone.lx,zone.ly-ZLR-9); ctx.fillStyle='#fff'; ctx.fillText(fmt(Lu.troops),zone.lx,zone.ly-ZLR-9); }
+  let af=Lu.alive?Lu.troops:0,ff=0; for(const b of zone.blocks){ if(b.side===0)af+=b.troops; else ff+=b.troops; }
+  ctx.textBaseline='middle'; ctx.font='bold 14px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#9be7a0'; ctx.fillText('아군 '+fmt(af),12,22);
+  ctx.textAlign='right'; ctx.fillStyle='#fca5a5'; ctx.fillText('적 '+fmt(ff),W-12,22);
+  ctx.textAlign='center'; ctx.fillStyle='#ffd966'; ctx.font='bold 12px sans-serif'; ctx.fillText('⚔ 전술 전투 · 탭=이동',W/2,22);
+  const bw=88,bh=30,bx=W/2-bw/2,by=H-bh-8; zone.btn={x:bx,y:by,w:bw,h:bh}; ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(bx,by,bw,bh); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh); ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textBaseline='middle'; ctx.fillText('⮜ 후퇴',W/2,by+bh/2); }
+function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
+  if(state==='play'){ if(zone){ updateZone(dt); } else { update(dt); updateHUD(); } }
+  draw(); if(state!=='end') requestAnimationFrame(loop); }
 const list=document.getElementById('factionList');
 FACTIONS.forEach((f,i)=>{ const b=document.createElement('button'); b.className='fbtn'; b.style.background=f.color; b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff'; b.innerHTML=f.name+'<small>영웅: '+f.hero+'</small>'; b.onclick=()=>startGame(i); list.appendChild(b); });
 resize();
