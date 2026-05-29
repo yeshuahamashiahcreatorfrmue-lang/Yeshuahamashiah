@@ -166,6 +166,9 @@ let bg=document.createElement('canvas'); bg.width=WORLD_W; bg.height=WORLD_H;
 let mm=document.createElement('canvas'); const MMW=110, MMH=Math.round(MMW*WORLD_H/WORLD_W); mm.width=MMW; mm.height=MMH;
 const TLS=0.5; // 영역 레이어 해상도(오프스크린, 점령 시에만 갱신)
 let terrLayer=document.createElement('canvas'); terrLayer.width=Math.round(WORLD_W*TLS); terrLayer.height=Math.round(WORLD_H*TLS);
+// 부드러운 국경: 셀당 1px 저해상 버퍼(소유색/국경)를 그린 뒤 보간 업스케일 → 픽셀 격자 제거
+let tFill=document.createElement('canvas'); tFill.width=GCOLS; tFill.height=GROWS;
+let tEdge=document.createElement('canvas'); tEdge.width=GCOLS; tEdge.height=GROWS;
 let terrCell=new Int16Array(GCOLS*GROWS); // 각 땅 셀이 속한 정착지 인덱스
 let regions=[];
 // 정착지별 영역(보로노이) 구축 + 영역 레이어 렌더(소유색 틴트 + 국경)
@@ -173,13 +176,21 @@ function buildTerritories(){ for(let cy=0;cy<GROWS;cy++)for(let cx=0;cx<GCOLS;cx
   if(grid[i]<2){ terrCell[i]=-1; continue; } const wx=cx*GCELL+GCELL/2, wy=cy*GCELL+GCELL/2;
   let bi=-1,bd=1e18; for(let k=0;k<castles.length;k++){ const dx=castles[k].x-wx,dy=castles[k].y-wy,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=k;} } terrCell[i]=bi; }
   renderTerritories(); }
-function renderTerritories(){ const g=terrLayer.getContext('2d'); g.clearRect(0,0,terrLayer.width,terrLayer.height); const cs=GCELL*TLS;
-  for(let cy=0;cy<GROWS;cy++)for(let cx=0;cx<GCOLS;cx++){ const i=cy*GCOLS+cx, s=terrCell[i]; if(s<0)continue; const ow=castles[s].owner;
-    if(ow>=0){ g.globalAlpha=0.17; g.fillStyle=teamColor(ow); g.fillRect(cx*cs,cy*cs,cs+1,cs+1); g.globalAlpha=1; }
-    const ri=(cx+1<GCOLS)?terrCell[i+1]:-2, di=(cy+1<GROWS)?terrCell[i+GCOLS]:-2;
-    g.fillStyle='rgba(18,12,8,0.55)';
-    if(ri!==s&&ri!==-1) g.fillRect((cx+1)*cs-1,cy*cs,1.5,cs+1);
-    if(di!==s&&di!==-1) g.fillRect(cx*cs,(cy+1)*cs-1,cs+1,1.5); }
+function renderTerritories(){
+  const fg=tFill.getContext('2d'), eg=tEdge.getContext('2d');
+  fg.clearRect(0,0,GCOLS,GROWS); eg.clearRect(0,0,GCOLS,GROWS);
+  const own=(i)=>{ const s=terrCell[i]; return s<0?-1:castles[s].owner; };
+  for(let cy=0;cy<GROWS;cy++)for(let cx=0;cx<GCOLS;cx++){ const i=cy*GCOLS+cx, ow=own(i); if(ow<0)continue;
+    fg.fillStyle=teamColor(ow); fg.fillRect(cx,cy,1,1);
+    // 국경: 상하좌우 이웃의 소유 세력이 다르면(물 제외) 경계 셀로 표시
+    let edge=false;
+    if(cx+1<GCOLS){ const n=own(i+1); if(n>=0&&n!==ow) edge=true; } if(!edge&&cx>0){ const n=own(i-1); if(n>=0&&n!==ow) edge=true; }
+    if(!edge&&cy+1<GROWS){ const n=own(i+GCOLS); if(n>=0&&n!==ow) edge=true; } if(!edge&&cy>0){ const n=own(i-GCOLS); if(n>=0&&n!==ow) edge=true; }
+    if(edge){ eg.fillStyle='#140e08'; eg.fillRect(cx,cy,1,1); } }
+  const g=terrLayer.getContext('2d'); g.clearRect(0,0,terrLayer.width,terrLayer.height);
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';            // 보간 업스케일=부드러운 국경
+  g.globalAlpha=0.20; g.drawImage(tFill,0,0,terrLayer.width,terrLayer.height); // 소유색 면(부드러운 그라데이션)
+  g.globalAlpha=0.55; g.drawImage(tEdge,0,0,terrLayer.width,terrLayer.height); // 국경 띠(부드럽게 번짐)
   g.globalAlpha=1; }
 function regionAt(wx,wy){ let bi=0,bd=1e18; for(let i=0;i<regions.length;i++){ const dx=regions[i].x-wx,dy=regions[i].y-wy,d=dx*dx+dy*dy; if(d<bd){bd=d;bi=i;} } return bi; }
 function terrAt(wx,wy){ const cx=Math.max(0,Math.min(GCOLS-1,(wx/GCELL)|0)), cy=Math.max(0,Math.min(GROWS-1,(wy/GCELL)|0)); return grid[cy*GCOLS+cx]; }
