@@ -77,7 +77,7 @@
 "use strict";
 // ============================================================ 데이터
 const FACTIONS = [
-  { name:"빛의 군단",   hero:"세라핌",  color:"#f5d442" },
+  { name:"예슈아한민족국", hero:"세라핌",  color:"#f5d442" },
   { name:"어둠의 결사", hero:"녹스",    color:"#a855f7" },
   { name:"불꽃 부족",   hero:"이그니스",color:"#f97316" },
   { name:"서리 왕국",   hero:"글라키",  color:"#38bdf8" },
@@ -321,7 +321,7 @@ const SHOP_ITEMS=[
   {ic:'🛡',name:'흉갑',desc:'받는 피해 -12%',price:60, apply:u=>u.gearDef=Math.max(0.4,(u.gearDef||1)*0.88)},
   {ic:'🐎',name:'준마',desc:'이동속도 +18%',price:50, apply:u=>u.gearSpd=Math.min(2.2,(u.gearSpd||1)*1.18)},
   {ic:'🍖',name:'군량',desc:'즉시 병력 +1800',price:40, apply:u=>u.troops=Math.min(capMaxOf(u.team),u.troops+1800)},
-  {ic:'✝️',name:'예슈아 성물',desc:'초당 병력회복 +12',price:90, apply:u=>u.gearRegen=(u.gearRegen||0)+12} ];
+  {ic:'🏥',name:'야전병원',desc:'초당 병력회복 +12',price:90, apply:u=>u.gearRegen=(u.gearRegen||0)+12} ];
 function nearestShop(){ if(!playerUnit||!playerUnit.alive||isShip(playerUnit)) return null; let best=null,bd=1e18;
   for(const c of castles){ if(c.owner<0)continue; const d=Math.hypot(c.x-playerUnit.x,c.y-playerUnit.y); if(d<c.r+55&&d<bd){bd=d;best=c;} } return best; }
 function tryOpenShop(){ const c=nearestShop(); if(c) openShop(c); }
@@ -364,8 +364,8 @@ function radiusOf(u){ if(isShip(u)||u.kind==='courier') return 10; return 8 + Ma
 const ATK_EXP=Math.log10(4.2), DEF_RATIO=0.5, COMBAT_RATE=0.5, TAC_ATK=1.42, TAC_DEF=0.23, ENC=0.2;
 const RANGED_RANGE=78, RANGED_K=0.7; // 궁병 원거리 포격 사거리/계수
 // 공통 병종 0~7 + 세력 특수병종 8~14(세력 f → 8+f, 팔방미인 올라운더)
-const TTYPE_NAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','성광기사','그림자밀정','화염투사','서리근위','거석수호','폭풍약탈자','강철친위'];
-const TTYPE_ICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','✝️','✨','🌑','🔥','❄️','🪨','🌊','⚙️'];
+const TTYPE_NAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','그림자밀정','화염투사','서리근위','거석수호','폭풍약탈자','강철친위'];
+const TTYPE_ICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','⛑️','⭐','🌑','🔥','❄️','🪨','🌊','⚙️'];
 function isRangedT(t){ return t===2||t===5||t===6; }   // 궁병·포병·자주포병=원거리
 function isHealerT(t){ return t===7; }                  // 예슈아대=회복 전담(비전투)
 function isSiegeT(t){ return t===5||t===6; }            // 포병류=공성(기갑 특효)
@@ -527,7 +527,7 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt; if(z
   if(train.on) processTrain(dt);   // 플레이어 라디얼 양성/발행
   shopTick(dt);                    // 금화 유통(개인↔가게, 개인 간 거래)
   if(playerUnit.alive){ playerUnit.coin=(playerUnit.coin||0)+(3+(TS[playerIdx]?TS[playerIdx].towns:0))*dt; // 예슈아화 수입(지도자 봉록)
-    if(playerUnit.gearRegen) playerUnit.troops=Math.min(capMaxOf(playerIdx), playerUnit.troops+playerUnit.gearRegen*dt); } // 성물 회복
+    if(playerUnit.gearRegen) playerUnit.troops=Math.min(capMaxOf(playerIdx), playerUnit.troops+playerUnit.gearRegen*dt); } // 야전병원 회복
   checkEnd();
 }
 // 양성 결과 병력을 같은 병종 아군 부대에 합류(없으면 정착지서 스폰, 상한 ARMY_CAP)
