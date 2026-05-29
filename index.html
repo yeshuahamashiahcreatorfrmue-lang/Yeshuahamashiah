@@ -197,7 +197,7 @@ function startGame(idx){ playerIdx=idx; state='play'; units=[]; gold=new Array(N
       units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:2800}));
       let nx=-1,nd=1e9; for(let i=0;i<castles.length;i++){if(castles[i].owner>=0)continue;const d=(castles[i].x-c.x)**2+(castles[i].y-c.y)**2;if(d<nd){nd=d;nx=i;}}
       if(nx>=0){castles[nx].owner=EVIL;castles[nx].fort=Math.max(castles[nx].fort,2);} } }
-  lord=units.find(u=>u.team===idx&&u.kind==='faction'); lord.kind='lord';
+  lord=units.find(u=>u.team===idx&&u.kind==='faction'); lord.kind='lord'; gStart=now;
   buildTerritory();
   document.getElementById('start').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden');
   cam.zoom=clamp(VW()/640,camMin(),2.4); cam.x=lord.x-VW()/cam.zoom/2; cam.y=lord.y-VH()/cam.zoom/2; clampCam(); }
@@ -235,7 +235,7 @@ function destroy(dead,killer){ dead.alive=false; dead.troops=0;
   if(dead===lord){ endGame(false); } }
 
 // ===== 업데이트 =====
-let aiT=0,terrT=0,navalT=0,upT=0;
+let aiT=0,terrT=0,navalT=0,upT=0,gStart=0;
 function aiUpgrade(){ for(let t=0;t<NF;t++){ if(t===playerIdx||t===RISE||!isPower(t))continue; let g=gold[t]||0; const towns=castles.filter(c=>c.owner===t); if(!towns.length)continue;
   for(const c of towns){ if(g>=COST.farm(c.farm)&&c.farm<=c.barr){g-=COST.farm(c.farm);c.farm++;} else if(g>=COST.barr(c.barr)){g-=COST.barr(c.barr);c.barr++;} }
   const coast=towns.find(c=>c.coastal&&!c.port); if(coast&&g>=COST.port&&Math.random()<.5){g-=COST.port;coast.port=true;}
@@ -522,7 +522,7 @@ addEventListener('wheel',e=>{if(zone)return;const w=s2w(e.clientX,e.clientY);cam
 el('shopBtn').addEventListener('click',()=>{const c=nearestShop();if(c)openShop(c);});
 
 // ===== 게임오버 =====
-function endGame(win){ if(state==='over')return; state='over'; el('overT').textContent=win?'👑 통일':'💀 패배'; el('overD').textContent=win?'대륙을 통일했습니다!':'영주가 쓰러졌습니다…'; el('over').classList.remove('hidden'); el('hud').classList.add('hidden'); el('shopBtn').classList.add('hidden'); closePanel(); }
+function endGame(win){ if(state==='over')return; state='over'; const secs=Math.round(now-gStart); el('overT').textContent=win?'👑 통일':'💀 패배'; el('overD').textContent=(win?'대륙을 통일했습니다!':'영주가 쓰러졌습니다…')+` · 생존 ${secs}초 · 보유 성 ${ownedCount(playerIdx)}`; el('over').classList.remove('hidden'); el('hud').classList.add('hidden'); el('shopBtn').classList.add('hidden'); closePanel(); }
 
 // ===== 시작화면 / 루프 =====
 function buildMenu(){ const fl=el('fl'); for(let i=0;i<PLAY;i++){const f=FACTIONS[i];const b=document.createElement('button');b.className='fb';b.style.background=f.color;b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';b.innerHTML=(f.crest?'✦ ':'')+f.name+'<small>영웅 '+f.hero+' — '+f.desc+'</small>';b.onclick=()=>startGame(i);fl.appendChild(b);} }
