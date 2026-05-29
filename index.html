@@ -3,37 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>7세력 전쟁 — RTS RPG</title>
+<title>7세력 전쟁 — 월드맵 RTS RPG</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
-  html,body { width:100%; height:100%; overflow:hidden; background:#0b0e14;
+  html,body { width:100%; height:100%; overflow:hidden; background:#05070c;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
   #game { display:block; position:absolute; left:0; top:0; touch-action:none; }
 
   .overlay { position:absolute; inset:0; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:16px; padding:24px;
-    background:rgba(8,10,18,0.92); color:#eef; text-align:center; z-index:10; }
-  .overlay h1 { font-size:24px; letter-spacing:1px; }
+    align-items:center; justify-content:center; gap:14px; padding:22px;
+    background:rgba(5,7,12,0.94); color:#eef; text-align:center; z-index:10; overflow:auto; }
+  .overlay h1 { font-size:23px; letter-spacing:1px; }
   .overlay h2 { font-size:30px; }
-  .overlay p { font-size:14px; color:#9aa; line-height:1.6; max-width:340px; }
-  .factions { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; width:100%; max-width:360px; }
-  .fbtn { padding:12px; border:none; border-radius:12px; color:#fff; font-size:15px;
-    font-weight:700; cursor:pointer; box-shadow:0 3px 0 rgba(0,0,0,0.35); }
-  .fbtn small { display:block; font-size:11px; font-weight:400; opacity:0.85; margin-top:3px; }
-  .btn { padding:14px 30px; border:none; border-radius:14px; background:#3b82f6;
-    color:#fff; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 3px 0 #1d4ed8; }
+  .overlay p { font-size:13px; color:#9aa; line-height:1.6; max-width:360px; }
+  .factions { display:grid; grid-template-columns:repeat(2,1fr); gap:9px; width:100%; max-width:360px; }
+  .fbtn { padding:11px; border:none; border-radius:11px; color:#fff; font-size:14px;
+    font-weight:700; cursor:pointer; box-shadow:0 3px 0 rgba(0,0,0,0.4); }
+  .fbtn small { display:block; font-size:10px; font-weight:400; opacity:0.85; margin-top:2px; }
+  .btn { padding:13px 28px; border:none; border-radius:13px; background:#3b82f6;
+    color:#fff; font-size:16px; font-weight:700; cursor:pointer; box-shadow:0 3px 0 #1d4ed8; }
 
-  #hud { position:absolute; left:0; top:0; right:0; padding:8px 12px;
+  #hud { position:absolute; left:0; top:0; right:0; padding:7px 10px;
     display:flex; justify-content:space-between; align-items:flex-start;
-    color:#fff; font-size:12px; pointer-events:none; z-index:5;
-    text-shadow:0 1px 2px #000; }
-  #hud .panel { background:rgba(10,14,24,0.55); padding:7px 10px; border-radius:10px; }
-  #barWrap { width:120px; height:6px; background:#333; border-radius:4px; margin-top:4px; overflow:hidden; }
-  #hpBar { height:100%; width:100%; background:#34d399; }
-  #xpBar { height:100%; width:0%; background:#fbbf24; }
+    color:#fff; font-size:12px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; }
+  #hud .panel { background:rgba(8,12,20,0.6); padding:6px 9px; border-radius:9px; }
+  .bar { width:118px; height:6px; background:#333; border-radius:4px; margin-top:3px; overflow:hidden; }
   .lab { color:#9ab; font-size:10px; }
-  #hint { position:absolute; left:0; right:0; bottom:14px; text-align:center;
-    color:#cde; font-size:12px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; }
+  #hint { position:absolute; left:0; right:0; bottom:12px; text-align:center;
+    color:#cde; font-size:11px; pointer-events:none; z-index:5; text-shadow:0 1px 2px #000; }
   .hidden { display:none !important; }
 </style>
 </head>
@@ -43,22 +40,23 @@
 <div id="hud" class="hidden">
   <div class="panel">
     <div id="heroName">영웅</div>
-    <div class="lab">HP</div><div id="barWrap"><div id="hpBar"></div></div>
-    <div class="lab" style="margin-top:3px">EXP (Lv <span id="lvl">1</span>)</div>
-    <div id="barWrap" style="background:#333;width:120px;height:6px;border-radius:4px;margin-top:4px;overflow:hidden"><div id="xpBar"></div></div>
+    <div class="lab">HP</div><div class="bar"><div id="hpBar" style="height:100%;width:100%;background:#34d399"></div></div>
+    <div class="lab" style="margin-top:2px">EXP (Lv <span id="lvl">1</span>)</div>
+    <div class="bar"><div id="xpBar" style="height:100%;width:0;background:#fbbf24"></div></div>
   </div>
   <div class="panel" style="text-align:right">
     <div>⚔️ 병사 <span id="troops">0</span></div>
-    <div>🏰 거점 <span id="bases">0</span>/7</div>
+    <div>🏰 성 <span id="castles">0</span>/<span id="castTot">0</span></div>
+    <div id="alive" style="color:#9ab"></div>
     <div id="clock" style="color:#9ab"></div>
   </div>
 </div>
-<div id="hint" class="hidden">탭: 이동 · 적/거점 탭: 공격·점령</div>
+<div id="hint" class="hidden">한 손가락 드래그=지도 이동 · 두 손가락=확대 · 탭=이동/적 탭=공격</div>
 
 <div id="startScreen" class="overlay">
-  <h1>⚔️ 7세력 전쟁 ⚔️</h1>
-  <p>7개 세력, 7명의 영웅이 한 전장에서 충돌한다.<br>
-     부대를 이끌고 거점을 점령하라. 모든 거점을 차지하면 승리!</p>
+  <h1>⚔️ 7세력 전쟁 · 월드맵 ⚔️</h1>
+  <p>7세력 · 충성 개인 7 · 무소속 7, 총 <b>21명의 플레이어</b>가 한 대륙에서 패권을 다툰다.<br>
+     무소속은 누구의 편도 아니다 — 스스로 성을 차지하는 독립 군주.</p>
   <p style="color:#cde">플레이할 세력을 고르세요</p>
   <div class="factions" id="factionList"></div>
 </div>
@@ -70,310 +68,413 @@
 </div>
 
 <script>
-// ====== 세력 & 영웅 데이터 ======
+"use strict";
+// ============================================================
+// 데이터
+// ============================================================
 const FACTIONS = [
-  { name:"빛의 군단",   hero:"세라핌",  color:"#f5d442", glow:"#fff3b0" },
-  { name:"어둠의 결사", hero:"녹스",    color:"#a855f7", glow:"#d8b4fe" },
-  { name:"불꽃 부족",   hero:"이그니스",color:"#f97316", glow:"#fdba74" },
-  { name:"서리 왕국",   hero:"글라키",  color:"#38bdf8", glow:"#bae6fd" },
-  { name:"대지 연맹",   hero:"테라",    color:"#84cc16", glow:"#d9f99d" },
-  { name:"폭풍 해적단", hero:"마엘",    color:"#3b82f6", glow:"#93c5fd" },
-  { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8", glow:"#e2e8f0" },
+  { name:"빛의 군단",   hero:"세라핌",  color:"#f5d442" },
+  { name:"어둠의 결사", hero:"녹스",    color:"#a855f7" },
+  { name:"불꽃 부족",   hero:"이그니스",color:"#f97316" },
+  { name:"서리 왕국",   hero:"글라키",  color:"#38bdf8" },
+  { name:"대지 연맹",   hero:"테라",    color:"#84cc16" },
+  { name:"폭풍 해적단", hero:"마엘",    color:"#3b82f6" },
+  { name:"강철 제국",   hero:"펠릭스",  color:"#94a3b8" },
+];
+const LOYAL_NAMES = ["근위대장 로엔","흑기사 가웨인","화염장군 드라코","서리검 한","대지수호 메이","해적두목 발드","강철검성 유리"];
+const INDEP_NAMES = ["떠돌이검객 카인","현상금사냥꾼 리라","방랑술사 오브","용병대장 그렌","그림자도적 시프","야만전사 보르","점성술사 셀레네"];
+const INDEP_COLORS= ["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
+
+// 월드
+const WORLD_W=1120, WORLD_H=1680;
+const CELL=20, COLS=Math.ceil(WORLD_W/CELL), ROWS=Math.ceil(WORLD_H/CELL);
+
+// 지형 정의 (색 / 이동속도 배율 / 이름)
+const TERR=[
+  {c:"#163a5c",spd:0.40}, //0 바다
+  {c:"#2a6f9e",spd:0.60}, //1 강/얕은물
+  {c:"#d6bf78",spd:0.85}, //2 사막
+  {c:"#aebd6e",spd:1.18}, //3 평지
+  {c:"#5a9a4f",spd:1.00}, //4 초원
+  {c:"#6a5c3c",spd:0.58}, //5 진흙
+  {c:"#7c746a",spd:0.55}, //6 산맥
+  {c:"#cdd7e2",spd:0.70}, //7 설산
 ];
 
-// 월드 좌표 (세로 모바일)
-const W = 720, H = 1280;
-const BASE_POS = [
-  {x:360,y:1150},{x:130,y:980},{x:590,y:980},
-  {x:360,y:690},{x:130,y:380},{x:590,y:380},{x:360,y:140},
-];
-
-const cv = document.getElementById('game');
-const ctx = cv.getContext('2d');
-let scale=1, offX=0, offY=0;
-
-function resize(){
-  const ww=window.innerWidth, wh=window.innerHeight;
-  scale=Math.min(ww/W, wh/H);
-  offX=(ww-W*scale)/2; offY=(wh-H*scale)/2;
-  cv.width=ww; cv.height=wh;
+// ============================================================
+// 캔버스 & 카메라
+// ============================================================
+const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+let cam={x:0,y:0,zoom:1}, minZoom=0.2, maxZoom=2.6;
+function resize(){ cv.width=window.innerWidth; cv.height=window.innerHeight;
+  minZoom=Math.min(cv.width/WORLD_W, cv.height/WORLD_H); clampCam(); }
+window.addEventListener('resize',resize);
+function clampCam(){
+  cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom));
+  const vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
+  cam.x = vw>=WORLD_W ? (WORLD_W-vw)/2 : Math.max(0,Math.min(WORLD_W-vw,cam.x));
+  cam.y = vh>=WORLD_H ? (WORLD_H-vh)/2 : Math.max(0,Math.min(WORLD_H-vh,cam.y));
 }
-window.addEventListener('resize',resize); resize();
-function toWorld(sx,sy){ return { x:(sx-offX)/scale, y:(sy-offY)/scale }; }
+function s2w(sx,sy){ return { x:sx/cam.zoom+cam.x, y:sy/cam.zoom+cam.y }; }
 
-// ====== 게임 상태 ======
-let state='select', playerIdx=0, armies=[], bases=[], elapsed=0, lastT=0;
+// ============================================================
+// 지형 생성 (값 노이즈) + 오프스크린 렌더 (최적화 핵심)
+// ============================================================
+function hash2(ix,iy){ let n=(Math.imul(ix,374761393)+Math.imul(iy,668265263))|0;
+  n=Math.imul(n^(n>>>13),1274126177); return ((n^(n>>>16))>>>0)/4294967295; }
+function smooth(t){ return t*t*(3-2*t); }
+function vnoise(x,y){
+  const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0;
+  const a=hash2(x0,y0),b=hash2(x0+1,y0),c=hash2(x0,y0+1),d=hash2(x0+1,y0+1);
+  const u=smooth(fx),v=smooth(fy);
+  return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;
+}
+function fbm(x,y){ let s=0,a=0.5,f=1; for(let i=0;i<4;i++){ s+=a*vnoise(x*f,y*f); f*=2; a*=0.5; } return s/0.9375; }
+function smoothstep(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
 
-function makeArmy(i){
-  const f=FACTIONS[i], p=BASE_POS[i];
-  return {
-    id:i, name:f.hero, color:f.color, glow:f.glow,
-    x:p.x, y:p.y, tx:p.x, ty:p.y,
-    troops:24, alive:true,
-    lvl:1, xp:0, xpNeed:100,
-    hp:120, maxHp:120, atk:12,
-    targetArmy:null, attackMove:false,
-    capProg:0, capBase:-1,
-  };
+let grid=new Uint8Array(COLS*ROWS);
+let bg=document.createElement('canvas'); bg.width=WORLD_W; bg.height=WORLD_H;
+
+function genWorld(){
+  const ox=Math.random()*1000, oy=Math.random()*1000;
+  const bx=bg.getContext('2d');
+  for(let cy=0;cy<ROWS;cy++) for(let cx=0;cx<COLS;cx++){
+    const wx=cx*CELL+CELL/2, wy=cy*CELL+CELL/2;
+    let e=fbm(wx/300+ox, wy/300+oy);
+    const m=fbm(wx/210+oy+50, wy/210+ox+50);
+    // 가장자리는 바다로 가라앉힘 → 대륙 형태
+    const ex=Math.abs(wx/WORLD_W*2-1), ey=Math.abs(wy/WORLD_H*2-1);
+    e -= smoothstep(0.52,1.0,Math.max(ex,ey))*0.6;
+    let t;
+    if(e<0.30) t=0;            // 바다
+    else if(e<0.355) t=1;      // 강/물가
+    else if(e>0.80) t=7;       // 설산
+    else if(e>0.69) t=6;       // 산맥
+    else if(m<0.33) t=2;       // 사막
+    else if(m<0.46) t=3;       // 평지
+    else if(m<0.70) t=4;       // 초원
+    else t=5;                  // 진흙
+    grid[cy*COLS+cx]=t;
+    // 셀별 밝기 지터로 자연스러운 질감
+    const base=TERR[t].c, j=(hash2(cx*7+1,cy*13+3)-0.5)*22;
+    bx.fillStyle=shade(base,j);
+    bx.fillRect(cx*CELL,cy*CELL,CELL+1,CELL+1);
+  }
+  // 강줄기 한두 개 (얇게)
+  drawRiver(bx,ox,oy);
+}
+function shade(hex,d){
+  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  r=Math.max(0,Math.min(255,r+d)); g=Math.max(0,Math.min(255,g+d)); b=Math.max(0,Math.min(255,b+d));
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+function drawRiver(bx,ox,oy){
+  bx.strokeStyle=TERR[1].c; bx.lineWidth=10; bx.lineCap='round';
+  for(let k=0;k<2;k++){
+    let x=WORLD_W*(0.3+0.4*Math.random()), y=20; bx.beginPath(); bx.moveTo(x,y);
+    while(y<WORLD_H){ y+=24; x+=Math.sin((y+k*300)/120+ox)*16; x=Math.max(20,Math.min(WORLD_W-20,x));
+      bx.lineTo(x,y);
+      const cx=Math.floor(x/CELL),cy=Math.floor(y/CELL);
+      if(cx>=0&&cx<COLS&&cy>=0&&cy<ROWS&&grid[cy*COLS+cx]!==0) grid[cy*COLS+cx]=1;
+    }
+    bx.stroke();
+  }
+}
+function terrAt(wx,wy){
+  const cx=Math.max(0,Math.min(COLS-1,Math.floor(wx/CELL)));
+  const cy=Math.max(0,Math.min(ROWS-1,Math.floor(wy/CELL)));
+  return grid[cy*COLS+cx];
+}
+function isLand(wx,wy){ return terrAt(wx,wy)>=2; }
+function randLand(){
+  for(let i=0;i<400;i++){ const x=40+Math.random()*(WORLD_W-80), y=40+Math.random()*(WORLD_H-80);
+    if(terrAt(x,y)>=2) return {x,y}; }
+  return {x:WORLD_W/2,y:WORLD_H/2};
+}
+
+// ============================================================
+// 게임 상태
+// ============================================================
+let state='select', playerIdx=0, units=[], castles=[], playerUnit=null;
+let elapsed=0, lastT=0, aiTimer=0, ended=false;
+
+// 팀 규칙: 0~6 = 세력(소속 충성개인도 같은 팀). 100+i = 무소속(각자 단독 팀)
+function teamColor(team){ if(team<0) return '#8a93a3'; if(team<7) return FACTIONS[team].color; return INDEP_COLORS[team-100]; }
+
+function makeUnit(o){ return Object.assign({
+  x:0,y:0,tx:0,ty:0, alive:true, troops:20, lvl:1,xp:0,xpNeed:100,
+  hp:100,maxHp:100,atk:10, targetU:null, capProg:0, capC:null, capMax:250
+},o); }
+
+function pickHomes(list,n){ // 가장 멀리 퍼진 n개 (farthest-point)
+  const chosen=[0];
+  while(chosen.length<n){
+    let bi=-1,bd=-1;
+    for(let i=0;i<list.length;i++){ if(chosen.includes(i))continue;
+      let md=1e9; for(const c of chosen) md=Math.min(md,Math.hypot(list[i].x-list[c].x,list[i].y-list[c].y));
+      if(md>bd){bd=md;bi=i;} }
+    chosen.push(bi);
+  }
+  return chosen;
 }
 
 function startGame(idx){
-  playerIdx=idx;
-  armies=FACTIONS.map((_,i)=>makeArmy(i));
-  bases=BASE_POS.map((p,i)=>({x:p.x,y:p.y,owner:i,r:34}));
-  elapsed=0; state='play'; lastT=performance.now();
+  playerIdx=idx; genWorld();
+  // 성 배치: 후보 땅 셀에서 최소거리 유지하며 그리디 선택
+  castles=[]; const cand=[];
+  for(let i=0;i<600;i++){ const p=randLand(); cand.push(p); }
+  for(const p of cand){ if(castles.length>=17)break;
+    if(castles.every(c=>Math.hypot(c.x-p.x,c.y-p.y)>200)) castles.push({x:p.x,y:p.y,r:30,owner:-1}); }
+  // 세력 본성 7개 (멀리 퍼진 것)
+  const homeIdx=pickHomes(castles,7);
+  homeIdx.forEach((ci,f)=>castles[ci].owner=f);
+
+  // 유닛 생성
+  units=[];
+  // 세력 군대 7 + 충성 개인 7
+  homeIdx.forEach((ci,f)=>{
+    const h=castles[ci];
+    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,
+      color:FACTIONS[f].color, x:h.x,y:h.y,tx:h.x,ty:h.y,
+      troops:38,hp:150,maxHp:150,atk:15,capMax:250}));
+    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,
+      color:FACTIONS[f].color, x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,
+      troops:16,hp:85,maxHp:85,atk:9,capMax:130}));
+  });
+  // 무소속 7 (각자 단독, 땅 위 랜덤)
+  for(let i=0;i<7;i++){ const p=randLand();
+    units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',
+      color:INDEP_COLORS[i], x:p.x,y:p.y,tx:p.x,ty:p.y,
+      troops:20,hp:95,maxHp:95,atk:11,capMax:150})); }
+
+  playerUnit=units.find(u=>u.kind==='faction'&&u.team===idx);
+  // 카메라: 플레이어 중심, 살짝 확대
+  cam.zoom=Math.min(maxZoom,minZoom*1.7);
+  cam.x=playerUnit.x-cv.width/cam.zoom/2; cam.y=playerUnit.y-cv.height/cam.zoom/2; clampCam();
+
+  elapsed=0; ended=false; state='play'; lastT=performance.now();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('hint').classList.remove('hidden');
-  document.getElementById('heroName').textContent=FACTIONS[idx].name+" · "+FACTIONS[idx].hero;
+  document.getElementById('heroName').textContent=FACTIONS[idx].name+' · '+FACTIONS[idx].hero;
+  document.getElementById('castTot').textContent=castles.length;
   requestAnimationFrame(loop);
 }
 
-// ====== 입력 ======
-function handleTap(sx,sy){
-  if(state!=='play') return;
-  const me=armies[playerIdx]; if(!me.alive) return;
-  const w=toWorld(sx,sy);
-  // 적 부대 클릭?
-  let target=null, best=44;
-  for(const a of armies){
-    if(a.id===playerIdx||!a.alive) continue;
-    const d=Math.hypot(a.x-w.x,a.y-w.y);
-    if(d<best){ best=d; target=a; }
-  }
-  if(target){ me.targetArmy=target; me.attackMove=true; me.tx=target.x; me.ty=target.y; return; }
-  // 그 외: 이동 (거점도 이동으로 처리되며 도착 시 자동 점령)
-  me.targetArmy=null; me.attackMove=false;
-  me.tx=Math.max(20,Math.min(W-20,w.x));
-  me.ty=Math.max(20,Math.min(H-20,w.y));
-}
-cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];handleTap(t.clientX,t.clientY);},{passive:false});
-cv.addEventListener('mousedown',e=>handleTap(e.clientX,e.clientY));
+// ============================================================
+// 입력 (드래그=이동, 핀치/휠=줌, 탭=명령)
+// ============================================================
+let drag={on:false,moved:false,lx:0,ly:0,sx:0,sy:0,st:0};
+let pinch={on:false,d:0};
+function dist2(a,b){ return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); }
 
-// ====== AI ======
-function aiThink(a){
-  if(!a.alive) return;
+cv.addEventListener('touchstart',e=>{ e.preventDefault();
+  if(e.touches.length===1){ const t=e.touches[0];
+    drag={on:true,moved:false,lx:t.clientX,ly:t.clientY,sx:t.clientX,sy:t.clientY,st:performance.now()}; pinch.on=false; }
+  else if(e.touches.length===2){ pinch={on:true,d:dist2(e.touches[0],e.touches[1])}; drag.on=false; }
+},{passive:false});
+cv.addEventListener('touchmove',e=>{ e.preventDefault();
+  if(pinch.on && e.touches.length>=2){ const nd=dist2(e.touches[0],e.touches[1]);
+    const fx=(e.touches[0].clientX+e.touches[1].clientX)/2, fy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+    zoomAt(fx,fy, nd/pinch.d); pinch.d=nd; }
+  else if(drag.on && e.touches.length===1){ const t=e.touches[0]; panBy(t.clientX-drag.lx,t.clientY-drag.ly);
+    if(Math.hypot(t.clientX-drag.sx,t.clientY-drag.sy)>10) drag.moved=true; drag.lx=t.clientX; drag.ly=t.clientY; }
+},{passive:false});
+cv.addEventListener('touchend',e=>{ e.preventDefault();
+  if(drag.on && !drag.moved && performance.now()-drag.st<320 && e.touches.length===0) tap(drag.sx,drag.sy);
+  if(e.touches.length===0){ drag.on=false; pinch.on=false; }
+},{passive:false});
+
+// 데스크톱
+cv.addEventListener('mousedown',e=>{ drag={on:true,moved:false,lx:e.clientX,ly:e.clientY,sx:e.clientX,sy:e.clientY,st:performance.now()}; });
+cv.addEventListener('mousemove',e=>{ if(drag.on){ panBy(e.clientX-drag.lx,e.clientY-drag.ly);
+  if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6) drag.moved=true; drag.lx=e.clientX; drag.ly=e.clientY; } });
+cv.addEventListener('mouseup',e=>{ if(drag.on && !drag.moved) tap(e.clientX,e.clientY); drag.on=false; });
+cv.addEventListener('wheel',e=>{ e.preventDefault(); zoomAt(e.clientX,e.clientY, e.deltaY<0?1.12:0.89); },{passive:false});
+
+function panBy(dx,dy){ cam.x-=dx/cam.zoom; cam.y-=dy/cam.zoom; clampCam(); }
+function zoomAt(fx,fy,factor){ const w=s2w(fx,fy); cam.zoom=Math.max(minZoom,Math.min(maxZoom,cam.zoom*factor));
+  cam.x=w.x-fx/cam.zoom; cam.y=w.y-fy/cam.zoom; clampCam(); }
+
+function tap(sx,sy){ if(state!=='play'||!playerUnit.alive) return;
+  const w=s2w(sx,sy);
+  let target=null,best=40/cam.zoom;
+  for(const u of units){ if(!u.alive||u.team===playerUnit.team) continue;
+    const d=Math.hypot(u.x-w.x,u.y-w.y); if(d<best){best=d;target=u;} }
+  if(target){ playerUnit.targetU=target; playerUnit.tx=target.x; playerUnit.ty=target.y; }
+  else { playerUnit.targetU=null; playerUnit.tx=Math.max(10,Math.min(WORLD_W-10,w.x)); playerUnit.ty=Math.max(10,Math.min(WORLD_H-10,w.y)); }
+}
+
+// ============================================================
+// 시뮬레이션
+// ============================================================
+function radius(u){ return 9+Math.min(15,u.troops/9); }
+function power(u){ return u.troops+u.atk+u.lvl*4; }
+
+function ai(u){
+  if(u===playerUnit) return;
   // 교전 중이면 유지
-  if(a.targetArmy && a.targetArmy.alive && Math.hypot(a.targetArmy.x-a.x,a.targetArmy.y-a.y)<60){
-    a.tx=a.targetArmy.x; a.ty=a.targetArmy.y; return;
-  }
-  a.targetArmy=null; a.attackMove=false;
-  // 자기 소유가 아닌 가장 가까운 거점으로
-  let tb=null, bd=1e9;
-  for(const b of bases){
-    if(b.owner===a.id) continue;
-    const d=Math.hypot(b.x-a.x,b.y-a.y);
-    if(d<bd){ bd=d; tb=b; }
-  }
-  // 근처에 약한 적 부대가 있으면 공격
-  let weak=null, wd=260;
-  for(const o of armies){
-    if(o.id===a.id||!o.alive) continue;
-    const d=Math.hypot(o.x-a.x,o.y-a.y);
-    if(d<wd && (o.troops+o.lvl*3) < (a.troops+a.lvl*3)*1.15){ wd=d; weak=o; }
-  }
-  if(weak){ a.targetArmy=weak; a.attackMove=true; a.tx=weak.x; a.ty=weak.y; }
-  else if(tb){ a.tx=tb.x; a.ty=tb.y; }
+  if(u.targetU && u.targetU.alive && u.targetU.team!==u.team && Math.hypot(u.targetU.x-u.x,u.targetU.y-u.y)<70){
+    u.tx=u.targetU.x; u.ty=u.targetU.y; return; }
+  u.targetU=null;
+  // 근처 약한 적 공격
+  let weak=null,wd=300;
+  for(const o of units){ if(!o.alive||o.team===u.team) continue;
+    const d=Math.hypot(o.x-u.x,o.y-u.y);
+    if(d<wd && power(o)<power(u)*1.1){ wd=d; weak=o; } }
+  // 내 팀 소유 아닌 가장 가까운 성
+  let tc=null,cd=1e9;
+  for(const c of castles){ if(c.owner===u.team) continue;
+    const d=Math.hypot(c.x-u.x,c.y-u.y); if(d<cd){cd=d;tc=c;} }
+  if(weak && wd<180){ u.targetU=weak; u.tx=weak.x; u.ty=weak.y; }
+  else if(tc){ u.tx=tc.x; u.ty=tc.y; }
 }
-let aiTimer=0;
-
-// ====== 업데이트 ======
-function power(a){ return a.troops + a.atk + a.lvl*4; }
 
 function update(dt){
-  elapsed+=dt;
-  aiTimer-=dt;
-  if(aiTimer<=0){ aiTimer=0.6; for(const a of armies) if(a.id!==playerIdx) aiThink(a); }
+  elapsed+=dt; aiTimer-=dt;
+  if(aiTimer<=0){ aiTimer=0.5; for(const u of units) ai(u); }
 
-  // 이동
-  for(const a of armies){
-    if(!a.alive) continue;
-    const dx=a.tx-a.x, dy=a.ty-a.y, d=Math.hypot(dx,dy);
-    const sp=78*dt;
-    if(d>2){ const m=Math.min(sp,d); a.x+=dx/d*m; a.y+=dy/d*m; }
-  }
+  // 이동 (지형 속도 반영)
+  for(const u of units){ if(!u.alive) continue;
+    const dx=u.tx-u.x,dy=u.ty-u.y,d=Math.hypot(dx,dy);
+    if(d>2){ const sp=82*dt*TERR[terrAt(u.x,u.y)].spd, m=Math.min(sp,d);
+      u.x+=dx/d*m; u.y+=dy/d*m; } }
 
-  // 전투 (교전 거리 내 적끼리)
-  for(let i=0;i<armies.length;i++){
-    const A=armies[i]; if(!A.alive) continue;
-    for(let j=i+1;j<armies.length;j++){
-      const B=armies[j]; if(!B.alive) continue;
-      if(Math.hypot(A.x-B.x,A.y-B.y)<46){
-        fight(A,B,dt); fight(B,A,dt);
-      }
-    }
-  }
+  // 전투 (다른 팀끼리 근접 시)
+  for(let i=0;i<units.length;i++){ const A=units[i]; if(!A.alive)continue;
+    for(let j=i+1;j<units.length;j++){ const B=units[j]; if(!B.alive||B.team===A.team)continue;
+      if(Math.hypot(A.x-B.x,A.y-B.y)<radius(A)+radius(B)+8){ fight(A,B,dt); fight(B,A,dt); } } }
 
-  // 거점 점령 + 병력 보충
-  for(const a of armies){
-    if(!a.alive) continue;
-    let onEnemyBase=null;
-    for(const b of bases){
-      if(Math.hypot(b.x-a.x,b.y-a.y)<b.r){
-        if(b.owner!==a.id){
-          // 적 부대가 같은 거점에서 교전 중이면 점령 보류
-          let contested=false;
-          for(const o of armies){ if(o.alive&&o.id!==a.id&&Math.hypot(o.x-b.x,o.y-b.y)<b.r){contested=true;break;} }
-          if(!contested) onEnemyBase=b;
-        }
-      }
-    }
-    if(onEnemyBase){
-      if(a.capBase!==onEnemyBase){ a.capBase=onEnemyBase; a.capProg=0; }
-      a.capProg+=dt;
-      if(a.capProg>=2.0){ onEnemyBase.owner=a.id; a.capProg=0; a.capBase=-1; }
-    } else { a.capBase=-1; a.capProg=0; }
+  // 성 점령 + 병력/HP 보충
+  for(const u of units){ if(!u.alive) continue;
+    let onC=null;
+    for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r && c.owner!==u.team){
+      let contested=false;
+      for(const o of units){ if(o.alive&&o.team!==u.team&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){contested=true;break;} }
+      if(!contested){ onC=c; break; } } }
+    if(onC){ if(u.capC!==onC){u.capC=onC;u.capProg=0;} u.capProg+=dt;
+      if(u.capProg>=1.8){ onC.owner=u.team; u.capProg=0; u.capC=null; } }
+    else { u.capC=null; u.capProg=0; }
   }
-
-  // 거점 보충: 자기 거점 1개당 +0.7병사/초
-  for(const a of armies){
-    if(!a.alive) continue;
-    let owned=0; for(const b of bases) if(b.owner===a.id) owned++;
-    a.troops=Math.min(220, a.troops+owned*0.7*dt);
-    if(a.hp<a.maxHp) a.hp=Math.min(a.maxHp,a.hp+owned*1.5*dt);
-  }
+  // 팀 소유 성 1개당 보충
+  for(const u of units){ if(!u.alive) continue;
+    let owned=0; for(const c of castles) if(c.owner===u.team) owned++;
+    u.troops=Math.min(u.capMax,u.troops+owned*0.55*dt);
+    if(u.hp<u.maxHp) u.hp=Math.min(u.maxHp,u.hp+owned*1.2*dt); }
 
   checkEnd();
 }
 
 function fight(att,def,dt){
-  const dmg=power(att)*0.45*dt*(0.85+Math.random()*0.3);
-  if(def.troops>0.5){
-    def.troops-=dmg;
-    if(def.troops<0){ def.hp+=def.troops*4; def.troops=0; }
-  } else {
-    def.hp-=dmg*4;
-  }
-  if(def.hp<=0){ destroyArmy(def, att); }
+  const dmg=power(att)*0.42*dt*(0.85+Math.random()*0.3);
+  if(def.troops>0.5){ def.troops-=dmg; if(def.troops<0){ def.hp+=def.troops*4; def.troops=0; } }
+  else def.hp-=dmg*4;
+  if(def.hp<=0) destroy(def,att);
 }
-
-function destroyArmy(dead, killer){
+function destroy(dead,killer){
   dead.alive=false; dead.troops=0;
-  // 영웅 처치 보상
-  killer.xp+=60; killer.troops=Math.min(220,killer.troops+15);
-  while(killer.xp>=killer.xpNeed){
-    killer.xp-=killer.xpNeed; killer.lvl++;
-    killer.xpNeed=Math.round(killer.xpNeed*1.4);
-    killer.maxHp+=40; killer.hp=killer.maxHp; killer.atk+=6;
-  }
-  // 죽은 세력 거점은 중립화하지 않고 그대로 두되, 점령 가능
-  killer.targetArmy=null; killer.attackMove=false;
+  killer.xp+=50; killer.troops=Math.min(killer.capMax,killer.troops+12);
+  while(killer.xp>=killer.xpNeed){ killer.xp-=killer.xpNeed; killer.lvl++; killer.xpNeed=Math.round(killer.xpNeed*1.4);
+    killer.maxHp+=35; killer.hp=killer.maxHp; killer.atk+=5; }
+  killer.targetU=null;
 }
 
 function checkEnd(){
-  const me=armies[playerIdx];
-  let owned=0; for(const b of bases) if(b.owner===playerIdx) owned++;
-  if(!me.alive){ endGame(false,"당신의 영웅이 쓰러졌습니다…"); return; }
-  if(owned===bases.length){ endGame(true,`${FACTIONS[playerIdx].name}이(가) 전장을 통일했습니다!`); return; }
+  if(!playerUnit.alive){ endGame(false,"당신의 영웅이 쓰러졌습니다…"); return; }
+  let mine=0; for(const c of castles) if(c.owner===playerIdx) mine++;
+  if(mine===castles.length){ endGame(true,`${FACTIONS[playerIdx].name}이(가) 대륙을 통일했습니다!`); }
 }
-
-let ended=false;
-function endGame(win,msg){
-  if(ended) return; ended=true; state='end';
+function endGame(win,msg){ if(ended)return; ended=true; state='end';
   document.getElementById('endScreen').classList.remove('hidden');
-  document.getElementById('endTitle').textContent= win? "🏆 승리!" : "💀 패배";
+  document.getElementById('endTitle').textContent=win?"🏆 승리!":"💀 패배";
   document.getElementById('endMsg').textContent=msg+` (생존 ${elapsed.toFixed(0)}초)`;
 }
 
-// ====== 렌더 ======
+// ============================================================
+// 렌더
+// ============================================================
 function draw(){
-  ctx.save();
-  ctx.clearRect(0,0,cv.width,cv.height);
-  ctx.translate(offX,offY); ctx.scale(scale,scale);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#05070c'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.setTransform(cam.zoom,0,0,cam.zoom,-cam.x*cam.zoom,-cam.y*cam.zoom);
+  // 지형 (오프스크린 1장)
+  ctx.drawImage(bg,0,0);
+  // 화면 영역 (컬링용)
+  const vx=cam.x, vy=cam.y, vw=cv.width/cam.zoom, vh=cv.height/cam.zoom;
 
-  // 배경
-  ctx.fillStyle='#10151f'; ctx.fillRect(0,0,W,H);
-  // 격자
-  ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-  for(let x=0;x<=W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-  for(let y=0;y<=H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-
-  // 거점 간 연결선
-  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=2;
-  const links=[[0,1],[0,2],[1,3],[2,3],[3,4],[3,5],[4,6],[5,6],[1,2],[4,5]];
-  for(const[a,b]of links){ctx.beginPath();ctx.moveTo(bases[a].x,bases[a].y);ctx.lineTo(bases[b].x,bases[b].y);ctx.stroke();}
-
-  // 거점
-  for(const b of bases){
-    const c=FACTIONS[b.owner].color;
-    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7);
-    ctx.fillStyle='rgba(20,26,38,0.9)'; ctx.fill();
-    ctx.lineWidth=5; ctx.strokeStyle=c; ctx.stroke();
-    ctx.fillStyle=c; ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('🏰',b.x,b.y);
+  // 성
+  for(const c of castles){
+    if(c.x< vx-40||c.x>vx+vw+40||c.y<vy-40||c.y>vy+vh+40) continue;
+    const col=teamColor(c.owner);
+    ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,7); ctx.fillStyle='rgba(15,20,30,0.85)'; ctx.fill();
+    ctx.lineWidth=4; ctx.strokeStyle=col; ctx.stroke();
+    ctx.fillStyle=col; ctx.font='18px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🏰',c.x,c.y+1);
   }
+  // 점령 게이지
+  for(const u of units){ if(u.alive&&u.capC&&u.capProg>0){ const c=u.capC;
+    ctx.beginPath(); ctx.arc(c.x,c.y,c.r+5,-Math.PI/2,-Math.PI/2+(u.capProg/1.8)*Math.PI*2);
+    ctx.lineWidth=4; ctx.strokeStyle=u.color; ctx.stroke(); } }
 
-  // 점령 진행 표시
-  for(const a of armies){
-    if(a.alive && a.capBase && a.capBase!==-1 && a.capProg>0){
-      const b=a.capBase;
-      ctx.beginPath(); ctx.arc(b.x,b.y,b.r+6,-Math.PI/2,-Math.PI/2+ (a.capProg/2)*Math.PI*2);
-      ctx.lineWidth=4; ctx.strokeStyle=a.color; ctx.stroke();
-    }
-  }
+  // 플레이어 목표선
+  if(playerUnit.alive){ const u=playerUnit;
+    if(Math.abs(u.tx-u.x)>3||Math.abs(u.ty-u.y)>3){ ctx.setLineDash([7,7]);
+      ctx.beginPath(); ctx.moveTo(u.x,u.y); ctx.lineTo(u.tx,u.ty);
+      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); } }
 
-  // 부대
-  for(const a of armies){
-    if(!a.alive) continue;
-    const isMe=a.id===playerIdx;
-    // 이동 목표선 (내 부대만)
-    if(isMe && (Math.abs(a.tx-a.x)>3||Math.abs(a.ty-a.y)>3)){
-      ctx.beginPath(); ctx.setLineDash([6,6]); ctx.moveTo(a.x,a.y); ctx.lineTo(a.tx,a.ty);
-      ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]);
-    }
-    const rad=14+Math.min(16,a.troops/12);
-    // 글로우
-    ctx.beginPath(); ctx.arc(a.x,a.y,rad+6,0,7);
-    ctx.fillStyle=a.glow+'33'; ctx.fill();
-    // 본체
-    ctx.beginPath(); ctx.arc(a.x,a.y,rad,0,7);
-    ctx.fillStyle=a.color; ctx.fill();
-    ctx.lineWidth= isMe?3:2; ctx.strokeStyle= isMe?'#fff':'rgba(0,0,0,0.4)'; ctx.stroke();
+  // 유닛
+  for(const u of units){ if(!u.alive) continue;
+    if(u.x<vx-30||u.x>vx+vw+30||u.y<vy-30||u.y>vy+vh+30) continue;
+    const r=radius(u), me=(u===playerUnit);
+    ctx.lineWidth=me?3:1.5; ctx.strokeStyle=me?'#fff':'rgba(0,0,0,0.5)'; ctx.fillStyle=u.color;
+    if(u.kind==='faction'){ ctx.beginPath(); ctx.arc(u.x,u.y,r,0,7); ctx.fill(); ctx.stroke(); }
+    else if(u.kind==='loyal'){ poly(u.x,u.y,r,3,-Math.PI/2); ctx.fill(); ctx.stroke(); }
+    else { poly(u.x,u.y,r,4,0); ctx.fill(); ctx.stroke(); } // 무소속 = 다이아
     // 병사 수
-    ctx.fillStyle='#10151f'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(Math.ceil(a.troops),a.x,a.y);
-    // 영웅 HP 바
-    const bw=rad*2, hp=a.hp/a.maxHp;
-    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(a.x-bw/2,a.y-rad-9,bw,4);
-    ctx.fillStyle= hp>0.4?'#34d399':'#f87171'; ctx.fillRect(a.x-bw/2,a.y-rad-9,bw*hp,4);
-    // 이름표
-    ctx.fillStyle='#dbeafe'; ctx.font='10px sans-serif';
-    ctx.fillText('Lv'+a.lvl+' '+a.name, a.x, a.y+rad+11);
+    ctx.fillStyle='#0a0e16'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(Math.ceil(u.troops),u.x,u.y);
+    // HP 바
+    const bw=r*2,hp=u.hp/u.maxHp;
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(u.x-bw/2,u.y-r-7,bw,3.5);
+    ctx.fillStyle=hp>0.4?'#34d399':'#f87171'; ctx.fillRect(u.x-bw/2,u.y-r-7,bw*hp,3.5);
+    // 이름 (확대 시에만 → 최적화)
+    if(cam.zoom>0.55){ ctx.fillStyle='#dbeafe'; ctx.font='9px sans-serif';
+      ctx.fillText('Lv'+u.lvl+' '+u.name,u.x,u.y+r+9); }
   }
-
-  ctx.restore();
 }
+function poly(cx,cy,r,n,rot){ ctx.beginPath();
+  for(let i=0;i<n;i++){ const a=rot+i/n*Math.PI*2; const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.closePath(); }
 
-function updateHUD(){
-  const me=armies[playerIdx];
-  document.getElementById('hpBar').style.width=Math.max(0,me.hp/me.maxHp*100)+'%';
-  document.getElementById('xpBar').style.width=(me.xp/me.xpNeed*100)+'%';
-  document.getElementById('lvl').textContent=me.lvl;
-  document.getElementById('troops').textContent=Math.ceil(me.troops);
-  let owned=0; for(const b of bases) if(b.owner===playerIdx) owned++;
-  document.getElementById('bases').textContent=owned;
+function updateHUD(){ const u=playerUnit;
+  document.getElementById('hpBar').style.width=Math.max(0,u.hp/u.maxHp*100)+'%';
+  document.getElementById('xpBar').style.width=(u.xp/u.xpNeed*100)+'%';
+  document.getElementById('lvl').textContent=u.lvl;
+  document.getElementById('troops').textContent=Math.ceil(u.troops);
+  let mine=0; for(const c of castles) if(c.owner===playerIdx) mine++;
+  document.getElementById('castles').textContent=mine;
+  const fac=units.filter(x=>x.alive&&x.kind==='faction').length;
+  const ind=units.filter(x=>x.alive&&x.kind==='indep').length;
+  document.getElementById('alive').textContent=`세력 ${fac} · 무소속 ${ind}`;
   document.getElementById('clock').textContent=elapsed.toFixed(0)+'s';
 }
 
-// ====== 루프 ======
-function loop(t){
-  const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
+// ============================================================
+// 루프
+// ============================================================
+function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t;
   if(state==='play'){ update(dt); updateHUD(); }
   draw();
-  if(state!=='end') requestAnimationFrame(loop);
-  else draw();
-}
+  if(state!=='end') requestAnimationFrame(loop); }
 
-// ====== 세력 선택 UI ======
+// 세력 선택 UI
 const list=document.getElementById('factionList');
-FACTIONS.forEach((f,i)=>{
-  const b=document.createElement('button');
+FACTIONS.forEach((f,i)=>{ const b=document.createElement('button');
   b.className='fbtn'; b.style.background=f.color;
-  b.style.color = ['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';
-  b.innerHTML=f.name+'<small>영웅: '+f.hero+'</small>';
-  b.onclick=()=>startGame(i);
-  list.appendChild(b);
-});
+  b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';
+  b.innerHTML=f.name+'<small>영웅: '+f.hero+'</small>'; b.onclick=()=>startGame(i);
+  list.appendChild(b); });
+resize();
 </script>
 </body>
 </html>
