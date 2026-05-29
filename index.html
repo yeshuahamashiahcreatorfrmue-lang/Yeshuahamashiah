@@ -204,7 +204,7 @@ let state='select', playerIdx=0, units=[], castles=[], playerUnit=null;
 let elapsed=0, lastT=0, aiTimer=0, upTimer=0, ended=false;
 let gold={}, TS={}, warCD={}, selFleet=null; // 팀별 금 / 집계 / 전함스폰쿨다운 / 플레이어 선택 함대
 function teamColor(team){ if(team<0) return '#8a93a3'; if(team<7) return FACTIONS[team].color; return INDEP_COLORS[team-100]; }
-function makeUnit(o){ return Object.assign({ x:0,y:0,tx:0,ty:0, alive:true, troops:420, lvl:1,xp:0,xpNeed:500, atk:10, targetU:null, capProg:0, capC:null, lastLand:0, atSea:false,
+function makeUnit(o){ return Object.assign({ x:0,y:0,tx:0,ty:0, alive:true, troops:420, lvl:1,xp:0,xpNeed:500, atk:10, ttype:null, _eng:0, targetU:null, capProg:0, capC:null, lastLand:0, atSea:false,
   naval:false, shipType:null, crew:'land', ferryUntil:0, wt:0,
   laden:false, cargo:0, homePort:null, homePost:null, originPort:null, manualTarget:null, cargoMul:1, escort:0 },o); }
 let navalTimer=0;
@@ -237,9 +237,9 @@ function startGame(idx){
 
   units=[];
   homeIdx.forEach((ci,f)=>{ const h=castles[ci];
-    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x,y:h.y,tx:h.x,ty:h.y,troops:4200,atk:18,lastLand:h.land}));
-    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,troops:840,atk:11,lastLand:h.land})); });
-  for(let i=0;i<7;i++){ const p=randLand(); units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',color:INDEP_COLORS[i],x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,atk:12,lastLand:landAt(p.x,p.y)})); }
+    units.push(makeUnit({kind:'faction',team:f,name:FACTIONS[f].hero,fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x,y:h.y,tx:h.x,ty:h.y,troops:4200,atk:18,ttype:f%3,lastLand:h.land}));
+    units.push(makeUnit({kind:'loyal',team:f,name:LOYAL_NAMES[f],fac:FACTIONS[f].name,color:FACTIONS[f].color,x:h.x+45,y:h.y+45,tx:h.x+45,ty:h.y+45,troops:840,atk:11,ttype:(f+1)%3,lastLand:h.land})); });
+  for(let i=0;i<7;i++){ const p=randLand(); units.push(makeUnit({kind:'indep',team:100+i,name:INDEP_NAMES[i],fac:'무소속',color:INDEP_COLORS[i],x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,atk:12,ttype:i%3,lastLand:landAt(p.x,p.y)})); }
   TS=computeTS();
   playerUnit=units.find(u=>u.kind==='faction'&&u.team===idx);
   cam.zoom=Math.min(maxZoom,minZoom*1.8); cam.x=playerUnit.x-cv.width/cam.zoom/2; cam.y=playerUnit.y-cv.height/cam.zoom/2; clampCam();
@@ -324,13 +324,19 @@ window.closeTown=closeTown; window.upg=upg;
 
 // ============================================================ 시뮬레이션
 function radiusOf(u){ if(isShip(u)||u.kind==='courier') return 10; return 8 + Math.min(26, Math.log10(u.troops+10)*5); }
-// 전투력: 해상은 함선 성능 기준(해군 전함 ×1.42, 즉석 전함=함선기본, 수송선 절반, 교역선 0)
-function effPower(u){
-  if(u.shipType==='warship') return u.crew==='navy' ? u.troops*(1+u.lvl*0.06)*NAVY_BONUS+300 : SHIP_BASE;
-  if(u.shipType==='transport') return SHIP_BASE*0.5;
+// 공격력: 병력 42명=1, 10배마다 ×4.2  ⇒ power=(troops/42)^0.6232 (42명 블록 단위)
+const ATK_EXP=Math.log10(4.2), DEF_RATIO=0.5, COMBAT_RATE=0.5, TAC_ATK=1.42, TAC_DEF=0.23, ENC=0.2;
+const TTYPE_NAME=['보병','기병','궁병'], TBEATS=[1,2,0]; // 보병>기병>궁병>보병
+function counters(a,b){ return TBEATS[a]===b; }
+function atkBlocks(t){ return Math.pow(Math.max(1,t)/42, ATK_EXP); }
+// 유닛 공격력(블록): 육군=병력기반, 전함 해군 ×1.42 / 육군승선전함=함선고정(탑승자 무효) / 수송선 약함 / 교역선 0
+function unitPower(u){
+  if(u.shipType==='warship') return u.crew==='navy' ? atkBlocks(u.troops)*NAVY_BONUS : atkBlocks(2000);
+  if(u.shipType==='transport') return atkBlocks(u.troops)*0.35;
   if(isCarrier(u)) return 0;
-  return u.troops*(1+u.lvl*0.06)+u.atk*4;
+  return atkBlocks(u.troops);
 }
+function effPower(u){ return unitPower(u); } // AI 강약 비교용
 function teamHasPort(team){ return !!(TS[team]&&TS[team].port); }
 function canCrossStrat(u){ return teamHasPort(u.team) || u.ferryUntil>elapsed; } // AI 도달성 판정
 function reachable(u,x,y){ if(canCrossStrat(u)) return true; return landAt(x,y)===u.lastLand; }
@@ -426,10 +432,14 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt;
   for(const team in TS){ gold[team]=(gold[team]||0)+TS[team].farm*GR*dt; } // 농지 수익
   updateTrade(dt);
   for(const u of units){ if(u.alive) moveUnit(u,dt); }
-  // 전투 (육↔해 포함, 같은 팀 제외)
+  // 전투 (육↔해 포함, 같은 팀 제외). 1패스: 포위(동시 교전 적 수) 선계산
+  for(const u of units) u._eng=0;
+  const pairs=[];
   for(let i=0;i<units.length;i++){ const A=units[i]; if(!A.alive)continue;
     for(let j=i+1;j<units.length;j++){ const B=units[j]; if(!B.alive||B.team===A.team)continue;
-      if(Math.hypot(A.x-B.x,A.y-B.y)<radiusOf(A)+radiusOf(B)+6){ fight(A,B,dt); fight(B,A,dt); } } }
+      const rng=radiusOf(A)+radiusOf(B)+6+((A.ttype===2||B.ttype===2)?34:0); // 궁병 끼면 사거리↑
+      if(Math.hypot(A.x-B.x,A.y-B.y)<rng){ A._eng++; B._eng++; pairs.push([A,B]); } } }
+  for(const [A,B] of pairs){ if(A.alive&&B.alive){ fight(A,B,dt); if(A.alive&&B.alive) fight(B,A,dt); } }
   // 성 점령 (함선/교역선 제외)
   for(const u of units){ if(!u.alive||isShip(u)||u.kind==='courier') continue; let onC=null;
     for(const c of castles){ if(Math.hypot(c.x-u.x,c.y-u.y)<c.r&&c.owner!==u.team){ let cont=false;
@@ -444,11 +454,20 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt;
   checkEnd();
 }
 function fortAt(u){ for(const c of castles){ if(c.owner===u.team&&c.fort>0&&Math.hypot(c.x-u.x,c.y-u.y)<c.r){ return c.fort; } } return 0; }
-function fight(att,def,dt){ let dmg=effPower(att)*KILL*dt*(0.85+Math.random()*0.3); if(dmg<=0) return;
-  if(!def.naval) dmg*=TERR[terrAt(def.x,def.y)].def;                 // 육상 방어지형
-  const f=def.naval?0:fortAt(def); if(f>0) dmg*=Math.max(0.4,1-f*0.08); // 아군 성곽 방어 보너스
-  if(terrAt(att.x,att.y)<2 && !(att.shipType==='warship'&&att.crew==='navy')) dmg*=0.85; // 물 위 비-해군 약화
-  def.troops-=dmg; if(def.troops<=0){ def.troops=0; destroy(def,att); } }
+// 차감병력 = (공격력 - 방어력) ×42블록, + 전술상성(공격+42%/방어-77%) + 포위 + 원거리 + 지형/성곽
+function fight(att,def,dt){ const ap=unitPower(att); if(ap<=0) return;
+  let dp=unitPower(def)*DEF_RATIO;
+  if(att.ttype===2 && !att.naval) dp*=0.6;                           // 원거리(궁병): 방어 일부 무시
+  let raw=ap-dp; if(raw<0.05) raw=0.05;                              // 공격력-방어력 (최소 소모)
+  if(att.ttype!=null && def.ttype!=null){                            // 전술 상성 발동
+    if(counters(att.ttype,def.ttype)) raw*=TAC_ATK;                  // 공격발동: 차감 +42%
+    if(counters(def.ttype,att.ttype)) raw*=TAC_DEF;                  // 방어발동: 차감 -77%
+  }
+  raw *= 1 + ENC*Math.min(3, Math.max(0,(def._eng||1)-1));           // 포위: 동시 교전 수만큼 가중
+  if(!def.naval){ raw*=TERR[terrAt(def.x,def.y)].def; const f=fortAt(def); if(f>0) raw*=Math.max(0.4,1-f*0.08); } // 지형/성곽
+  if(terrAt(att.x,att.y)<2 && !(att.shipType==='warship'&&att.crew==='navy')) raw*=0.85; // 물 위 비-해군 약화
+  def.troops -= raw*42*COMBAT_RATE*dt;
+  if(def.troops<=0){ def.troops=0; destroy(def,att); } }
 function destroy(dead,killer){ dead.alive=false; dead.troops=0; dead.targetU=null;
   if(dead.laden){ gold[killer.team]=(gold[killer.team]||0)+dead.cargo*0.5; dead.laden=false; dead.cargo=0; } // 약탈
   if(selFleet) selFleet=selFleet.filter(s=>s.alive);
@@ -540,7 +559,8 @@ function updateHUD(){ const u=playerUnit; const cap=capMaxOf(playerIdx);
   document.getElementById('status').textContent=isPower(playerIdx)?'⚑세력':'·개인';
   document.getElementById('alive').textContent=`세력 ${units.filter(x=>x.alive&&x.kind==='faction').length} · 무소속 ${units.filter(x=>x.alive&&x.kind==='indep').length}`;
   document.getElementById('clock').textContent=elapsed.toFixed(0)+'s';
-  const t=TERR[terrAt(u.x,u.y)]; document.getElementById('terr').textContent=`지형: ${t.name} ${t.def<0.95?'🛡엄폐':t.def>1.05?'⚠노출':'·'}${u.atSea?' ⚓항해':''}`;
+  const t=TERR[terrAt(u.x,u.y)]; const tt=u.ttype!=null?TTYPE_NAME[u.ttype]:'-';
+  document.getElementById('terr').textContent=`병종:${tt} · ${t.name}${t.def<0.95?' 🛡':t.def>1.05?' ⚠':''}${u.atSea?' ⚓':''}`;
 }
 function loop(t){ const dt=Math.min(0.05,(t-lastT)/1000); lastT=t; if(state==='play'){ update(dt); updateHUD(); } draw(); if(state!=='end') requestAnimationFrame(loop); }
 const list=document.getElementById('factionList');
