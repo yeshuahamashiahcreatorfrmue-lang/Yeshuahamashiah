@@ -448,15 +448,36 @@ function boardType(u){
   return null;
 }
 
+function nearestOwnCastle(u){ let b=null,bd=1e18; for(const c of castles){ if(c.owner!==u.team||!reachable(u,c.x,c.y))continue; const d=(c.x-u.x)**2+(c.y-u.y)**2; if(d<bd){bd=d;b=c;} } return b; }
+function defendTarget(u){ let b=null,bd=400*400; for(const c of castles){ if(c.owner!==u.team)continue;
+  let en=false; for(const o of units){ if(o.alive&&o.team!==u.team&&isArmy(o)&&!isShip(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r+70){en=true;break;} } if(!en)continue;
+  const d=(c.x-u.x)**2+(c.y-u.y)**2; if(d<bd){bd=d;b=c;} } return b; }
+// AI 병종 선택: 보유 금화로 감당되는 병종 가중 랜덤(자세력 특수 우대)
+function aiPickType(team){ const g=gold[team]||0, cand=[[0,3]];
+  if(g>=EQUIP[1])cand.push([1,2]); if(g>=EQUIP[2])cand.push([2,2]); if(g>=EQUIP[3])cand.push([3,2]);
+  if(g>=EQUIP[4])cand.push([4,1.4]); if(g>=EQUIP[5])cand.push([5,1]); if(g>=EQUIP[6])cand.push([6,1]); if(g>=EQUIP[7])cand.push([7,0.8]);
+  if(team>=0&&team<NF&&team!==RISE_FACTION&&g>=EQUIP[8+team])cand.push([8+team,1.6]);
+  let s=0; for(const c of cand)s+=c[1]; let r=Math.random()*s; for(const c of cand){ r-=c[1]; if(r<=0)return c[0]; } return 0; }
 function ai(u){ if(u===playerUnit) return;
   if(u.shipType==='warship' && u.crew==='navy'){ aiWarship(u); return; }
   if(isCarrier(u)) return;                       // 교역선은 updateTrade가 조종
-  // 육군/상륙군 일반 AI
-  if(u.targetU&&u.targetU.alive&&u.targetU.team!==u.team&&Math.hypot(u.targetU.x-u.x,u.targetU.y-u.y)<90){ u.tx=u.targetU.x; u.ty=u.targetU.y; return; }
-  u.targetU=null; let weak=null,wd=320;
-  for(const o of units){ if(!o.alive||o.team===u.team||isCarrier(o))continue; if(!reachable(u,o.x,o.y))continue; const d=Math.hypot(o.x-u.x,o.y-u.y); if(d<wd&&effPower(o)<effPower(u)*1.1){wd=d;weak=o;} }
-  let tc=null,cd=1e9; for(const c of castles){ if(c.owner===u.team)continue; if(!reachable(u,c.x,c.y))continue; const d=Math.hypot(c.x-u.x,c.y-u.y); if(d<cd){cd=d;tc=c;} }
-  if(weak&&wd<200){ u.targetU=weak; u.tx=weak.x; u.ty=weak.y; } else if(tc){ u.tx=tc.x; u.ty=tc.y; } else { u.tx=u.x; u.ty=u.y; } }
+  const myP=effPower(u);
+  // 1) 주변 위협 합산 → 압도당하면 아군 성으로 후퇴·재정비
+  let threat=0; for(const o of units){ if(!o.alive||o.team===u.team||isCarrier(o))continue; if(Math.hypot(o.x-u.x,o.y-u.y)<150) threat+=effPower(o); }
+  if(threat>myP*1.6){ const ref=nearestOwnCastle(u); if(ref){ u.targetU=null; u.tx=ref.x; u.ty=ref.y; return; } }
+  // 2) 위협받는 아군 성 방어
+  const dc=defendTarget(u); if(dc){ u.targetU=null; u.tx=dc.x; u.ty=dc.y; return; }
+  // 3) 추격 유지
+  if(u.targetU&&u.targetU.alive&&u.targetU.team!==u.team&&Math.hypot(u.targetU.x-u.x,u.targetU.y-u.y)<120){ u.tx=u.targetU.x; u.ty=u.targetU.y; return; }
+  u.targetU=null;
+  // 4) 약한 적 사냥
+  let weak=null,wd=340; for(const o of units){ if(!o.alive||o.team===u.team||isCarrier(o))continue; if(!reachable(u,o.x,o.y))continue; const d=Math.hypot(o.x-u.x,o.y-u.y); if(d<wd&&effPower(o)<myP*1.05){wd=d;weak=o;} }
+  if(weak&&wd<220){ u.targetU=weak; u.tx=weak.x; u.ty=weak.y; return; }
+  // 5) 점령 대상(중립 우대, 가까운 곳)
+  let tc=null,best=1e18; for(const c of castles){ if(c.owner===u.team||!reachable(u,c.x,c.y))continue; let sc=Math.hypot(c.x-u.x,c.y-u.y); if(c.owner<0)sc-=120; if(sc<best){best=sc;tc=c;} }
+  if(tc){ u.tx=tc.x; u.ty=tc.y; return; }
+  // 6) 할 일 없으면 아군 성으로 집결
+  const home=nearestOwnCastle(u); if(home){ u.tx=home.x; u.ty=home.y; } else { u.tx=u.x; u.ty=u.y; } }
 function aiWarship(u){ // 가장 가까운 적 함선/교역선 사냥, 없으면 모항 주변 순찰
   let t=null,td=520; for(const o of units){ if(!o.alive||o.team===u.team) continue; if(!isShip(o)) continue; const d=Math.hypot(o.x-u.x,o.y-u.y); if(d<td){td=d;t=o;} }
   if(t){ u.tx=t.x; u.ty=t.y; return; }
@@ -566,8 +587,8 @@ function update(dt){ elapsed+=dt; aiTimer-=dt; upTimer-=dt; navalTimer-=dt; if(z
   // 훈련소 경제: 정착지 인력(보병) 충원 + AI 보병 자동 양성
   for(const c of castles){ if(c.owner<0) continue;
     c.reserve=Math.min(reserveMaxOf(c), c.reserve + c.barracks*BR*dt);
-    if(c.owner!==playerIdx){ // AI는 보병만 자동 양성(EQUIP[0]=0)  // TODO: AI 병종/발행 고도화
-      c.aiAcc+=c.barracks*0.18*dt; while(c.aiAcc>=1 && c.reserve>=TRAIN_PULSE){ c.aiAcc-=1; c.reserve-=TRAIN_PULSE; deposit(c.owner,0,c,TRAIN_PULSE); } } }
+    if(c.owner!==playerIdx){ // AI 병종 다변화: 금화 감당 범위 내 가중 랜덤 양성
+      c.aiAcc+=c.barracks*0.18*dt; while(c.aiAcc>=1 && c.reserve>=TRAIN_PULSE){ c.aiAcc-=1; const ty=aiPickType(c.owner); c.reserve-=TRAIN_PULSE; gold[c.owner]=(gold[c.owner]||0)-EQUIP[ty]; deposit(c.owner,ty,c,TRAIN_PULSE); } } }
   if(train.on) processTrain(dt);   // 플레이어 라디얼 양성/발행
   shopTick(dt);                    // 금화 유통(개인↔가게, 개인 간 거래)
   if(playerUnit.alive){ playerUnit.coin=(playerUnit.coin||0)+(3+(TS[playerIdx]?TS[playerIdx].towns:0))*dt; // 예슈아화 수입(지도자 봉록)
