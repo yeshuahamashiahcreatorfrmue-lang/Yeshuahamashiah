@@ -7,7 +7,7 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{width:100%;height:100%;background:#05070c;overflow:hidden;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#e8eef5;touch-action:none}
-  #cv{display:block;position:fixed;inset:0}
+  #cv{display:block;position:fixed;inset:0;touch-action:none}
   .hidden{display:none!important}
   #hud{position:fixed;top:0;left:0;right:0;padding:7px 9px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;
     background:linear-gradient(#0a0f18dd,#0a0f1800);font-size:11.5px;font-weight:700;pointer-events:none;z-index:5}
@@ -54,7 +54,7 @@
   <span class="pill" id="hType">🗡</span><span class="pill" id="hGold">💰0</span>
   <span class="pill" id="hCoin">✦0</span><span class="grow"></span><span class="pill" id="hCastle">🏰0</span>
 </div>
-<div id="hint" class="hidden">탭=이동/선택 · 내 성 탭=운영 · 내 성 꾹+드래그=양성 · 끌기=지도 · 두손가락=확대</div>
+<div id="hint" class="hidden">탭·클릭=이동/선택 · 내 성=운영 · 내 성 꾹+드래그=양성 · 끌기=지도 · 두손가락·휠=확대</div>
 <button id="shopBtn" class="hidden">🛒 상점</button>
 <button id="riseBtn" class="hidden">⚑ 궐기</button>
 <div id="panel" class="hidden"></div>
@@ -565,13 +565,28 @@ function onUp(x,y){ if(mmDrag){mmDrag=false;return;} if(zone){ if(zone.btn&&x>=z
     if(sel&&sel.length){let k=0;for(const s of sel){if(!s.alive)continue;s.target=null;s.tx=clamp(w.x+(k%5-2)*16,4,WW-4);s.ty=clamp(w.y+((k/5|0))*16,4,WH-4);k++;}drag=null;return;}
     if(lord&&lord.alive){let tg=null,bd=40/cam.zoom;for(const u of units){if(!u.alive||u.team===lord.team||isCarrier(u))continue;const d=Math.hypot(u.x-w.x,u.y-w.y);if(d<bd){bd=d;tg=u;}}if(tg){lord.target=tg;lord.tx=tg.x;lord.ty=tg.y;}else{lord.target=null;lord.tx=clamp(w.x,4,WW-4);lord.ty=clamp(w.y,4,WH-4);}}
   } downC=null;drag=null; }
-function td(e){return Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
-cv.addEventListener('touchstart',e=>{e.preventDefault();if(e.touches.length===2){pinch={d:td(e),z:cam.zoom};drag=null;train.on=false;}else onDown(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
-cv.addEventListener('touchmove',e=>{e.preventDefault();if(pinch&&e.touches.length===2){const nd=td(e),ox=(e.touches[0].clientX+e.touches[1].clientX)/2,oy=(e.touches[0].clientY+e.touches[1].clientY)/2,w=s2w(ox,oy);cam.zoom=clamp(pinch.z*nd/pinch.d,camMin(),3.4);cam.x=w.x-ox/cam.zoom;cam.y=w.y-oy/cam.zoom;clampCam();}else onMove(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
-cv.addEventListener('touchend',e=>{e.preventDefault();if(pinch){pinch=null;return;}const t=e.changedTouches[0];onUp(t.clientX,t.clientY);},{passive:false});
-let mdn=false;cv.addEventListener('mousedown',e=>{mdn=true;onDown(e.clientX,e.clientY);});
-addEventListener('mousemove',e=>{if(mdn)onMove(e.clientX,e.clientY);});
-addEventListener('mouseup',e=>{if(mdn){mdn=false;onUp(e.clientX,e.clientY);}});
+// 포인터 통합 입력: PC 마우스 + 모바일 터치 + 펜을 한 경로로. 멀티터치 핀치는 포인터 맵으로.
+const ptrs=new Map();
+function pinchDist(){const p=[...ptrs.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);}
+function pinchMid(){const p=[...ptrs.values()];return {x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};}
+cv.addEventListener('pointerdown',e=>{ e.preventDefault();
+  if(e.pointerType==='mouse'&&e.button!==0)return;        // 좌클릭만
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){ pinch={d:pinchDist(),z:cam.zoom}; drag=null; train.on=false; }
+  else if(ptrs.size===1){ onDown(e.clientX,e.clientY); } },{passive:false});
+cv.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId))return;   // 버튼 안 누른 마우스 호버 무시
+  e.preventDefault(); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&ptrs.size>=2){ const nd=pinchDist(),m=pinchMid(),w=s2w(m.x,m.y);
+    cam.zoom=clamp(pinch.z*nd/pinch.d,camMin(),3.4); cam.x=w.x-m.x/cam.zoom; cam.y=w.y-m.y/cam.zoom; clampCam(); }
+  else if(!pinch){ onMove(e.clientX,e.clientY); } },{passive:false});
+function pointerEnd(e){ if(!ptrs.has(e.pointerId))return;
+  const wasPinch=!!pinch, solo=ptrs.size===1;
+  ptrs.delete(e.pointerId); if(ptrs.size<2)pinch=null;
+  if(!wasPinch&&solo)onUp(e.clientX,e.clientY);
+  else if(wasPinch){ drag=null; mmDrag=false; } }
+cv.addEventListener('pointerup',pointerEnd,{passive:false});
+cv.addEventListener('pointercancel',pointerEnd,{passive:false});
 addEventListener('wheel',e=>{if(zone)return;const w=s2w(e.clientX,e.clientY);cam.zoom=clamp(cam.zoom*(e.deltaY<0?1.1:.9),camMin(),3.4);cam.x=w.x-e.clientX/cam.zoom;cam.y=w.y-e.clientY/cam.zoom;clampCam();},{passive:true});
 el('shopBtn').addEventListener('click',()=>{const c=nearestShop();if(c)openShop(c);});
 el('riseBtn').addEventListener('click',()=>{const c=el('riseBtn')._c;if(!c||!lord||!lord.alive)return; riseIntoTruth(lord); c.owner=playerIdx; c.capital=true; el('riseBtn').classList.add('hidden'); refreshTerr();});
