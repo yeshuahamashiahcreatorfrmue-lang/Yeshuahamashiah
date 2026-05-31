@@ -39,7 +39,7 @@
   #editor .ew{max-width:520px;margin:0 auto}
   #editor h3{font-size:18px;margin-bottom:2px}#editor h4{font-size:13px;margin:13px 0 5px;color:#9fb2c8}
   #editor .er{display:flex;gap:5px;align-items:center;margin:4px 0}
-  #editor input[type=text]{flex:1;min-width:0;background:#111a28;border:1px solid #ffffff22;color:#e8eef5;border-radius:7px;padding:6px;font-size:12px}
+  #editor input[type=text],#editor input[type=number]{flex:1;min-width:0;background:#111a28;border:1px solid #ffffff22;color:#e8eef5;border-radius:7px;padding:6px;font-size:12px}
   #editor input[type=color]{width:32px;height:30px;border:none;background:none;padding:0;flex:0 0 auto}
   #editor .tg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
   #editor .eb{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;position:sticky;bottom:0;background:#070b12;padding:8px 0}
@@ -89,19 +89,22 @@ let FACTIONS=[
   {name:"예슈아한민족진리단일국가",hero:"예슈아하마쉬앟아버지랍비멜렉우앟엘로힘",color:"#14b8a6",crest:true,desc:"궐기한 개인이 거듭나는 진리의 단일 국가"},
   {name:"거짓 교단",hero:"거짓선지자",color:"#be123c",hostile:true,desc:"타락한 악마를 섬기는 거짓 선지자"},
 ];
-const NF=FACTIONS.length, PLAY=7, RISE=7, EVIL=8;         // 0~6 플레이, 7=궐기 전용, 8=적대(거짓 교단)
+let NF=FACTIONS.length; const PLAY=7, RISE=7, EVIL=8;     // 0~6 플레이, 7=궐기 전용, 8~=적대(거짓 교단 외 추가 가능)
 const LOYAL=["한벼리","밤쇠","노올","눈메","푸르미","가람","쇠돌","참빛"];
 const INDEP=["떠돌이 한새","활잡이 나래","들바람 노루","그늘 살손","외돌이 검돌","달안개 다래","비바리 솔뫼"];
 const INDEPC=["#e879f9","#fb7185","#22d3ee","#facc15","#4ade80","#fb923c","#c084fc"];
 // 병종 0~7 공통 / 8~14 세력특수(8+f) / 15 궐기특수 / 16 거짓사제
 let TNAME=['보병','기병','궁병','소총병','기갑','포병','자주포병','예슈아대','예슈아한민족대','밤기마','노을활잡이','눈보라꾼','들풀지기','물너울대','무쇠벼리','예슈아행하기위해죽지않음지옥','거짓사제'];
-const TICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','✦','⭐','🌑','🌅','❄️','🌿','🌊','⚙️','☀️','✝'];
-const EQUIP=[0,35,25,45,100,70,90,40,80,80,80,80,80,80,80,80,80];
-const TCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd','#fbbf24','#fb923c','#fde68a','#fff7cc','#c4b5fd','#fdba74','#bae6fd','#bbf7d0','#7dd3fc','#cbd5e1','#5eead4','#fb7185'];
-// 전투 상수
-const ATK_EXP=Math.log10(4.2), TAC_ATK=1.42, TAC_DEF=0.23, RATE=0.5, ENC=0.2;
-const RANGED=78, NAVY=1.42, SHIPBASE=1700, BOARD=92, HEALR=74, HEALRATE=46;
+let TICON=['🗡','🐎','🏹','🔫','🛡','💥','🚀','✦','⭐','🌑','🌅','❄️','🌿','🌊','⚙️','☀️','✝'];
+let EQUIP=[0,35,25,45,100,70,90,40,80,80,80,80,80,80,80,80,80];
+let TCOL=['#e5e7eb','#f9a8d4','#86efac','#fca5a5','#93c5fd','#fbbf24','#fb923c','#fde68a','#fff7cc','#c4b5fd','#fdba74','#bae6fd','#bbf7d0','#7dd3fc','#cbd5e1','#5eead4','#fb7185'];
+// 전투 상수 (엔진에서 편집 가능 → let)
+let ATK_EXP=Math.log10(4.2), TAC_ATK=1.42, TAC_DEF=0.23, RATE=0.5, ENC=0.2;
+let RANGED=78, NAVY=1.42, SHIPBASE=1700, BOARD=92, HEALR=74, HEALRATE=46;
 const GOODS={'곡물':1.0,'장비':1.3,'무기':1.6,'약탈물':1.9};   // #54 병참 품목별 수익 배율
+// 엔진 편집용 시작/경제 조건
+let TUNE={ heroTroops:4200, loyalTroops:900, indepTroops:420, evilTroops:6000, evilTroops2:2800,
+  startGold:120, farmYield:2.2, barrManpower:9, mintCost:30, mintOut:42, captureBase:2.2, captureFort:1.1, castleCount:44 };
 const TBEAT={4:3,3:1,1:4};
 const counters=(a,b)=>TBEAT[a]===b;
 const atkB=t=>Math.pow(Math.max(1,t)/42,ATK_EXP);
@@ -162,7 +165,7 @@ const tintC=document.createElement('canvas'); tintC.width=GX; tintC.height=GY;
 const TIER=[{n:"촌락",r:13},{n:"마을",r:16},{n:"중규모 마을",r:19},{n:"대규모 마을",r:22},{n:"도시",r:26},{n:"중규모 도시",r:30},{n:"대규모 도시",r:34}];
 function isCoastal(x,y){ for(let a=0;a<8;a++){ const ang=a/8*6.283; if(elevAt(x+Math.cos(ang)*34,y+Math.sin(ang)*34)<SEA)return true; } return false; }
 function placeCastles(){ castles=[]; let tries=0;
-  while(castles.length<44&&tries<5000){ tries++; const x=40+Math.random()*(WW-80),y=40+Math.random()*(WH-80);
+  while(castles.length<TUNE.castleCount&&tries<5000){ tries++; const x=40+Math.random()*(WW-80),y=40+Math.random()*(WH-80);
     const e=elevAt(x,y); if(e<SEA+0.03||e>SEA+0.5)continue; let ok=true; for(const c of castles)if(Math.hypot(c.x-x,c.y-y)<92){ok=false;break;}
     if(!ok)continue; const rr=Math.random(),t=rr<.28?0:rr<.5?1:rr<.68?2:rr<.82?3:rr<.92?4:rr<.975?5:6;
     castles.push({x,y,t,r:TIER[t].r,owner:-1,fort:t>=4?t-3:0,capC:null,capProg:0,barr:1+(t/2|0),farm:1+(t/2|0),reserve:0,aiAcc:0,
@@ -206,20 +209,22 @@ function mk(o){ return Object.assign({x:0,y:0,tx:0,ty:0,troops:420,team:0,ttype:
 function fmt(n){ n=Math.round(n); return n>=10000?(n/10000).toFixed(n>=100000?0:1)+'만':n>=1000?(n/1000).toFixed(1)+'천':''+n; }
 
 // ===== 시작 =====
-function startGame(idx){ playerIdx=idx; state='play'; units=[]; gold=new Array(NF).fill(120); coinPool=new Array(NF).fill(0);
+function startGame(idx){ playerIdx=idx; state='play'; units=[]; gold=new Array(NF).fill(TUNE.startGold); coinPool=new Array(NF).fill(0);
   const home=[0]; while(home.length<PLAY){ let bi=0,bd=-1; for(let i=0;i<castles.length;i++){if(home.includes(i))continue;let md=1e9;for(const h of home)md=Math.min(md,(castles[i].x-castles[h].x)**2+(castles[i].y-castles[h].y)**2);if(md>bd){bd=md;bi=i;}} home.push(bi); }
   home.forEach((ci,f)=>{ const c=castles[ci]; c.owner=f; c.t=Math.max(c.t,4); c.r=TIER[c.t].r; c.fort=Math.max(c.fort,1); c.barr=Math.max(3,c.barr); c.capital=true;
-    units.push(mk({kind:'faction',team:f,ttype:8+f,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:4200,hero:FACTIONS[f].hero}));
-    units.push(mk({kind:'loyal',team:f,ttype:(f+2)%5,x:c.x+34,y:c.y+28,tx:c.x+34,ty:c.y+28,troops:900,hero:LOYAL[f]})); });
-  for(let i=0;i<7;i++){ let p=randLand(); units.push(mk({kind:'indep',team:100+i,ttype:i%5,x:p.x,y:p.y,tx:p.x,ty:p.y,troops:420,hero:INDEP[i]})); }
-  // 적대세력 거짓 교단(플레이 불가, 모든 세력과 적대) — 플레이어에게서 가장 먼 중립 성에 거점
-  { let ci=-1,bd=-1; for(let i=0;i<castles.length;i++){ if(castles[i].owner>=0)continue; let md=1e9; for(const u of units)if(u.kind==='faction')md=Math.min(md,(castles[i].x-u.x)**2+(castles[i].y-u.y)**2); if(md>bd){bd=md;ci=i;} }
-    if(ci>=0){ const c=castles[ci]; c.owner=EVIL; c.t=Math.max(c.t,5); c.r=TIER[c.t].r; c.fort=Math.max(c.fort,4); c.barr=Math.max(4,c.barr); c.capital=true;
-      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:6000,hero:FACTIONS[EVIL].hero}));
-      units.push(mk({kind:'faction',team:EVIL,ttype:16,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:2800}));
+    units.push(mk({kind:'faction',team:f,ttype:8+f,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:TUNE.heroTroops,hero:FACTIONS[f].hero}));
+    units.push(mk({kind:'loyal',team:f,ttype:(f+2)%5,x:c.x+34,y:c.y+28,tx:c.x+34,ty:c.y+28,troops:TUNE.loyalTroops,hero:LOYAL[f]})); });
+  for(let i=0;i<7;i++){ let p=randLand(); units.push(mk({kind:'indep',team:100+i,ttype:i%5,x:p.x,y:p.y,tx:p.x,ty:p.y,troops:TUNE.indepTroops,hero:INDEP[i]})); }
+  // 적대세력(플레이 불가, 모든 세력과 적대) — 거짓 교단 + 엔진에서 추가한 적대세력 모두 거점 배치
+  for(let team=PLAY;team<NF;team++){ if(team===RISE||!FACTIONS[team].hostile)continue;
+    const tt=clamp(FACTIONS[team].troop!=null?FACTIONS[team].troop:(team===EVIL?16:0),0,TNAME.length-1);
+    let ci=-1,bd=-1; for(let i=0;i<castles.length;i++){ if(castles[i].owner>=0)continue; let md=1e9; for(const u of units)if(u.kind==='faction')md=Math.min(md,(castles[i].x-u.x)**2+(castles[i].y-u.y)**2); if(md>bd){bd=md;ci=i;} }
+    if(ci>=0){ const c=castles[ci]; c.owner=team; c.t=Math.max(c.t,5); c.r=TIER[c.t].r; c.fort=Math.max(c.fort,4); c.barr=Math.max(4,c.barr); c.capital=true;
+      units.push(mk({kind:'faction',team,ttype:tt,x:c.x,y:c.y,tx:c.x,ty:c.y,troops:TUNE.evilTroops,hero:FACTIONS[team].hero}));
+      units.push(mk({kind:'faction',team,ttype:tt,x:c.x+30,y:c.y+24,tx:c.x+30,ty:c.y+24,troops:TUNE.evilTroops2}));
       let nx=-1,nd=1e9; for(let i=0;i<castles.length;i++){if(castles[i].owner>=0)continue;const d=(castles[i].x-c.x)**2+(castles[i].y-c.y)**2;if(d<nd){nd=d;nx=i;}}
-      if(nx>=0){castles[nx].owner=EVIL;castles[nx].fort=Math.max(castles[nx].fort,2);} } }
-  aiTrait=[]; for(let f=0;f<NF;f++)aiTrait[f]=['aggro','eco','turtle'][Math.floor(Math.random()*3)]; aiTrait[EVIL]='aggro';
+      if(nx>=0){castles[nx].owner=team;castles[nx].fort=Math.max(castles[nx].fort,2);} } }
+  aiTrait=[]; for(let f=0;f<NF;f++)aiTrait[f]=FACTIONS[f].hostile?'aggro':['aggro','eco','turtle'][Math.floor(Math.random()*3)];
   lord=units.find(u=>u.team===idx&&u.kind==='faction'); lord.kind='lord'; gStart=now;
   buildTerritory();
   document.getElementById('start').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); document.getElementById('hint').classList.remove('hidden');
@@ -285,13 +290,13 @@ function update(dt){ now+=dt; aiT-=dt; navalT-=dt; upT-=dt; if(upT<=0){upT=3;aiU
   for(const u of units){ if(!u.alive||isShip(u)||u.kind==='courier'||!isArmy(u))continue; let on=null;
     for(const c of castles){ if(c.owner!==u.team&&Math.hypot(c.x-u.x,c.y-u.y)<c.r){ let blk=false;
       for(const o of units)if(o.alive&&o.team!==u.team&&isArmy(o)&&Math.hypot(o.x-c.x,o.y-c.y)<c.r){blk=true;break;} if(!blk){on=c;break;} } }
-    if(on){ if(u.capC!==on){u.capC=on;u.capProg=0;} u.capProg+=dt; if(u.capProg>=2.2+on.fort*1.1){ const was=isPower(u.team); if(!was)riseIntoTruth(u); on.owner=u.team; if(!was)on.capital=true; u.capProg=0;u.capC=null; terrT=0.01; } }
+    if(on){ if(u.capC!==on){u.capC=on;u.capProg=0;} u.capProg+=dt; if(u.capProg>=TUNE.captureBase+on.fort*TUNE.captureFort){ const was=isPower(u.team); if(!was)riseIntoTruth(u); on.owner=u.team; if(!was)on.capital=true; u.capProg=0;u.capC=null; terrT=0.01; } }
     else u.capC=null; }
   // 거점 주둔 보급: 아군 성 근처 부대 서서히 충원
   for(const u of units){ if(!u.alive||isShip(u)||isCarrier(u)||!isArmy(u)&&u.kind!=='lord')continue; for(const c of castles){ if(c.owner===u.team&&Math.hypot(c.x-u.x,c.y-u.y)<c.r+12){ u.troops=Math.min(capMax(u.team),u.troops+(8+c.barr*4)*dt); break; } } }
   // 경제: 농지 수익 + 인력 + AI 양성 + 예슈아화 발행
-  for(let f=0;f<NF;f++){ let farm=0; for(const c of castles)if(c.owner===f)farm+=c.farm; gold[f]=(gold[f]||0)+farm*2.2*dt; }
-  for(const c of castles){ if(c.owner<0)continue; c.reserve=Math.min(2000+c.barr*1500,c.reserve+c.barr*9*dt);
+  for(let f=0;f<NF;f++){ let farm=0; for(const c of castles)if(c.owner===f)farm+=c.farm; gold[f]=(gold[f]||0)+farm*TUNE.farmYield*dt; }
+  for(const c of castles){ if(c.owner<0)continue; c.reserve=Math.min(2000+c.barr*1500,c.reserve+c.barr*TUNE.barrManpower*dt);
     if(c.owner!==playerIdx){ c.aiAcc+=c.barr*0.18*dt; while(c.aiAcc>=1&&c.reserve>=420){ c.aiAcc-=1; const ty=aiPick(c.owner); c.reserve-=420; gold[c.owner]-=EQUIP[ty]; deposit(c.owner,ty,c,420); } } }
   if(train.on)processTrain(dt);
   updateTrade(dt); if(navalT<=0){navalT=0.6;spawnNaval(0.6);} shopTick(dt);
@@ -371,7 +376,7 @@ function trainTier2(c){const t=[3,5,6,7];if(c.capital)t.push('coin');return t;}
 function trainPick(c){ const sc=w2s(c.x,c.y),dx=train.sx-sc.x,dy=train.sy-sc.y,dist=Math.hypot(dx,dy);
   const tier=dist<TRAIN_BAND?1:2,T=tier===1?trainTier1(c):trainTier2(c),n=T.length; let a=Math.atan2(dy,dx);if(a<0)a+=6.283; const idx=Math.round(a/(6.283/n))%n;
   return {target:T[idx],dist,tier,rate:1.2*(1+Math.min(5,dist/100))}; }
-function commitPulse(team,c,tg){ if(tg==='coin'){if((gold[team]||0)>=30){gold[team]-=30;coinPool[team]=(coinPool[team]||0)+42;return true;}return false;}
+function commitPulse(team,c,tg){ if(tg==='coin'){if((gold[team]||0)>=TUNE.mintCost){gold[team]-=TUNE.mintCost;coinPool[team]=(coinPool[team]||0)+TUNE.mintOut;return true;}return false;}
   if(c.reserve>=420&&(gold[team]||0)>=EQUIP[tg]){c.reserve-=420;gold[team]-=EQUIP[tg];deposit(team,tg,c,420);return true;}return false; }
 function processTrain(dt){ const c=train.c; if(!c||c.owner!==playerIdx){train.on=false;return;} const p=trainPick(c); train.accum+=p.rate*dt; let g=20; while(train.accum>=1&&g-->0){if(commitPulse(playerIdx,c,p.target))train.accum-=1;else{train.accum=0;break;}} train.cur=p; }
 
@@ -470,7 +475,7 @@ function draw(){ ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#05070c'; ctx
   if(cam.zoom<1.5){ ctx.font=`italic ${13/cam.zoom}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';for(const r of regions){ctx.fillStyle='rgba(15,12,8,.5)';ctx.fillText(r.name,r.x+1.2/cam.zoom,r.y+1.2/cam.zoom);ctx.fillStyle='rgba(245,240,225,.72)';ctx.fillText(r.name,r.x,r.y);} }
   for(const c of castles){ const col=tcolor(c.owner); ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(c.x,c.y+c.r*.42,c.r*.55,c.r*.28,0,0,7);ctx.fill();
     ctx.fillStyle='#0d1320';ctx.strokeStyle=col;ctx.lineWidth=2.4/cam.zoom;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.5,0,7);ctx.fill();ctx.stroke();ctx.fillStyle=col;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.26,0,7);ctx.fill();
-    let cp=null;for(const u of units){if(u.alive&&u.capC===c&&u.capProg>0){cp=u;break;}} if(cp){const need=2.2+c.fort*1.1,fr=Math.min(1,cp.capProg/need);ctx.strokeStyle=tcolor(cp.team);ctx.lineWidth=2.6/cam.zoom;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.62,-1.57,-1.57+6.283*fr);ctx.stroke();}
+    let cp=null;for(const u of units){if(u.alive&&u.capC===c&&u.capProg>0){cp=u;break;}} if(cp){const need=TUNE.captureBase+c.fort*TUNE.captureFort,fr=Math.min(1,cp.capProg/need);ctx.strokeStyle=tcolor(cp.team);ctx.lineWidth=2.6/cam.zoom;ctx.beginPath();ctx.arc(c.x,c.y,c.r*.62,-1.57,-1.57+6.283*fr);ctx.stroke();}
     if(c.capital){ctx.font=`${11/cam.zoom}px sans-serif`;ctx.textAlign='center';ctx.fillText('👑',c.x,c.y-c.r*.5-6/cam.zoom);}
     if(cam.zoom>0.5){ ctx.font=`${8.5/cam.zoom}px sans-serif`;ctx.textAlign='center'; if(c.fort>0){ctx.fillStyle='#fcd34d';ctx.fillText('🛡'+c.fort,c.x,c.y+2/cam.zoom);}
       if(c.owner>=0){ctx.fillStyle='#cfe';let tag=(c.port?'⚓':'')+(c.tradePost?'🐎':'');ctx.fillText(tag,c.x,c.y+c.r*.5+8/cam.zoom);
@@ -501,7 +506,7 @@ function drawRadial(){ const c=train.c;if(!c)return;const sc=w2s(c.x,c.y);ctx.se
   ctx.strokeStyle='#ffffff33';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(sc.x,sc.y,TRAIN_BAND,0,7);ctx.stroke();
   const ring=(T,R,act)=>{const n=T.length;for(let i=0;i<n;i++){const a=i*6.283/n,ix=sc.x+Math.cos(a)*R,iy=sc.y+Math.sin(a)*R,tg=T[i],s=act&&tg===p.target;ctx.globalAlpha=act?1:.5;ctx.beginPath();ctx.arc(ix,iy,s?20:14,0,7);ctx.fillStyle=s?'rgba(250,204,21,.95)':'rgba(15,20,30,.85)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=s?'#fff':'#fff8';ctx.stroke();ctx.font=`${s?17:12}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText(tg==='coin'?'💰':TICON[tg],ix,iy);}ctx.globalAlpha=1;};
   ring(trainTier1(c),64,p.tier===1);ring(trainTier2(c),148,p.tier===2);
-  let label,ok;const tg=p.target; if(tg==='coin'){label='💰예슈아화';ok=(gold[playerIdx]||0)>=30;}else{label=TICON[tg]+TNAME[tg];ok=c.reserve>=420&&(gold[playerIdx]||0)>=EQUIP[tg];}
+  let label,ok;const tg=p.target; if(tg==='coin'){label='💰예슈아화';ok=(gold[playerIdx]||0)>=TUNE.mintCost;}else{label=TICON[tg]+TNAME[tg];ok=c.reserve>=420&&(gold[playerIdx]||0)>=EQUIP[tg];}
   ctx.font='bold 12px sans-serif';ctx.fillStyle=ok?'#86efac':'#fca5a5';ctx.fillText(label+' ⚡'+p.rate.toFixed(1),train.sx,train.sy-24); }
 function drawZone(){ const Z=zone,W=VW(),H=VH(),Lu=lord; ctx.setTransform(DPR,0,0,DPR,0,0);
   const bgc=['#1f2b3a','#22303f','#574629','#444d28','#23381e','#39332e','#363a41','#525a64'][Z.terr]||'#26301f';
@@ -578,17 +583,64 @@ function endGame(win){ if(state==='over')return; state='over'; const secs=Math.r
 function buildMenu(){ const fl=el('fl'); fl.innerHTML=''; for(let i=0;i<PLAY;i++){const f=FACTIONS[i];const b=document.createElement('button');b.className='fb';b.style.background=f.color;b.style.color=['#f5d442','#84cc16','#38bdf8','#94a3b8'].includes(f.color)?'#10151f':'#fff';b.innerHTML=(f.crest?'✦ ':'')+esc(f.name)+'<small>영웅 '+esc(f.hero)+' — '+esc(f.desc||'')+'</small>';b.onclick=()=>startGame(i);fl.appendChild(b);} }
 const editor=el('editor');
 function esc(s){return (''+s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
-function openEditor(){ let h='<div class="ew"><h3>⚙️ 데이터 편집기</h3><small>세력·영웅·색·병종 이름 편집 → 적용. 저장 시 이 기기에 유지됩니다.</small>';
-  h+='<h4>세력 (0~6 플레이 · 7 궐기 · 8 적대)</h4>';
-  FACTIONS.forEach((f,i)=>{ h+=`<div class="er"><input type="text" data-f="${i}" data-k="name" value="${esc(f.name)}" placeholder="세력명"><input type="text" data-f="${i}" data-k="hero" value="${esc(f.hero)}" placeholder="영웅"><input type="color" data-f="${i}" data-k="color" value="${f.color}"></div>`; });
-  h+='<h4>병종 이름</h4><div class="tg">'; TNAME.forEach((n,i)=>{ h+=`<input type="text" data-t="${i}" value="${esc(n)}">`; }); h+='</div>';
-  h+='<div class="eb"><button onclick="applyEditor()">✔ 적용·저장</button><button onclick="resetCfg()" style="background:#7c2d2d">기본값 복원</button><button onclick="closeEditor()" style="background:#475569">닫기</button></div></div>';
+// ===== 게임엔진: 데이터 편집기 (모든 데이터·수치 편집) =====
+const TUNE_META=[ ['heroTroops','세력 영웅 시작 병력'],['loyalTroops','충성 개인 시작 병력'],['indepTroops','무소속 시작 병력'],
+  ['evilTroops','적대세력 본대 병력'],['evilTroops2','적대세력 분대 병력'],['startGold','시작 금화'],
+  ['farmYield','농지 수익/초(농지합당)'],['barrManpower','병영 인력/초(병영당)'],['mintCost','예슈아화 발행 금화'],['mintOut','예슈아화 발행량'],
+  ['captureBase','점령 기본시간(초)'],['captureFort','성곽당 점령 가중(초)'],['castleCount','성 개수(재생성 필요)'] ];
+const COMBAT_META=[ ['ATK4_2','공격력 배율(10배당)',()=>Math.pow(10,ATK_EXP),v=>ATK_EXP=Math.log10(v)],
+  ['TAC_ATK','공격발동 배율(+42%=1.42)',()=>TAC_ATK,v=>TAC_ATK=v],['TAC_DEF','방어발동 잔여(−77%=0.23)',()=>TAC_DEF,v=>TAC_DEF=v],
+  ['RATE','전투 피해율',()=>RATE,v=>RATE=v],['ENC','포위 가중',()=>ENC,v=>ENC=v],['RANGED','궁병 사거리',()=>RANGED,v=>RANGED=v],
+  ['NAVY','해군 전함 보너스',()=>NAVY,v=>NAVY=v],['SHIPBASE','함선 기본 전투력',()=>SHIPBASE,v=>SHIPBASE=v],
+  ['HEALR','예슈아대 회복 사거리',()=>HEALR,v=>HEALR=v],['HEALRATE','예슈아대 회복/초',()=>HEALRATE,v=>HEALRATE=v] ];
+function openEditor(){ let h='<div class="ew"><h3>⚙️ 게임엔진 · 데이터 편집기</h3><small>이 게임의 모든 데이터·수치를 편집·저장합니다. 적용 시 즉시 반영, 이 기기에 유지(localStorage). 내보내기로 파일 백업·공유 가능.</small>';
+  // 세력
+  h+='<h4>세력 (0~6 플레이 · 7 궐기 · 8~ 적대)</h4>';
+  FACTIONS.forEach((f,i)=>{ const tag=i<PLAY?'플레이':i===RISE?'궐기':'적대'; h+=`<div class="er"><span style="font-size:10px;color:#7e8da0;width:30px;flex:0 0 30px">${tag}</span><input type="text" data-f="${i}" data-k="name" value="${esc(f.name)}" placeholder="세력명"><input type="text" data-f="${i}" data-k="hero" value="${esc(f.hero)}" placeholder="영웅"><input type="color" data-f="${i}" data-k="color" value="${f.color}">`; if(i>=PLAY&&i!==RISE)h+=`<button onclick="removeFaction(${i})" style="background:#7c2d2d;flex:0 0 auto;padding:6px 8px">✕</button>`; h+=`</div>`; });
+  h+='<button onclick="addFaction()" style="background:#16604a;margin-top:4px;padding:7px 10px;border:none;border-radius:8px;color:#fff;font-size:11.5px;font-weight:700">＋ 적대세력 추가</button>';
+  // 병종
+  h+='<h4>병종 (이름 · 아이콘 · 장비비)</h4>';
+  TNAME.forEach((n,i)=>{ h+=`<div class="er"><input type="text" data-t="${i}" data-tk="name" value="${esc(n)}"><input type="text" data-t="${i}" data-tk="icon" value="${esc(TICON[i]||'')}" style="flex:0 0 46px;text-align:center"><input type="number" data-t="${i}" data-tk="equip" value="${EQUIP[i]||0}" style="flex:0 0 64px" title="장비비(금화)">`; if(i>=8)h+=`<button onclick="removeTroop(${i})" style="background:#7c2d2d;flex:0 0 auto;padding:6px 8px">✕</button>`; h+=`</div>`; });
+  h+='<button onclick="addTroop()" style="background:#16604a;margin-top:4px;padding:7px 10px;border:none;border-radius:8px;color:#fff;font-size:11.5px;font-weight:700">＋ 병종 추가</button>';
+  // 시작/경제
+  h+='<h4>시작 · 경제 수치</h4>';
+  TUNE_META.forEach(([k,lbl])=>{ h+=`<div class="er"><span style="flex:1;font-size:11.5px">${lbl}</span><input type="number" step="any" data-tune="${k}" value="${TUNE[k]}" style="flex:0 0 90px"></div>`; });
+  // 전투 상수
+  h+='<h4>전투 상수 (#16~#19)</h4>';
+  COMBAT_META.forEach(([k,lbl,get])=>{ h+=`<div class="er"><span style="flex:1;font-size:11.5px">${lbl}</span><input type="number" step="any" data-combat="${k}" value="${(+get().toFixed(4))}" style="flex:0 0 90px"></div>`; });
+  // 버튼
+  h+='<div class="eb"><button onclick="applyEditor()">✔ 적용·저장</button><button onclick="exportCfg()" style="background:#0e7490">⤓ 내보내기</button><button onclick="document.getElementById(\'impFile\').click()" style="background:#0e7490">⤒ 불러오기</button><button onclick="resetCfg()" style="background:#7c2d2d">기본값</button><button onclick="closeEditor()" style="background:#475569">닫기</button></div>';
+  h+='<input id="impFile" type="file" accept="application/json,.json" style="display:none" onchange="importCfg(event)"></div>';
   editor.innerHTML=h; editor.classList.remove('hidden'); }
 function closeEditor(){ editor.classList.add('hidden'); }
-function applyEditor(){ editor.querySelectorAll('[data-f]').forEach(inp=>{const i=+inp.dataset.f,k=inp.dataset.k; if(FACTIONS[i])FACTIONS[i][k]=inp.value;}); editor.querySelectorAll('[data-t]').forEach(inp=>{TNAME[+inp.dataset.t]=inp.value;}); saveCfg(); buildMenu(); closeEditor(); }
-function saveCfg(){ try{ localStorage.setItem('yh_cfg',JSON.stringify({factions:FACTIONS.map(f=>({name:f.name,hero:f.hero,color:f.color,desc:f.desc})),tnames:TNAME})); }catch(e){} }
-function loadCfg(){ try{ const s=localStorage.getItem('yh_cfg'); if(!s)return; const c=JSON.parse(s); if(c.factions)c.factions.forEach((f,i)=>{if(FACTIONS[i])Object.assign(FACTIONS[i],f);}); if(c.tnames)c.tnames.forEach((n,i)=>{if(i<TNAME.length&&n)TNAME[i]=n;}); }catch(e){} }
+function readEditor(){
+  editor.querySelectorAll('[data-f]').forEach(inp=>{const i=+inp.dataset.f,k=inp.dataset.k; if(FACTIONS[i])FACTIONS[i][k]=inp.value;});
+  editor.querySelectorAll('[data-t]').forEach(inp=>{const i=+inp.dataset.t,k=inp.dataset.tk; if(k==='name')TNAME[i]=inp.value; else if(k==='icon')TICON[i]=inp.value; else if(k==='equip')EQUIP[i]=+inp.value||0;});
+  editor.querySelectorAll('[data-tune]').forEach(inp=>{const k=inp.dataset.tune,v=+inp.value; if(!isNaN(v))TUNE[k]=v;});
+  editor.querySelectorAll('[data-combat]').forEach(inp=>{const k=inp.dataset.combat,v=+inp.value; if(isNaN(v))return; const m=COMBAT_META.find(x=>x[0]===k); if(m)m[3](v);}); }
+function applyEditor(){ readEditor(); saveCfg(); buildMenu(); closeEditor(); }
+function addFaction(){ readEditor(); TNAME.push('새 적대병종');TICON.push('✙');EQUIP.push(80);TCOL.push('#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0')); FACTIONS.push({name:'새 적대세력',hero:'새 영웅',color:'#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'),hostile:true,desc:'적대세력',troop:TNAME.length-1}); NF=FACTIONS.length; openEditor(); }
+function removeFaction(i){ if(i<PLAY||i===RISE)return; readEditor(); FACTIONS.splice(i,1); NF=FACTIONS.length; openEditor(); }
+function addTroop(){ readEditor(); TNAME.push('새 병종');TICON.push('⚔');EQUIP.push(60);TCOL.push('#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0')); openEditor(); }
+function removeTroop(i){ if(i<8)return; readEditor(); TNAME.splice(i,1);TICON.splice(i,1);EQUIP.splice(i,1);if(TCOL[i])TCOL.splice(i,1); openEditor(); }
+function cfgObj(){ return { factions:FACTIONS.map(f=>({name:f.name,hero:f.hero,color:f.color,desc:f.desc,hostile:!!f.hostile,crest:!!f.crest})),
+  tnames:TNAME.slice(),ticons:TICON.slice(),equip:EQUIP.slice(),tcol:TCOL.slice(),tune:Object.assign({},TUNE),
+  combat:COMBAT_META.reduce((o,[k,,get])=>{o[k]=get();return o;},{}) }; }
+function applyCfg(c){ if(!c)return;
+  if(c.factions){ FACTIONS.length=0; c.factions.forEach(f=>FACTIONS.push(Object.assign({},f))); NF=FACTIONS.length; }
+  if(c.tnames){TNAME.length=0;c.tnames.forEach(n=>TNAME.push(n));}
+  if(c.ticons){TICON.length=0;c.ticons.forEach(n=>TICON.push(n));}
+  if(c.equip){EQUIP.length=0;c.equip.forEach(n=>EQUIP.push(n));}
+  if(c.tcol){TCOL.length=0;c.tcol.forEach(n=>TCOL.push(n));}
+  if(c.tune)Object.assign(TUNE,c.tune);
+  if(c.combat)COMBAT_META.forEach(([k,,,set])=>{if(c.combat[k]!=null)set(c.combat[k]);}); }
+function saveCfg(){ try{ localStorage.setItem('yh_cfg',JSON.stringify(cfgObj())); }catch(e){} }
+function loadCfg(){ try{ const s=localStorage.getItem('yh_cfg'); if(s)applyCfg(JSON.parse(s)); }catch(e){} }
 function resetCfg(){ try{localStorage.removeItem('yh_cfg');}catch(e){} location.reload(); }
+function exportCfg(){ readEditor(); try{ const blob=new Blob([JSON.stringify(cfgObj(),null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='예슈아_게임데이터.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000); }catch(e){alert('내보내기 실패: '+e.message);} }
+function importCfg(ev){ const f=ev.target.files&&ev.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{ applyCfg(JSON.parse(r.result)); saveCfg(); buildMenu(); openEditor(); }catch(e){alert('불러오기 실패: '+e.message);} }; r.readAsText(f); }
 let last=0;
 function loop(t){ const dt=Math.min(0.05,(t-last)/1000)||0; last=t;
   if(state==='play'){ if(zoneCD>0)zoneCD-=dt; if(!zone){const tb=detectBattle();if(tb)enterZone(tb);} if(zone)updateZone(dt); else update(dt); }
