@@ -23,6 +23,19 @@ void TitleScreen::update(float dt) {
     if (IsKeyPressed(KEY_UP))   selection_ = (selection_ + count - 1) % count;
 
     bool confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
+
+    // Mouse support: hovering highlights an option, clicking confirms it.
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int oy = sh / 2 + 40;
+    Vector2 mp = GetMousePosition();
+    for (int i = 0; i < count; ++i) {
+        Rectangle r = { (float)sw / 2 - 160, (float)(oy + i * 44 - 4), 320, 36 };
+        if (CheckCollisionPointRec(mp, r)) {
+            selection_ = i;
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) confirm = true;
+        }
+    }
+
     if (!confirm) return;
 
     if (selection_ == 0) { // New Game

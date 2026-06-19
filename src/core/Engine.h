@@ -34,6 +34,9 @@ public:
     void setMode(Mode m);
     Mode mode() const { return mode_; }
 
+    // Start a fresh playtest immediately (used by the editor's Play / F5).
+    void startPlaytest();
+
     Project&      project()  { return *project_; }
     GameState&    state()    { return state_; }
     TextureCache& textures() { return textures_; }

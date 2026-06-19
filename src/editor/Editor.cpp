@@ -32,7 +32,7 @@ void Editor::update(float dt) {
         engine_.project().save();
         setStatus("Project saved.");
     }
-    if (IsKeyPressed(KEY_F5)) { engine_.setMode(Mode::Title); return; }
+    if (IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
 
     // Camera pan (arrow keys) & zoom (wheel) when not typing
     bool typing = eventTextFocus_ || dbNameFocus_ >= 0;
@@ -114,7 +114,7 @@ void Editor::drawToolbar() {
     x += 16;
     if (ui::button({ x, 6, 90, 28 }, "Save")) { engine_.project().save(); setStatus("Saved."); }
     x += 94;
-    if (ui::button({ x, 6, 110, 28 }, "Play (F5)", false)) engine_.setMode(Mode::Title);
+    if (ui::button({ x, 6, 110, 28 }, "Play (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {

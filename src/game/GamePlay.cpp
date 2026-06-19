@@ -64,6 +64,10 @@ void GamePlay::updateField(float dt) {
     if (!map_) return;
     int TS = map_->tileset.tileWidth;
 
+    // Debug: TSUKURU_AUTOWALK makes the player auto-walk right, to verify movement
+    // headlessly (no effect unless the env var is set).
+    static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
+
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) { interact(); return; }
 
@@ -74,6 +78,7 @@ void GamePlay::updateField(float dt) {
         else if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))  d = Direction::Left;
         else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) d = Direction::Right;
         else press = false;
+        if (autowalk && !press) { d = Direction::Right; press = true; }
         if (press) tryMove(d);
     }
 
@@ -87,6 +92,7 @@ void GamePlay::updateField(float dt) {
             pxX_ = tx; pxY_ = ty; moving_ = false;
             engine_.state().playerX = destX_;
             engine_.state().playerY = destY_;
+            if (autowalk) TraceLog(LOG_INFO, "AUTOWALK arrived at tile (%d,%d)", destX_, destY_);
             // arrival: touch events + encounter
             if (Event* e = map_->eventAt(destX_, destY_))
                 if (e->trigger == TriggerType::PlayerTouch) runEvent(*e);

@@ -21,6 +21,12 @@ void Engine::setMode(Mode m) {
     if (m == Mode::Play && play_) play_->onEnter();
 }
 
+void Engine::startPlaytest() {
+    state_.newGame(project_->database, project_->startActor,
+                   project_->startMap, project_->startX, project_->startY);
+    setMode(Mode::Play);
+}
+
 int Engine::run(const std::string& projectDir, int maxFrames) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1280, 720, "Tsukuru Engine — RPG Maker");
