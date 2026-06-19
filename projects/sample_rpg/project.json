@@ -76,14 +76,19 @@
     ],
     "nextId": 13
   },
+  "attackEffect": -1,
+  "dashEffect": -1,
   "maps": [
     1,
     2
   ],
   "name": "윌로우브룩",
+  "playerFrames": 4,
   "playerSprite": 2,
+  "rangedEffect": -1,
   "startActor": 1,
   "startMap": 1,
   "startX": 22,
-  "startY": 20
+  "startY": 20,
+  "ultEffect": -1
 }

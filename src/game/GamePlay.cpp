@@ -33,7 +33,9 @@ void GamePlay::onEnter() {
     dir_ = gs.playerDir;
     moving_ = false;
     phase_ = Phase::Field;
-    attackTimer_ = attackCd_ = playerHurt_ = 0;
+    attackTimer_ = playerHurt_ = 0;
+    for (float& c : skillCd_) c = 0;
+    projectiles_.clear(); fx_.clear();
     spawnMonsters();
     runAutoruns();
 }
@@ -141,16 +143,32 @@ void GamePlay::updateField(float dt) {
     static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
 
     if (attackTimer_ > 0) attackTimer_ -= dt;
-    if (attackCd_ > 0)    attackCd_ -= dt;
+    for (float& c : skillCd_) if (c > 0) c -= dt;
     if (playerHurt_ > 0)  playerHurt_ -= dt;
+
+    // slow MP regeneration so skills are sustainable
+    if (!engine_.state().party.empty()) {
+        mpRegen_ -= dt;
+        if (mpRegen_ <= 0) {
+            mpRegen_ = 1.5f;
+            PartyMember& h = engine_.state().party[0];
+            if (h.mp < h.maxMp) h.mp = std::min(h.maxMp, h.mp + 1);
+        }
+    }
+
+    updateProjectiles(dt);
+    updateFx(dt);
 
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
 
-    // Space / Z = attack (or talk if nothing to hit). Enter = talk only.
+    // Skills: Z/Space = melee, X = ranged, C = dash, V = ultimate.
     if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_LEFT_CONTROL))
-        playerAttack();
-    else if (IsKeyPressed(KEY_ENTER))
-        interact();
+        castSkill(SK_Attack);
+    if (IsKeyPressed(KEY_X)) castSkill(SK_Ranged);
+    if (IsKeyPressed(KEY_C)) castSkill(SK_Dash);
+    if (IsKeyPressed(KEY_V)) castSkill(SK_Ult);
+    handleSkillClicks();                 // touch / mouse click on the skill panel
+    if (IsKeyPressed(KEY_ENTER)) interact();
 
     // Debug autopilot: chase and attack the nearest monster (verifies combat).
     Direction autoDir = Direction::Right; bool autoMove = false;
@@ -202,7 +220,8 @@ void GamePlay::updateField(float dt) {
             pxY_ += dy / dist * step;
         }
         animTime_ += dt;
-        if (animTime_ > 0.12f) { animTime_ = 0; frame_ = (frame_ + 1) % 4; }
+        int pframes = std::max(1, engine_.project().playerFrames);
+        if (animTime_ > 0.12f) { animTime_ = 0; frame_ = (frame_ + 1) % pframes; }
     } else {
         frame_ = 0;
     }
@@ -251,14 +270,41 @@ void GamePlay::interact() {
 }
 
 // ----------------------------- combat -----------------------------
+// Apply damage to a monster; returns true if it died (and handles the kill).
+bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
+    if (!m.alive()) return false;
+    m.hp -= std::max(1, dmg);
+    m.hurtFlash = 0.18f;
+    if (m.hp <= 0) { onMonsterKilled(m); return true; }
+    return false;
+}
+
+void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius) {
+    SkillFx f; f.type = type; f.px = px; f.py = py; f.dir = dir;
+    f.assetId = assetId; f.dur = dur; f.t = 0; f.radius = radius;
+    fx_.push_back(f);
+}
+
+// Central dispatch so both keys and panel clicks/touches share one path.
+void GamePlay::castSkill(int slot) {
+    switch (slot) {
+        case SK_Attack:   playerAttack(); break;
+        case SK_Ranged:   castRanged();   break;
+        case SK_Dash:     castDash();      break;
+        case SK_Ult:      castUltimate();  break;
+    }
+}
+
 void GamePlay::playerAttack() {
-    if (attackCd_ > 0) return;
-    attackCd_ = 0.32f;
+    if (skillCd_[SK_Attack] > 0) return;
+    skillCd_[SK_Attack] = 0.32f;
     attackTimer_ = 0.18f;
     engine_.audio().playSfx("attack", 0.7f);
 
     Vec2i delta = dirToDelta((Direction)dir_);
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
+    int TS = map_->tileset.tileWidth;
+    spawnFx(0, fx * (float)TS, fy * (float)TS, dir_, engine_.project().attackEffect, 0.18f);
 
     const Database& db = engine_.project().database;
     int atk = engine_.state().party.empty() ? 10 : engine_.state().party[0].totalAtk(db);
@@ -267,11 +313,8 @@ void GamePlay::playerAttack() {
     for (auto& m : monsters_) {
         if (!m.alive()) continue;
         if ((m.x == fx && m.y == fy) || (m.x == destX_ && m.y == destY_)) {
-            int dmg = std::max(1, atk - m.def);
-            m.hp -= dmg;
-            m.hurtFlash = 0.18f;
+            damageMonster(m, atk - m.def);
             hit = true;
-            if (m.hp <= 0) onMonsterKilled(m);
         }
     }
     monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
@@ -279,6 +322,120 @@ void GamePlay::playerAttack() {
 
     if (hit) engine_.audio().playSfx("hit", 0.8f);
     else interact(); // nothing to hit -> talk to an NPC in front
+}
+
+// X — ranged bolt: fires a projectile in the facing direction (costs MP).
+void GamePlay::castRanged() {
+    if (skillCd_[SK_Ranged] > 0) return;
+    GameState& gs = engine_.state();
+    if (gs.party.empty()) return;
+    const int cost = 4;
+    if (gs.party[0].mp < cost) { toast_ = "MP가 부족합니다"; toastTimer_ = 1.0f; return; }
+    gs.party[0].mp -= cost;
+    skillCd_[SK_Ranged] = 0.9f;
+    engine_.audio().playSfx("attack", 0.6f);
+
+    const Database& db = engine_.project().database;
+    int atk = gs.party[0].totalAtk(db);
+    Projectile pr;
+    pr.dir = dir_;
+    pr.px = pxX_; pr.py = pxY_;
+    pr.life = 0.8f;
+    pr.dmg = (int)(atk * 1.3f);
+    projectiles_.push_back(pr);
+}
+
+// C — dodge dash: quickly slides up to 4 tiles in the facing direction,
+// passing over hazards, leaving a trail effect. No MP, medium cooldown.
+void GamePlay::castDash() {
+    if (skillCd_[SK_Dash] > 0) return;
+    skillCd_[SK_Dash] = 1.6f;
+    engine_.audio().playSfx("select", 0.8f);
+    Vec2i d = dirToDelta((Direction)dir_);
+    int TS = map_->tileset.tileWidth;
+    int nx = destX_, ny = destY_;
+    for (int i = 0; i < 4; ++i) {
+        int tx = nx + d.x, ty = ny + d.y;
+        if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
+        if (monsterAt(tx, ty) || npcAt(tx, ty)) break;
+        nx = tx; ny = ty;
+        spawnFx(2, nx * (float)TS, ny * (float)TS, dir_, engine_.project().dashEffect, 0.30f);
+    }
+    destX_ = nx; destY_ = ny;
+    pxX_ = nx * (float)TS; pxY_ = ny * (float)TS;
+    moving_ = false;
+    engine_.state().playerX = nx; engine_.state().playerY = ny;
+    playerHurt_ = 0; // brief safety
+}
+
+// V — ultimate: blink forward to the farthest open tile (up to 5), then deal
+// area-of-effect damage to every monster within radius 2. Costs MP, long CD.
+void GamePlay::castUltimate() {
+    if (skillCd_[SK_Ult] > 0) return;
+    GameState& gs = engine_.state();
+    if (gs.party.empty()) return;
+    const int cost = 16;
+    if (gs.party[0].mp < cost) { toast_ = "MP가 부족합니다 (16)"; toastTimer_ = 1.2f; return; }
+    gs.party[0].mp -= cost;
+    skillCd_[SK_Ult] = 8.0f;
+    engine_.audio().playSfx("levelup", 0.9f);
+
+    Vec2i d = dirToDelta((Direction)dir_);
+    int TS = map_->tileset.tileWidth;
+    int nx = destX_, ny = destY_;
+    for (int i = 0; i < 5; ++i) {
+        int tx = nx + d.x, ty = ny + d.y;
+        if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
+        if (npcAt(tx, ty)) break;
+        nx = tx; ny = ty;
+    }
+    destX_ = nx; destY_ = ny;
+    pxX_ = nx * (float)TS; pxY_ = ny * (float)TS;
+    moving_ = false;
+    gs.playerX = nx; gs.playerY = ny;
+
+    // big AoE burst at the landing point
+    spawnFx(3, nx * (float)TS, ny * (float)TS, dir_, engine_.project().ultEffect, 0.5f, TS * 2.6f);
+    const Database& db = engine_.project().database;
+    int atk = gs.party[0].totalAtk(db);
+    for (auto& m : monsters_) {
+        if (!m.alive()) continue;
+        int cheb = std::max(std::abs(m.x - nx), std::abs(m.y - ny));
+        if (cheb <= 2) damageMonster(m, atk * 2 - m.def);
+    }
+    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
+                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+    engine_.audio().playSfx("defeat", 0.7f);
+}
+
+void GamePlay::updateProjectiles(float dt) {
+    if (!map_) { projectiles_.clear(); return; }
+    int TS = map_->tileset.tileWidth;
+    float speed = TS * 11.0f;
+    for (auto& pr : projectiles_) {
+        Vec2i d = dirToDelta((Direction)pr.dir);
+        pr.px += d.x * speed * dt;
+        pr.py += d.y * speed * dt;
+        pr.life -= dt;
+        int tx = (int)((pr.px + TS/2) / TS), ty = (int)((pr.py + TS/2) / TS);
+        if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) { pr.life = 0; continue; }
+        if (FieldMonster* m = monsterAt(tx, ty)) {
+            damageMonster(*m, pr.dmg);
+            spawnFx(1, m->px, m->py, pr.dir, -1, 0.2f);
+            engine_.audio().playSfx("hit", 0.8f);
+            pr.life = 0;
+        }
+    }
+    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
+                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+    projectiles_.erase(std::remove_if(projectiles_.begin(), projectiles_.end(),
+                    [](const Projectile& p){ return p.life <= 0; }), projectiles_.end());
+}
+
+void GamePlay::updateFx(float dt) {
+    for (auto& f : fx_) f.t += dt;
+    fx_.erase(std::remove_if(fx_.begin(), fx_.end(),
+              [](const SkillFx& f){ return f.t >= f.dur; }), fx_.end());
 }
 
 void GamePlay::onMonsterKilled(const FieldMonster& m) {
@@ -608,11 +765,13 @@ void GamePlay::runEvent(Event& e) {
 }
 
 // ----------------------------- rendering -----------------------------
-void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint) {
+void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint, int frames) {
     int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
+    if (frames < 1) frames = 1;
     if (assetId >= 0) {
         const Texture2D& tex = engine_.assetTexture(assetId);
-        float fw = tex.width / 4.0f, fh = tex.height / 4.0f;
+        float fw = tex.width / (float)frames, fh = tex.height / 4.0f;
+        if (frame >= frames) frame %= frames;
         Rectangle src = { frame * fw, dir * fh, fw, fh };
         Rectangle dst = { px, py, (float)TS, (float)TS };
         DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
@@ -646,6 +805,112 @@ void GamePlay::drawMonsters() {
             DrawRectangle((int)m.px, (int)m.py - 7, (int)(w * ratio), 4, Color{ 220, 80, 80, 255 });
         }
     }
+}
+
+// world-space ranged bolts
+void GamePlay::drawProjectiles() {
+    if (!map_) return;
+    int TS = map_->tileset.tileWidth;
+    for (auto& pr : projectiles_) {
+        float cx = pr.px + TS/2.0f, cy = pr.py + TS/2.0f;
+        Vec2i d = dirToDelta((Direction)pr.dir);
+        Color core = { 120, 200, 255, 255 };
+        DrawCircle((int)cx, (int)cy, TS*0.18f, Fade(core, 0.95f));
+        DrawCircle((int)(cx - d.x*6), (int)(cy - d.y*6), TS*0.12f, Fade(core, 0.5f)); // trail
+        DrawCircleLines((int)cx, (int)cy, TS*0.22f, Fade(WHITE, 0.7f));
+    }
+}
+
+// world-space skill effects (sprite sheet if assigned, else procedural)
+void GamePlay::drawFx() {
+    int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
+    for (auto& f : fx_) {
+        float k = f.dur > 0 ? f.t / f.dur : 1.0f;          // 0..1 progress
+        if (f.assetId >= 0) {
+            const Texture2D& tex = engine_.assetTexture(f.assetId);
+            int frames = 4;
+            float fw = tex.width / (float)frames, fh = tex.height / 4.0f;
+            int fr = std::min(frames-1, (int)(k * frames));
+            int row = std::min(3, f.dir);
+            Rectangle src = { fr*fw, row*fh, fw, fh };
+            float sz = (f.type == 3) ? f.radius*2 : TS*1.2f;
+            Rectangle dst = { f.px + TS/2 - sz/2, f.py + TS/2 - sz/2, sz, sz };
+            DrawTexturePro(tex, src, dst, {0,0}, 0, Fade(WHITE, 1.0f - k*0.3f));
+            continue;
+        }
+        // procedural fallbacks
+        float cx = f.px + TS/2.0f, cy = f.py + TS/2.0f;
+        if (f.type == 0) {                                  // melee slash arc
+            DrawRectangle((int)f.px, (int)f.py, TS, TS, Fade(Color{255,240,160,255}, 0.45f*(1-k)));
+            DrawRectangleLinesEx({ f.px, f.py, (float)TS, (float)TS }, 2, Fade(WHITE, 0.8f*(1-k)));
+        } else if (f.type == 1) {                           // bolt impact
+            DrawCircle((int)cx, (int)cy, TS*0.5f*k, Fade(Color{150,210,255,255}, 0.6f*(1-k)));
+        } else if (f.type == 2) {                           // dash trail
+            DrawCircle((int)cx, (int)cy, TS*0.4f*(1-k), Fade(Color{180,220,255,255}, 0.5f*(1-k)));
+        } else if (f.type == 3) {                           // AoE ring
+            float r = f.radius * k;
+            DrawCircleGradient((int)cx, (int)cy, r, Fade(Color{255,200,120,255}, 0.5f*(1-k)), Fade(Color{255,120,80,0},0));
+            DrawCircleLines((int)cx, (int)cy, r, Fade(Color{255,230,160,255}, 0.9f*(1-k)));
+            DrawCircleLines((int)cx, (int)cy, r*0.7f, Fade(WHITE, 0.7f*(1-k)));
+        }
+    }
+}
+
+// Right-side skill panel: key, name, MP cost, cooldown sweep, description.
+void GamePlay::drawSkillPanel() {
+    static const char* keys[SK_COUNT]  = { "Z", "X", "C", "V" };
+    static const char* names[SK_COUNT] = { "공격", "원거리", "회피 이동", "궁극기" };
+    static const char* desc[SK_COUNT]  = {
+        "근접 공격", "MP4 원거리 일격", "전방 4칸 회피", "MP16 순간이동+광역" };
+    static const float maxCd[SK_COUNT] = { 0.32f, 0.9f, 1.6f, 8.0f };
+    static const int   mpCost[SK_COUNT] = { 0, 4, 0, 16 };
+
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    float pw = 168, ph = 76, gap = 8;
+    float px = sw - pw - 12;
+    float py = sh - (ph + gap) * SK_COUNT - 14;
+
+    GameState& gs = engine_.state();
+    int mp = gs.party.empty() ? 0 : gs.party[0].mp;
+
+    for (int i = 0; i < SK_COUNT; ++i) {
+        Rectangle r = { px, py + i*(ph+gap), pw, ph };
+        skillBtn_[i] = r;
+        bool hover = CheckCollisionPointRec(GetMousePosition(), r);
+        bool ready = skillCd_[i] <= 0 && mp >= mpCost[i];
+        Color bg = ready ? (hover ? ui::kPanelHi : ui::kPanel) : Color{40,30,30,235};
+        DrawRectangleRec(r, Fade(bg, 0.95f));
+        DrawRectangleLinesEx(r, 2, ready ? ui::kAccent : Fade(ui::kDanger,0.7f));
+
+        // key badge
+        DrawRectangle((int)r.x+8, (int)r.y+8, 30, 30, Fade(ui::kAccent, ready?0.9f:0.4f));
+        DrawTextU(keys[i], (int)r.x+17, (int)r.y+13, 22, BLACK);
+        // name + cost + description
+        DrawTextU(names[i], (int)r.x+46, (int)r.y+8, 19, ui::kText);
+        if (mpCost[i] > 0)
+            DrawTextU(TextFormat("MP %d", mpCost[i]), (int)r.x+46, (int)r.y+32, 13,
+                      mp >= mpCost[i] ? ui::kGood : ui::kDanger);
+        DrawTextU(desc[i], (int)r.x+8, (int)r.y+52, 12, ui::kTextDim);
+
+        // cooldown sweep overlay (top -> bottom fill while recharging)
+        if (skillCd_[i] > 0) {
+            float frac = skillCd_[i] / maxCd[i];
+            if (frac > 1) frac = 1;
+            DrawRectangle((int)r.x, (int)r.y, (int)r.width, (int)(r.height*frac), Fade(BLACK, 0.55f));
+            DrawTextU(TextFormat("%.1f", skillCd_[i]), (int)(r.x+r.width-40), (int)r.y+8, 16, ui::kTextDim);
+        }
+    }
+    DrawTextU("스킬: 키 또는 클릭/터치", (int)px, (int)py - 20, 13, Fade(ui::kText,0.7f));
+}
+
+// touch / mouse click on a skill slot casts that skill
+void GamePlay::handleSkillClicks() {
+    bool pressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    int touches = GetTouchPointCount();
+    if (!pressed && touches == 0) return;
+    Vector2 mp = pressed ? GetMousePosition() : GetTouchPosition(0);
+    for (int i = 0; i < SK_COUNT; ++i)
+        if (CheckCollisionPointRec(mp, skillBtn_[i])) { castSkill(i); return; }
 }
 
 void GamePlay::drawField() {
@@ -697,15 +962,11 @@ void GamePlay::drawField() {
 
     // player (red flash when hurt)
     Color ptint = playerHurt_ > 0 ? Color{ 255, 130, 130, 255 } : WHITE;
-    drawCharacter(engine_.project().playerSprite, dir_, moving_ ? frame_ : 0, pxX_, pxY_, ptint);
+    drawCharacter(engine_.project().playerSprite, dir_, moving_ ? frame_ : 0, pxX_, pxY_, ptint,
+                  std::max(1, engine_.project().playerFrames));
 
-    // melee slash effect in the facing tile
-    if (attackTimer_ > 0) {
-        Vec2i d = dirToDelta((Direction)dir_);
-        float fx = (destX_ + d.x) * (float)TS, fy = (destY_ + d.y) * (float)TS;
-        DrawRectangle((int)fx, (int)fy, TS, TS, Fade(Color{ 255, 240, 160, 255 }, 0.45f));
-        DrawRectangleLinesEx({ fx, fy, (float)TS, (float)TS }, 2, Fade(WHITE, 0.8f));
-    }
+    drawProjectiles();
+    drawFx();
     // overhead layer (treetops, roof edges) on top of the player
     drawLayer(kLayerCount - 1);
     EndMode2D();
@@ -749,8 +1010,10 @@ void GamePlay::drawField() {
         DrawRectangle(0, 32, MeasureTextU(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
         DrawTextU(TextFormat("목표: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
     }
-    DrawTextU("Space:공격  방향키/WASD:이동  Enter:대화  ESC:메뉴  F2:에디터",
+    DrawTextU("Z:공격 X:원거리 C:회피 V:궁극기  방향키/WASD:이동  Enter:대화  ESC:메뉴  F2:에디터",
              12, GetScreenHeight() - 24, 15, Fade(ui::kText, 0.7f));
+
+    drawSkillPanel();
 
     if (toastTimer_ > 0) {
         int tw = MeasureTextU(toast_.c_str(), 18);

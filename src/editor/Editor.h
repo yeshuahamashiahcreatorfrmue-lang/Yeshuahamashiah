@@ -33,6 +33,7 @@ private:
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
     int  generateCharacter();          // make + register a new character sheet
+    int  generateEffect(int style);    // make + register a skill-effect sheet
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
@@ -55,6 +56,7 @@ private:
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;
     int  newMapW_ = 30, newMapH_ = 24;
+    int  newMapTier_ = 0;           // standardized size tier for a new map (0..6)
     // Character generation
     int  charColor_ = 0;
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag

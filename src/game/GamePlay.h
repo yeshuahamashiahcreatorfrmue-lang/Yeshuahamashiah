@@ -50,6 +50,28 @@ struct NpcInst {
 
 struct Particle { float x, y, vx, vy, life; };
 
+// A travelling ranged bolt (X skill).
+struct Projectile {
+    float px = 0, py = 0;   // pixel position
+    int dir = 0;
+    float life = 0;
+    int dmg = 0;
+};
+
+// A short-lived visual effect. If assetId >= 0 it draws an animated sprite
+// sheet (4 frames x 4 dirs, like a character); otherwise a procedural shape.
+struct SkillFx {
+    int type = 0;           // 0 slash, 1 bolt-impact, 2 dash, 3 aoe-ring
+    float px = 0, py = 0;
+    float t = 0, dur = 0.25f;
+    int dir = 0;
+    int assetId = -1;
+    float radius = 0;       // for aoe ring
+};
+
+// Player skill slots (Z/X/C/V).
+enum SkillSlot { SK_Attack = 0, SK_Ranged = 1, SK_Dash = 2, SK_Ult = 3, SK_COUNT = 4 };
+
 class GamePlay {
 public:
     explicit GamePlay(Engine& engine);
@@ -71,7 +93,7 @@ private:
     void drawField();
     void drawMessage();
     void showMessage(const std::string& text); // splits on '|' into pages
-    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE);
+    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4);
 
     // --- field combat ---
     void spawnMonsters();
@@ -82,6 +104,20 @@ private:
     FieldMonster* monsterAt(int x, int y);
     bool walkable(int x, int y);            // not blocked / not occupied
     void onMonsterKilled(const FieldMonster& m);
+
+    // --- skills (Z/X/C/V), cooldowns, ranged bolts, blink+AoE ----
+    void castSkill(int slot);               // dispatch by SkillSlot
+    void castRanged();
+    void castDash();
+    void castUltimate();
+    bool damageMonster(FieldMonster& m, int dmg); // returns true if killed
+    void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0);
+    void updateProjectiles(float dt);
+    void updateFx(float dt);
+    void drawProjectiles();
+    void drawFx();
+    void drawSkillPanel();                   // right-side cooldown/description panel
+    void handleSkillClicks();                // touch/click to cast
 
     // --- NPCs / atmosphere / hud ---
     void spawnNpcs();
@@ -109,11 +145,17 @@ private:
 
     // Player melee attack
     float attackTimer_ = 0;     // >0 while the slash effect shows
-    float attackCd_ = 0;        // cooldown between swings
     float playerHurt_ = 0;      // red flash when the player takes damage
+
+    // Skills: per-slot cooldown remaining (Z/X/C/V).
+    float skillCd_[SK_COUNT] = { 0, 0, 0, 0 };
+    Rectangle skillBtn_[SK_COUNT] = {}; // screen rects for click/touch casting
+    float mpRegen_ = 0;         // MP regenerates slowly over time
 
     std::vector<FieldMonster> monsters_;
     std::vector<NpcInst>      npcs_;
+    std::vector<Projectile>   projectiles_;
+    std::vector<SkillFx>      fx_;
     std::vector<Particle>     weatherP_;
     Texture2D minimapTex_{};    // cached minimap terrain (rebuilt once per map)
     bool minimapValid_ = false;

@@ -15,6 +15,20 @@ namespace tsukuru {
 
 static const float kToolbarH = 40;
 static const float kPaletteW = 220;
+static const int   kUndoLimit = 42;     // Ctrl+Z history depth
+
+// Standardized world sizes (7 tiers), square, up to 420x420.
+static const int kSizeTiers[7] = { 30, 60, 120, 180, 270, 360, 420 };
+static const char* kSizeTierNames[7] = {
+    "1단계 30x30", "2단계 60x60", "3단계 120x120", "4단계 180x180",
+    "5단계 270x270", "6단계 360x360", "7단계 420x420 (최대)"
+};
+// nearest tier index for a given side length
+static int sizeTierOf(int side) {
+    int best = 0, bestd = 1<<30;
+    for (int i = 0; i < 7; ++i) { int d = std::abs(kSizeTiers[i]-side); if (d < bestd){bestd=d;best=i;} }
+    return best;
+}
 
 Editor::Editor(Engine& engine) : engine_(engine) {
     cam_.zoom = 1.5f;
@@ -43,7 +57,7 @@ void Editor::pushUndo() {
     if (!m) return;
     if (undoMap_ != m->id) { undo_.clear(); redo_.clear(); undoMap_ = m->id; }
     undo_.push_back(m->tilemap.toJson().dump());
-    if (undo_.size() > 80) undo_.erase(undo_.begin());
+    if (undo_.size() > kUndoLimit) undo_.erase(undo_.begin());
     redo_.clear();
 }
 void Editor::doUndo() {
@@ -740,13 +754,15 @@ void Editor::drawWorldTab() {
         y += 32;
     }
 
-    // new map controls
+    // new map controls — standardized world size (7 tiers, up to 420x420)
     y += 8;
-    ui::intStepper({ lx + 10, y, (lw-30)/2, 26 }, "너비", newMapW_, 5, 5, 200);
-    ui::intStepper({ lx + 10 + (lw-30)/2 + 10, y, (lw-30)/2, 26 }, "높이", newMapH_, 5, 5, 200);
+    ui::label("새 맵 크기 (규격)", (int)lx + 10, (int)y, 14, ui::kTextDim); y += 20;
+    if (ui::button({ lx + 10, y, lw - 20, 26 }, kSizeTierNames[newMapTier_]))
+        newMapTier_ = (newMapTier_ + 1) % 7;
     y += 34;
     if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ 새 맵")) {
-        auto nm = p.addMap("Map" + std::to_string(p.nextMapId()), newMapW_, newMapH_);
+        int side = kSizeTiers[newMapTier_];
+        auto nm = p.addMap("Map" + std::to_string(p.nextMapId()), side, side);
         // copy tileset from current map so it is paintable immediately
         if (auto cur = activeMap()) nm->tileset = cur->tileset;
         activeMapId_ = nm->id;
@@ -775,11 +791,17 @@ void Editor::drawWorldTab() {
     dy += 40;
 
     int w = m->tilemap.width(), h = m->tilemap.height();
-    DrawTextU(TextFormat("크기: %d x %d 타일", w, h), (int)dx, (int)dy, 16, ui::kText); dy += 28;
-    int nw = w, nh = h;
-    ui::intStepper({ dx, dy, 220, 26 }, "너비", nw, 5, 5, 200); dy += 30;
-    ui::intStepper({ dx, dy, 220, 26 }, "높이", nh, 5, 5, 200); dy += 32;
-    if ((nw != w || nh != h)) m->tilemap.resizePreserve(nw, nh);
+    DrawTextU(TextFormat("크기: %d x %d 타일", w, h), (int)dx, (int)dy, 16, ui::kText); dy += 26;
+    // standardized size tiers (cycle to resize, content preserved)
+    int tier = sizeTierOf(std::max(w, h));
+    if (ui::button({ dx, dy, 260, 26 }, kSizeTierNames[tier])) {
+        int nt = (tier + 1) % 7;
+        int side = kSizeTiers[nt];
+        m->tilemap.resizePreserve(side, side);
+        setStatus(std::string("맵 크기 변경: ") + kSizeTierNames[nt]);
+    }
+    dy += 30;
+    DrawTextU("위 버튼 클릭 = 다음 규격으로 크기 변경 (내용 보존)", (int)dx, (int)dy, 12, ui::kTextDim); dy += 24;
 
     ui::intStepper({ dx, dy, 260, 26 }, "조우율%", m->encounterRate, 5, 0, 100); dy += 34;
 
@@ -869,21 +891,79 @@ int Editor::generateCharacter() {
     return id;
 }
 
+// Generate a skill-effect sheet (4 frames x 4 dirs) and register it as an asset.
+int Editor::generateEffect(int style) {
+    Project& p = engine_.project();
+    static const Color cols[4] = {
+        {255,235,150,255},  // slash - warm
+        {130,200,255,255},  // bolt  - blue
+        {190,225,255,255},  // dash  - pale
+        {255,170,110,255}   // burst - orange
+    };
+    static const char* tags[4] = { "fx_slash", "fx_bolt", "fx_dash", "fx_burst" };
+    int s = style & 3;
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir) / "assets" / (std::string(tags[s]) + "_" + std::to_string(n++) + ".png"); }
+    while (fs::exists(dest));
+
+    Image img = gen::effectSheet(cols[s], s);
+    ExportImage(img, dest.string().c_str());
+    UnloadImage(img);
+
+    std::string rel = (fs::path("assets") / dest.filename()).generic_string();
+    int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+    p.save();
+    setStatus("이펙트 에셋 생성됨: " + dest.stem().string());
+    return id;
+}
+
 void Editor::drawCharsTab() {
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
 
-    ui::label("캐릭터", 20, (int)kToolbarH + 14, 24, ui::kAccent);
-    DrawTextU("엔진에서 새 캐릭터를 생성하거나, PNG 스프라이트시트(4프레임 x 4방향)를 창에 끌어다 놓으세요.",
-             20, (int)kToolbarH + 44, 16, ui::kTextDim);
-    if (ui::button({ 20, kToolbarH + 70, 240, 32 }, "+ 새 캐릭터 생성"))
+    ui::label("캐릭터 / 이펙트 에셋", 20, (int)kToolbarH + 14, 24, ui::kAccent);
+    DrawTextU("캐릭터/이펙트를 엔진에서 생성하거나, PNG 시트(N프레임 x 4방향)를 창에 끌어다 놓으세요.",
+             20, (int)kToolbarH + 44, 15, ui::kTextDim);
+    if (ui::button({ 20, kToolbarH + 68, 220, 30 }, "+ 새 캐릭터 생성"))
         generateCharacter();
-    handleAssetDrop(); // allow dropping character sheets here too
+    // generate one of each effect style (slash/bolt/dash/burst)
+    static const char* fxBtn[4] = { "+ 베기", "+ 볼트", "+ 대시", "+ 폭발" };
+    for (int s = 0; s < 4; ++s)
+        if (ui::button({ 252.0f + s*110, kToolbarH + 68, 104, 30 }, fxBtn[s]))
+            generateEffect(s);
+    handleAssetDrop(); // allow dropping character/effect sheets here too
 
-    // grid of image assets (characters), with the 'facing-down' frame preview
     auto imgs = p.assets.byType(AssetType::Image);
-    float x = 20, y = kToolbarH + 118, cell = 150;
+
+    // ---- player movement frames + skill-effect assignment ----
+    auto imgName = [&](int id)->std::string {
+        if (id < 0) return "없음";
+        const AssetEntry* e = p.assets.find(id);
+        return e ? e->name : "없음";
+    };
+    auto cycleAsset = [&](int& slot){            // None -> each image -> None
+        int idx = -1;
+        for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == slot) idx = i;
+        idx++;
+        slot = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
+        p.save();
+    };
+    float py = kToolbarH + 104;
+    ui::panel({ 20, py, 720, 92 }, ui::kPanel);
+    ui::label("플레이어 / 스킬 이펙트 지정", 30, (int)py + 6, 16, ui::kAccent);
+    ui::intStepper({ 30, py + 30, 200, 26 }, "이동 프레임", p.playerFrames, 1, 4, 7);
+    static const char* slotName[4] = { "공격(Z)", "원거리(X)", "회피(C)", "궁극기(V)" };
+    int* slots[4] = { &p.attackEffect, &p.rangedEffect, &p.dashEffect, &p.ultEffect };
+    for (int i = 0; i < 4; ++i) {
+        Rectangle r = { 250.0f + (i%2)*240, py + 30 + (i/2)*30, 232, 26 };
+        if (ui::button(r, std::string(slotName[i]) + ": " + imgName(*slots[i]), *slots[i] >= 0))
+            cycleAsset(*slots[i]);
+    }
+
+    // grid of image assets, with the 'facing-down' frame preview
+    float x = 20, y = py + 108, cell = 150;
     for (auto* a : imgs) {
         Rectangle c = { x, y, cell, cell + 56 };
         bool isPlayer = (a->id == p.playerSprite);
