@@ -57,15 +57,6 @@ FieldMonster* GamePlay::monsterAt(int x, int y) {
     return nullptr;
 }
 
-bool GamePlay::walkable(int x, int y) {
-    if (!map_ || !map_->tilemap.inBounds(x, y)) return false;
-    if (map_->tilemap.blocked(x, y)) return false;
-    if (monsterAt(x, y)) return false;
-    if (npcAt(x, y)) return false;
-    return true;
-}
-
-// ----------------------------- kill rewards + AI -----------------------------
 void GamePlay::onMonsterKilled(const FieldMonster& m) {
     GameState& gs = engine_.state();
     gs.inventory.gold += m.goldReward;
@@ -185,6 +176,13 @@ void GamePlay::drawMonsters() {
     }
 }
 
-// world-space ranged bolts
+// ----------------------------- damage / death -----------------------------
+bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
+    if (!m.alive()) return false;
+    m.hp -= std::max(1, dmg);
+    m.hurtFlash = 0.18f;
+    if (m.hp <= 0) { onMonsterKilled(m); return true; }
+    return false;
+}
 
 } // namespace tsukuru

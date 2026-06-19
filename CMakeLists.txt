@@ -89,6 +89,7 @@ if(BUILD_ENGINE)
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayEvents.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayMonsters.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlaySkills.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayFx.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayNpc.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayRender.cpp
         ${CMAKE_SOURCE_DIR}/src/game/TitleScreen.cpp

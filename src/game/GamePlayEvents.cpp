@@ -12,6 +12,8 @@
 
 namespace tsukuru {
 
+// Pick the first ActionButton event at (x,y) whose condition is satisfied
+// (multiple events on one tile act like RPG-Maker "event pages").
 Event* GamePlay::actionEventAt(int x, int y) {
     GameState& gs = engine_.state();
     Event* fallback = nullptr;

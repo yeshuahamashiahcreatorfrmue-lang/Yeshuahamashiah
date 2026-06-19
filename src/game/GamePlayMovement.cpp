@@ -138,7 +138,13 @@ void GamePlay::tryMove(Direction d) {
     destX_ = nx; destY_ = ny; moving_ = true;
 }
 
-// pick the first ActionButton event at (x,y) whose condition is satisfied
-// (multiple events on one tile act like RPG-Maker "event pages").
+// ----------------------------- tile passability -----------------------------
+bool GamePlay::walkable(int x, int y) {
+    if (!map_ || !map_->tilemap.inBounds(x, y)) return false;
+    if (map_->tilemap.blocked(x, y)) return false;
+    if (monsterAt(x, y)) return false;
+    if (npcAt(x, y)) return false;
+    return true;
+}
 
 } // namespace tsukuru

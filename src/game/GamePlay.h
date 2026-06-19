@@ -40,6 +40,7 @@ private:
     // --- movement (GamePlayMovement.cpp) ---
     void updateField(float dt);
     void tryMove(Direction d);
+    bool walkable(int x, int y);            // not blocked / not occupied (any mover)
 
     // --- events / dialogue (GamePlayEvents.cpp) ---
     void interact();
@@ -54,23 +55,24 @@ private:
     void updateMonsters(float dt);
     void drawMonsters();
     FieldMonster* monsterAt(int x, int y);
-    bool walkable(int x, int y);            // not blocked / not occupied
+    bool damageMonster(FieldMonster& m, int dmg); // returns true if killed
     void onMonsterKilled(const FieldMonster& m);
 
-    // --- data-driven skills (GamePlaySkills.cpp): pattern/projectile/blink/FX ---
+    // --- data-driven skills (GamePlaySkills.cpp): definition + cast + HUD ---
     void loadSkills();                       // pull from db (or built-in defaults)
     void castSlot(int slot);                 // cast the skill bound to a key slot
     void castFieldSkill(const FieldSkill& s, int slot);
     void playerAttack();                     // convenience: cast slot 0
-    bool damageMonster(FieldMonster& m, int dmg); // returns true if killed
+    void drawSkillPanel();                   // right-side cooldown/description panel
+    void handleSkillClicks();                // touch/click to cast
+    static Vec2i rotateToFacing(int ox, int oy, int dir); // canonical up -> facing
+
+    // --- projectiles & visual effects (GamePlayFx.cpp) ---
     void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0);
     void updateProjectiles(float dt);
     void updateFx(float dt);
     void drawProjectiles();
     void drawFx();
-    void drawSkillPanel();                   // right-side cooldown/description panel
-    void handleSkillClicks();                // touch/click to cast
-    static Vec2i rotateToFacing(int ox, int oy, int dir); // canonical up -> facing
 
     // --- NPCs / autoruns (GamePlayNpc.cpp) ---
     void spawnNpcs();
