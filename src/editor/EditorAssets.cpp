@@ -55,6 +55,5 @@ void Editor::drawAssetsTab() {
         ui::label("(아직 에셋이 없습니다)", 20, (int)kToolbarH + 56, 18, ui::kTextDim);
 }
 
-// --------------------------- DATABASE ---------------------------
 
 } // namespace tsukuru

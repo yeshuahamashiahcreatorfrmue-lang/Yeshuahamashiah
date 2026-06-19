@@ -65,8 +65,7 @@ bool GamePlay::walkable(int x, int y) {
     return true;
 }
 
-// ----------------------------- update -----------------------------
-// ----------------------------- combat -----------------------------
+// ----------------------------- kill rewards + AI -----------------------------
 void GamePlay::onMonsterKilled(const FieldMonster& m) {
     GameState& gs = engine_.state();
     gs.inventory.gold += m.goldReward;
@@ -162,8 +161,7 @@ void GamePlay::updateMonsters(float dt) {
     }
 }
 
-// ----------------------------- NPCs -----------------------------
-// ----------------------------- combat rendering -----------------------------
+// ----------------------------- monster rendering -----------------------------
 void GamePlay::drawMonsters() {
     int TS = map_->tileset.tileWidth;
     for (auto& m : monsters_) {

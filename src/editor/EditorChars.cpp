@@ -140,6 +140,5 @@ void Editor::drawCharsTab() {
         ui::label("(아직 캐릭터가 없습니다 - 생성을 클릭하세요)", 20, (int)kToolbarH + 120, 18, ui::kTextDim);
 }
 
-// ---------------------------- SKILLS (field-skill designer) ----------------------------
 
 } // namespace tsukuru

@@ -123,6 +123,5 @@ void Editor::drawDatabaseTab() {
              (int)dx, (int)dy + 6, 14, ui::kTextDim);
 }
 
-// ---------------------------- WORLD (map management) ----------------------------
 
 } // namespace tsukuru

@@ -146,6 +146,5 @@ void Editor::drawWorldTab() {
              (int)dx, (int)(ly + area.height - 60), 14, ui::kTextDim);
 }
 
-// ---------------------------- CHARS (character assets) ----------------------------
 
 } // namespace tsukuru

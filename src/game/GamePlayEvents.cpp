@@ -37,8 +37,7 @@ void GamePlay::interact() {
     if (e) runEvent(*e);
 }
 
-// ----------------------------- combat -----------------------------
-// Apply damage to a monster; returns true if it died (and handles the kill).
+// ----------------------------- message box -----------------------------
 void GamePlay::showMessage(const std::string& text) {
     msgPages_.clear();
     size_t start = 0;
@@ -130,7 +129,6 @@ void GamePlay::runEvent(Event& e) {
     if (e.once) firedOnce_.insert(key);
 }
 
-// ----------------------------- rendering -----------------------------
 void GamePlay::drawMessage() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };

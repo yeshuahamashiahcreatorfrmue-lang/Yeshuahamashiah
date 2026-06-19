@@ -86,6 +86,4 @@ void GamePlay::runAutoruns() {
     }
 }
 
-// ----------------------------- atmosphere -----------------------------
-
 } // namespace tsukuru

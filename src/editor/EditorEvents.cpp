@@ -164,6 +164,5 @@ void Editor::drawEventsTab() {
     }
 }
 
-// ---------------------------- ASSETS ----------------------------
 
 } // namespace tsukuru

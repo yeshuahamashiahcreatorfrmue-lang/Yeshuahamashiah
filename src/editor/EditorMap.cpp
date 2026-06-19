@@ -210,6 +210,5 @@ void Editor::drawMapCanvas(Rectangle area) {
     EndScissorMode();
 }
 
-// ---------------------------- EVENTS ----------------------------
 
 } // namespace tsukuru
