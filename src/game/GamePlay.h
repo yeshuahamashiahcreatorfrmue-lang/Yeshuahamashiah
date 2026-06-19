@@ -1,7 +1,8 @@
 #pragma once
-// GamePlay: the runtime that plays a project as a game. Handles grid movement
-// with smooth interpolation, collision, event interaction, teleports, random
-// encounters (-> Battle), the message box, and the in-game menu.
+// GamePlay: the runtime that plays a project as a game. Movement is grid-based
+// with smooth interpolation. Combat is real-time and on-field (Kingdom-of-the-
+// Winds style): monsters roam the map and the player kills them with melee
+// attacks in the facing direction — there is no separate battle screen.
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,8 +13,26 @@
 namespace tsukuru {
 
 class Engine;
-class Battle;
 class Menu;
+
+// A live monster wandering the field.
+struct FieldMonster {
+    int enemyId = -1;
+    std::string name;
+    int spriteAsset = -1;
+    int x = 0, y = 0;          // grid position
+    float px = 0, py = 0;      // pixel position (for smooth movement)
+    int destX = 0, destY = 0;
+    bool moving = false;
+    int dir = 0;
+    int hp = 0, maxHp = 0;
+    int atk = 0, def = 0;
+    int expReward = 0, goldReward = 0;
+    float moveCd = 0;          // time until next move decision
+    float atkCd = 0;           // time until it can hit the player again
+    float hurtFlash = 0;       // white/red flash timer when struck
+    bool alive() const { return hp > 0; }
+};
 
 class GamePlay {
 public:
@@ -25,20 +44,26 @@ public:
     void draw();
 
 private:
-    enum class Phase { Field, Message, Battle, Menu, GameOver };
+    enum class Phase { Field, Message, Menu, GameOver };
 
     void loadMap(int id);
     void updateField(float dt);
     void tryMove(Direction d);
     void interact();
     void runEvent(Event& e);
-    void startBattle(const std::vector<int>& enemyIds);
-    void checkEncounter();
-    void updateBattle(float dt);
     void drawField();
     void drawMessage();
-    void drawBattle();
-    void drawCharacter(int assetId, int dir, int frame, float px, float py);
+    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE);
+
+    // --- field combat ---
+    void spawnMonsters();
+    void spawnOne();
+    void updateMonsters(float dt);
+    void playerAttack();
+    void drawMonsters();
+    FieldMonster* monsterAt(int x, int y);
+    bool walkable(int x, int y);            // not blocked / not occupied
+    void onMonsterKilled(const FieldMonster& m);
 
     Engine& engine_;
     std::shared_ptr<Map> map_;
@@ -47,23 +72,28 @@ private:
     Phase phase_ = Phase::Field;
 
     // Player smooth movement (grid -> pixel interpolation)
-    float pxX_ = 0, pxY_ = 0;     // current pixel position (top-left of tile)
-    int   destX_ = 0, destY_ = 0; // grid destination
+    float pxX_ = 0, pxY_ = 0;
+    int   destX_ = 0, destY_ = 0;
     bool  moving_ = false;
-    int   dir_ = 0;               // Direction
+    int   dir_ = 0;
     float animTime_ = 0;
     int   frame_ = 0;
-    int   stepsSinceEncounter_ = 0;
+
+    // Player melee attack
+    float attackTimer_ = 0;     // >0 while the slash effect shows
+    float attackCd_ = 0;        // cooldown between swings
+    float playerHurt_ = 0;      // red flash when the player takes damage
+
+    std::vector<FieldMonster> monsters_;
+    float spawnTimer_ = 0;
+    int   targetMonsters_ = 0;
+    std::string toast_;
+    float toastTimer_ = 0;
 
     // message box
     std::string message_;
-    Event* pendingEvent_ = nullptr;
 
-    std::unique_ptr<Battle> battle_;
-    std::unique_ptr<Menu>   menu_;
-    int battleSelection_ = 0;   // 0 attack,1 skill,2 item,3 flee
-    int battleSubSelection_ = 0;
-    bool battleSubMenu_ = false;
+    std::unique_ptr<Menu> menu_;
 };
 
 } // namespace tsukuru

@@ -1,8 +1,8 @@
 #include "game/GamePlay.h"
 #include "core/Engine.h"
 #include "game/Menu.h"
-#include "battle/Battle.h"
 #include "render/UI.h"
+#include "database/Database.h"
 #include <set>
 #include <cmath>
 #include <cstdlib>
@@ -11,6 +11,8 @@
 namespace tsukuru {
 
 static std::set<long> g_firedOnce; // (mapId<<16 | eventId) one-shot events this session
+
+static int isign(int v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
 
 GamePlay::GamePlay(Engine& engine) : engine_(engine) {
     cam_.zoom = 2.0f;
@@ -30,16 +32,77 @@ void GamePlay::onEnter() {
     dir_ = gs.playerDir;
     moving_ = false;
     phase_ = Phase::Field;
+    attackTimer_ = attackCd_ = playerHurt_ = 0;
+    spawnMonsters();
 }
 
 void GamePlay::loadMap(int id) {
     map_ = engine_.project().map(id);
     if (!map_ && !engine_.project().maps.empty()) map_ = engine_.project().maps.front();
     engine_.state().currentMap = map_ ? map_->id : -1;
+    monsters_.clear();
 }
 
+// ----------------------------- spawning -----------------------------
+void GamePlay::spawnMonsters() {
+    monsters_.clear();
+    if (!map_) { targetMonsters_ = 0; return; }
+    const Database& db = engine_.project().database;
+    bool haveEnemies = !map_->encounterEnemies.empty() || !db.enemies.empty();
+    if (!haveEnemies) { targetMonsters_ = 0; return; }
+    int area = map_->tilemap.width() * map_->tilemap.height();
+    targetMonsters_ = std::min(8, std::max(3, area / 45));
+    for (int i = 0; i < targetMonsters_; ++i) spawnOne();
+}
+
+void GamePlay::spawnOne() {
+    if (!map_) return;
+    const Database& db = engine_.project().database;
+    std::vector<int> pool = map_->encounterEnemies;
+    if (pool.empty()) for (const auto& e : db.enemies) pool.push_back(e.id);
+    if (pool.empty()) return;
+    int enemyId = pool[std::rand() % pool.size()];
+    const EnemyDef* def = db.enemy(enemyId);
+    if (!def) return;
+
+    int TS = map_->tileset.tileWidth;
+    for (int tries = 0; tries < 40; ++tries) {
+        int x = std::rand() % map_->tilemap.width();
+        int y = std::rand() % map_->tilemap.height();
+        if (!walkable(x, y)) continue;
+        if (std::abs(x - destX_) + std::abs(y - destY_) < 4) continue; // not on top of player
+        FieldMonster m;
+        m.enemyId = def->id; m.name = def->name; m.spriteAsset = def->spriteAsset;
+        m.x = m.destX = x; m.y = m.destY = y;
+        m.px = x * (float)TS; m.py = y * (float)TS;
+        m.hp = m.maxHp = def->maxHp;
+        m.atk = def->atk; m.def = def->def;
+        m.expReward = def->expReward; m.goldReward = def->goldReward;
+        m.moveCd = 0.3f + (std::rand() % 100) / 100.0f;
+        monsters_.push_back(m);
+        return;
+    }
+}
+
+FieldMonster* GamePlay::monsterAt(int x, int y) {
+    for (auto& m : monsters_) if (m.alive() && m.x == x && m.y == y) return &m;
+    return nullptr;
+}
+
+bool GamePlay::walkable(int x, int y) {
+    if (!map_ || !map_->tilemap.inBounds(x, y)) return false;
+    if (map_->tilemap.blocked(x, y)) return false;
+    if (monsterAt(x, y)) return false;
+    if (Event* e = map_->eventAt(x, y))
+        if (e->graphicAsset >= 0 && e->trigger != TriggerType::PlayerTouch) return false;
+    return true;
+}
+
+// ----------------------------- update -----------------------------
 void GamePlay::update(float dt) {
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
+
+    if (toastTimer_ > 0) toastTimer_ -= dt;
 
     switch (phase_) {
         case Phase::Field: updateField(dt); break;
@@ -49,7 +112,6 @@ void GamePlay::update(float dt) {
                 message_.clear();
             }
             break;
-        case Phase::Battle: updateBattle(dt); break;
         case Phase::Menu:
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
@@ -64,12 +126,40 @@ void GamePlay::updateField(float dt) {
     if (!map_) return;
     int TS = map_->tileset.tileWidth;
 
-    // Debug: TSUKURU_AUTOWALK makes the player auto-walk right, to verify movement
-    // headlessly (no effect unless the env var is set).
     static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
 
+    if (attackTimer_ > 0) attackTimer_ -= dt;
+    if (attackCd_ > 0)    attackCd_ -= dt;
+    if (playerHurt_ > 0)  playerHurt_ -= dt;
+
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
-    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) { interact(); return; }
+
+    // Space / Z = attack (or talk if nothing to hit). Enter = talk only.
+    if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_LEFT_CONTROL))
+        playerAttack();
+    else if (IsKeyPressed(KEY_ENTER))
+        interact();
+
+    // Debug autopilot: chase and attack the nearest monster (verifies combat).
+    Direction autoDir = Direction::Right; bool autoMove = false;
+    if (autowalk) {
+        FieldMonster* near = nullptr; int best = 1000000;
+        for (auto& m : monsters_) {
+            if (!m.alive()) continue;
+            int d = std::abs(m.x - destX_) + std::abs(m.y - destY_);
+            if (d < best) { best = d; near = &m; }
+        }
+        if (near) {
+            int ddx = near->x - destX_, ddy = near->y - destY_;
+            if (std::abs(ddx) >= std::abs(ddy) && ddx != 0)
+                autoDir = ddx > 0 ? Direction::Right : Direction::Left;
+            else if (ddy != 0)
+                autoDir = ddy > 0 ? Direction::Down : Direction::Up;
+            dir_ = (int)autoDir;
+            autoMove = true;
+            if (best <= 1) playerAttack();
+        }
+    }
 
     if (!moving_) {
         Direction d; bool press = true;
@@ -78,13 +168,13 @@ void GamePlay::updateField(float dt) {
         else if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))  d = Direction::Left;
         else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) d = Direction::Right;
         else press = false;
-        if (autowalk && !press) { d = Direction::Right; press = true; }
+        if (!press && autoMove) { d = autoDir; press = true; }
         if (press) tryMove(d);
     }
 
     if (moving_) {
         float tx = destX_ * (float)TS, ty = destY_ * (float)TS;
-        float speed = TS * 5.0f; // tiles? 5 tiles/sec
+        float speed = TS * 5.0f;
         float dx = tx - pxX_, dy = ty - pxY_;
         float dist = std::sqrt(dx*dx + dy*dy);
         float step = speed * dt;
@@ -93,10 +183,8 @@ void GamePlay::updateField(float dt) {
             engine_.state().playerX = destX_;
             engine_.state().playerY = destY_;
             if (autowalk) TraceLog(LOG_INFO, "AUTOWALK arrived at tile (%d,%d)", destX_, destY_);
-            // arrival: touch events + encounter
             if (Event* e = map_->eventAt(destX_, destY_))
                 if (e->trigger == TriggerType::PlayerTouch) runEvent(*e);
-            if (phase_ == Phase::Field) checkEncounter();
         } else {
             pxX_ += dx / dist * step;
             pxY_ += dy / dist * step;
@@ -107,13 +195,16 @@ void GamePlay::updateField(float dt) {
         frame_ = 0;
     }
     engine_.state().playerDir = dir_;
+
+    updateMonsters(dt);
 }
 
 void GamePlay::tryMove(Direction d) {
     dir_ = (int)d;
     Vec2i delta = dirToDelta(d);
     int nx = destX_ + delta.x, ny = destY_ + delta.y;
-    if (map_->tilemap.blocked(nx, ny)) return;        // wall
+    if (map_->tilemap.blocked(nx, ny)) return;
+    if (monsterAt(nx, ny)) return;                    // can't walk through monsters
     if (Event* e = map_->eventAt(nx, ny))             // solid NPC-style event
         if (e->graphicAsset >= 0 && e->trigger != TriggerType::PlayerTouch) return;
     destX_ = nx; destY_ = ny; moving_ = true;
@@ -123,13 +214,120 @@ void GamePlay::interact() {
     Vec2i delta = dirToDelta((Direction)dir_);
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
     Event* e = map_->eventAt(fx, fy);
-    if (!e) e = map_->eventAt(destX_, destY_); // stand-on
+    if (!e) e = map_->eventAt(destX_, destY_);
     if (e && e->trigger == TriggerType::ActionButton) runEvent(*e);
+}
+
+// ----------------------------- combat -----------------------------
+void GamePlay::playerAttack() {
+    if (attackCd_ > 0) return;
+    attackCd_ = 0.32f;
+    attackTimer_ = 0.18f;
+
+    Vec2i delta = dirToDelta((Direction)dir_);
+    int fx = destX_ + delta.x, fy = destY_ + delta.y;
+
+    const Database& db = engine_.project().database;
+    int atk = engine_.state().party.empty() ? 10 : engine_.state().party[0].totalAtk(db);
+
+    bool hit = false;
+    for (auto& m : monsters_) {
+        if (!m.alive()) continue;
+        if ((m.x == fx && m.y == fy) || (m.x == destX_ && m.y == destY_)) {
+            int dmg = std::max(1, atk - m.def);
+            m.hp -= dmg;
+            m.hurtFlash = 0.18f;
+            hit = true;
+            if (m.hp <= 0) onMonsterKilled(m);
+        }
+    }
+    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
+                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+
+    if (!hit) interact(); // nothing to hit -> talk to an NPC in front
+}
+
+void GamePlay::onMonsterKilled(const FieldMonster& m) {
+    GameState& gs = engine_.state();
+    gs.inventory.gold += m.goldReward;
+    for (auto& p : gs.party) if (p.alive()) p.gainExp(m.expReward);
+    toast_ = m.name + " defeated!  +" + std::to_string(m.expReward) + " EXP  +" +
+             std::to_string(m.goldReward) + " G";
+    toastTimer_ = 1.8f;
+    TraceLog(LOG_INFO, "KILL: %s  party gold=%d exp=%d lv=%d", m.name.c_str(),
+             gs.inventory.gold, gs.party.empty()?0:gs.party[0].exp,
+             gs.party.empty()?0:gs.party[0].level);
+}
+
+void GamePlay::updateMonsters(float dt) {
+    if (!map_) return;
+    int TS = map_->tileset.tileWidth;
+    GameState& gs = engine_.state();
+    const Database& db = engine_.project().database;
+    int pdef = gs.party.empty() ? 0 : gs.party[0].totalDef(db);
+
+    // maintain population
+    if ((int)monsters_.size() < targetMonsters_) {
+        spawnTimer_ -= dt;
+        if (spawnTimer_ <= 0) { spawnOne(); spawnTimer_ = 2.5f; }
+    }
+
+    for (auto& m : monsters_) {
+        if (m.hurtFlash > 0) m.hurtFlash -= dt;
+        if (m.atkCd > 0)     m.atkCd -= dt;
+
+        // smooth move
+        if (m.moving) {
+            float tx = m.destX * (float)TS, ty = m.destY * (float)TS;
+            float dx = tx - m.px, dy = ty - m.py;
+            float dist = std::sqrt(dx*dx + dy*dy);
+            float step = TS * 3.0f * dt;
+            if (dist <= step) { m.px = tx; m.py = ty; m.x = m.destX; m.y = m.destY; m.moving = false; }
+            else { m.px += dx / dist * step; m.py += dy / dist * step; }
+        } else {
+            m.moveCd -= dt;
+            if (m.moveCd <= 0) {
+                m.moveCd = 0.45f + (std::rand() % 60) / 100.0f;
+                int cheb = std::max(std::abs(m.x - destX_), std::abs(m.y - destY_));
+                int ddx = 0, ddy = 0;
+                if (cheb <= 6) {                  // chase the player
+                    ddx = isign(destX_ - m.x);
+                    ddy = isign(destY_ - m.y);
+                } else if (std::rand() % 3 != 0) { // wander
+                    int r = std::rand() % 4;
+                    ddx = (r == 0) - (r == 1);
+                    ddy = (r == 2) - (r == 3);
+                }
+                // try preferred axis first, then the other
+                int tries[4][2] = { {ddx,0}, {0,ddy}, {ddy,ddx}, {-ddx,-ddy} };
+                for (auto& t : tries) {
+                    if (t[0] == 0 && t[1] == 0) continue;
+                    int nx = m.x + isign(t[0]), ny = m.y + isign(t[1]);
+                    if (nx == destX_ && ny == destY_) continue; // don't step onto player
+                    if (walkable(nx, ny)) {
+                        m.destX = nx; m.destY = ny; m.moving = true;
+                        m.dir = t[1] > 0 ? 0 : t[1] < 0 ? 3 : t[0] < 0 ? 1 : 2;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // attack the player when adjacent
+        int cheb = std::max(std::abs(m.x - destX_), std::abs(m.y - destY_));
+        if (cheb <= 1 && m.atkCd <= 0 && !gs.party.empty()) {
+            m.atkCd = 1.1f;
+            int dmg = std::max(1, m.atk - pdef);
+            PartyMember& hero = gs.party[0];
+            hero.hp = std::max(0, hero.hp - dmg);
+            playerHurt_ = 0.22f;
+            if (gs.partyWiped()) { phase_ = Phase::GameOver; return; }
+        }
+    }
 }
 
 void GamePlay::runEvent(Event& e) {
     GameState& gs = engine_.state();
-    // condition gate
     if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) return;
     long key = ((long)map_->id << 16) | (e.id & 0xffff);
     if (e.once && g_firedOnce.count(key)) return;
@@ -144,6 +342,7 @@ void GamePlay::runEvent(Event& e) {
             pxX_ = destX_ * (float)TS; pxY_ = destY_ * (float)TS;
             moving_ = false;
             gs.playerX = destX_; gs.playerY = destY_;
+            spawnMonsters();
             break;
         }
         case EventType::GiveItem:
@@ -156,11 +355,22 @@ void GamePlay::runEvent(Event& e) {
             if (!e.text.empty()) { message_ = e.text; phase_ = Phase::Message; }
             break;
         case EventType::StartBattle: {
-            // event.itemId reused as enemy id, event.amount as count
-            std::vector<int> troop;
+            // Repurposed: spawn live monsters on the field near the event.
+            const Database& db = engine_.project().database;
+            const EnemyDef* def = db.enemy(e.itemId);
+            int TS = map_->tileset.tileWidth;
             int n = std::max(1, e.amount);
-            for (int i = 0; i < n; ++i) troop.push_back(e.itemId);
-            startBattle(troop);
+            for (int i = 0; i < n && def; ++i) {
+                FieldMonster m;
+                m.enemyId = def->id; m.name = def->name; m.spriteAsset = def->spriteAsset;
+                m.x = m.destX = std::min(map_->tilemap.width()-1, e.x + 1 + i);
+                m.y = m.destY = e.y;
+                m.px = m.x * (float)TS; m.py = m.y * (float)TS;
+                m.hp = m.maxHp = def->maxHp; m.atk = def->atk; m.def = def->def;
+                m.expReward = def->expReward; m.goldReward = def->goldReward;
+                monsters_.push_back(m);
+                targetMonsters_ = std::max(targetMonsters_, (int)monsters_.size());
+            }
             break;
         }
         case EventType::Shop: {
@@ -179,100 +389,44 @@ void GamePlay::runEvent(Event& e) {
     if (e.once) g_firedOnce.insert(key);
 }
 
-void GamePlay::checkEncounter() {
-    if (!map_ || map_->encounterRate <= 0 || map_->encounterEnemies.empty()) return;
-    if (++stepsSinceEncounter_ < 3) return; // grace period
-    if (std::rand() % 100 < map_->encounterRate) {
-        stepsSinceEncounter_ = 0;
-        std::vector<int> troop;
-        int n = 1 + std::rand() % 2;
-        for (int i = 0; i < n; ++i)
-            troop.push_back(map_->encounterEnemies[std::rand() % map_->encounterEnemies.size()]);
-        startBattle(troop);
-    }
-}
-
-void GamePlay::startBattle(const std::vector<int>& enemyIds) {
-    battle_ = std::make_unique<Battle>(engine_.project().database, engine_.state(), enemyIds);
-    battleSelection_ = 0; battleSubSelection_ = 0; battleSubMenu_ = false;
-    phase_ = Phase::Battle;
-}
-
-void GamePlay::updateBattle(float dt) {
-    if (!battle_) { phase_ = Phase::Field; return; }
-    Database& db = engine_.project().database;
-    GameState& gs = engine_.state();
-
-    if (battle_->result() != BattleResult::Ongoing) {
-        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-            BattleResult r = battle_->result();
-            battle_.reset();
-            if (r == BattleResult::Defeat) phase_ = Phase::GameOver;
-            else phase_ = Phase::Field;
-        }
-        return;
-    }
-    if (!battle_->actorReady()) return;
-
-    PartyMember& me = gs.party[battle_->currentActor()];
-
-    if (!battleSubMenu_) {
-        const int N = 4; // Attack, Skill, Item, Flee
-        if (IsKeyPressed(KEY_DOWN)) battleSelection_ = (battleSelection_ + 1) % N;
-        if (IsKeyPressed(KEY_UP))   battleSelection_ = (battleSelection_ + N - 1) % N;
-        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-            if (battleSelection_ == 0) { // Attack
-                BattleAction a; a.kind = ActionKind::Attack; a.targetIndex = battle_->firstAliveEnemy();
-                battle_->submit(a);
-            } else if (battleSelection_ == 1 || battleSelection_ == 2) {
-                battleSubMenu_ = true; battleSubSelection_ = 0;
-            } else { // Flee
-                BattleAction a; a.kind = ActionKind::Flee; battle_->submit(a);
-            }
-        }
-    } else {
-        if (IsKeyPressed(KEY_ESCAPE)) { battleSubMenu_ = false; return; }
-        if (battleSelection_ == 1) { // skills
-            const ActorDef* def = db.actor(me.actorId);
-            int n = def ? (int)def->skills.size() : 0;
-            if (n == 0) { battleSubMenu_ = false; return; }
-            if (IsKeyPressed(KEY_DOWN)) battleSubSelection_ = (battleSubSelection_ + 1) % n;
-            if (IsKeyPressed(KEY_UP))   battleSubSelection_ = (battleSubSelection_ + n - 1) % n;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                BattleAction a; a.kind = ActionKind::Skill; a.id = def->skills[battleSubSelection_];
-                battle_->submit(a); battleSubMenu_ = false;
-            }
-        } else { // items
-            auto items = gs.inventory.list();
-            if (items.empty()) { battleSubMenu_ = false; return; }
-            int n = (int)items.size();
-            if (IsKeyPressed(KEY_DOWN)) battleSubSelection_ = (battleSubSelection_ + 1) % n;
-            if (IsKeyPressed(KEY_UP))   battleSubSelection_ = (battleSubSelection_ + n - 1) % n;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                BattleAction a; a.kind = ActionKind::Item; a.id = items[battleSubSelection_].first;
-                battle_->submit(a); battleSubMenu_ = false;
-            }
-        }
-    }
-}
-
-// --------------------- rendering ---------------------
-
-void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py) {
+// ----------------------------- rendering -----------------------------
+void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint) {
     int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
     if (assetId >= 0) {
         const Texture2D& tex = engine_.assetTexture(assetId);
         float fw = tex.width / 4.0f, fh = tex.height / 4.0f;
         Rectangle src = { frame * fw, dir * fh, fw, fh };
         Rectangle dst = { px, py, (float)TS, (float)TS };
-        DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
+        DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
     } else {
-        // Fallback hero: body + facing marker
         DrawRectangle((int)px+6, (int)py+6, TS-12, TS-12, Color{ 80, 140, 220, 255 });
         DrawRectangleLines((int)px+6, (int)py+6, TS-12, TS-12, BLACK);
         int cx = (int)px + TS/2, cy = (int)py + TS/2;
         Vec2i d = dirToDelta((Direction)dir);
         DrawCircle(cx + d.x*6, cy + d.y*6, 3, WHITE);
+    }
+}
+
+void GamePlay::drawMonsters() {
+    int TS = map_->tileset.tileWidth;
+    for (auto& m : monsters_) {
+        Color tint = m.hurtFlash > 0 ? Color{ 255, 120, 120, 255 } : WHITE;
+        if (m.spriteAsset >= 0) {
+            const Texture2D& tex = engine_.assetTexture(m.spriteAsset);
+            float size = TS * 1.15f;
+            Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+            Rectangle dst = { m.px + (TS - size)/2, m.py + (TS - size)/2, size, size };
+            DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
+        } else {
+            DrawCircle((int)m.px + TS/2, (int)m.py + TS/2, TS*0.4f,
+                       m.hurtFlash > 0 ? RED : Color{ 180, 90, 90, 255 });
+        }
+        // HP bar when damaged
+        if (m.hp < m.maxHp) {
+            float w = TS, ratio = (float)m.hp / m.maxHp;
+            DrawRectangle((int)m.px, (int)m.py - 7, (int)w, 4, Fade(BLACK, 0.6f));
+            DrawRectangle((int)m.px, (int)m.py - 7, (int)(w * ratio), 4, Color{ 220, 80, 80, 255 });
+        }
     }
 }
 
@@ -286,7 +440,6 @@ void GamePlay::drawField() {
     const Tileset& set = map_->tileset;
 
     BeginMode2D(cam_);
-    // visible tile range
     int w = map_->tilemap.width(), h = map_->tilemap.height();
     for (int layer = 0; layer < kLayerCount; ++layer) {
         for (int y = 0; y < h; ++y) {
@@ -300,24 +453,44 @@ void GamePlay::drawField() {
             }
         }
     }
-    // events with a graphic
     for (auto& e : map_->events) {
         if (e.graphicAsset >= 0)
             drawCharacter(e.graphicAsset, 0, 0, (float)e.x*TS, (float)e.y*TS);
         else if (e.type == EventType::Teleport)
             DrawRectangleLines(e.x*TS+2, e.y*TS+2, TS-4, TS-4, Fade(ui::kAccent, 0.5f));
     }
-    // player
-    drawCharacter(engine_.project().playerSprite, dir_, moving_ ? frame_ : 0, pxX_, pxY_);
+
+    drawMonsters();
+
+    // player (red flash when hurt)
+    Color ptint = playerHurt_ > 0 ? Color{ 255, 130, 130, 255 } : WHITE;
+    drawCharacter(engine_.project().playerSprite, dir_, moving_ ? frame_ : 0, pxX_, pxY_, ptint);
+
+    // melee slash effect in the facing tile
+    if (attackTimer_ > 0) {
+        Vec2i d = dirToDelta((Direction)dir_);
+        float fx = (destX_ + d.x) * (float)TS, fy = (destY_ + d.y) * (float)TS;
+        DrawRectangle((int)fx, (int)fy, TS, TS, Fade(Color{ 255, 240, 160, 255 }, 0.45f));
+        DrawRectangleLinesEx({ fx, fy, (float)TS, (float)TS }, 2, Fade(WHITE, 0.8f));
+    }
     EndMode2D();
 
     // HUD
     GameState& gs = engine_.state();
-    DrawRectangle(0, 0, GetScreenWidth(), 32, Fade(BLACK, 0.5f));
+    DrawRectangle(0, 0, GetScreenWidth(), 32, Fade(BLACK, 0.55f));
     if (!gs.party.empty()) {
         PartyMember& m = gs.party[0];
-        DrawText(TextFormat("HP %d/%d   MP %d/%d   Gold %d   (ESC: menu, F2: editor)",
-                 m.hp, m.maxHp, m.mp, m.maxMp, gs.inventory.gold), 12, 8, 16, ui::kText);
+        DrawText(TextFormat("Lv %d   HP %d/%d   MP %d/%d   EXP %d   Gold %d",
+                 m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold),
+                 12, 8, 16, ui::kText);
+    }
+    DrawText("Space:Attack  Arrows/WASD:Move  Enter:Talk  ESC:Menu  F2:Editor",
+             12, GetScreenHeight() - 24, 15, Fade(ui::kText, 0.7f));
+
+    if (toastTimer_ > 0) {
+        int tw = MeasureText(toast_.c_str(), 18);
+        DrawRectangle(GetScreenWidth()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
+        DrawText(toast_.c_str(), GetScreenWidth()/2 - tw/2, 46, 18, BLACK);
     }
 }
 
@@ -330,86 +503,7 @@ void GamePlay::drawMessage() {
     DrawText("[Enter]", (int)(box.x + box.width - 90), (int)(box.y + box.height - 28), 16, ui::kTextDim);
 }
 
-void GamePlay::drawBattle() {
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
-    DrawRectangleGradientV(0, 0, sw, sh, Color{ 40, 20, 28, 255 }, Color{ 12, 8, 12, 255 });
-    Database& db = engine_.project().database;
-    GameState& gs = engine_.state();
-
-    // enemies
-    const auto& enemies = battle_->enemies();
-    int ex = sw/2 - (int)enemies.size()*70;
-    for (int i = 0; i < (int)enemies.size(); ++i) {
-        const auto& e = enemies[i];
-        int x = ex + i*140, y = 120;
-        Color tint = e.alive() ? WHITE : Fade(RED, 0.3f);
-        const EnemyDef* def = db.enemy(e.enemyId);
-        if (def && def->spriteAsset >= 0) {
-            const Texture2D& tex = engine_.assetTexture(def->spriteAsset);
-            DrawTextureEx(tex, {(float)x, (float)y}, 0, 96.0f / std::max(1, tex.width), tint);
-        } else {
-            DrawCircle(x + 48, y + 48, 40, e.alive() ? Color{180,80,80,255} : Fade(GRAY,0.4f));
-        }
-        DrawText(e.name.c_str(), x, y + 100, 16, ui::kText);
-        DrawText(TextFormat("HP %d/%d", e.hp < 0 ? 0 : e.hp, e.maxHp), x, y + 120, 14, ui::kGood);
-    }
-
-    // party status
-    DrawRectangle(0, sh - 200, sw, 200, Fade(Color{ 16, 18, 26, 255 }, 0.95f));
-    int py = sh - 188;
-    for (auto& m : gs.party) {
-        const ActorDef* def = db.actor(m.actorId);
-        DrawText(TextFormat("%s  HP %d/%d  MP %d/%d  Lv %d",
-                 def ? def->name.c_str() : "Hero", m.hp, m.maxHp, m.mp, m.maxMp, m.level),
-                 sw/2 + 20, py, 18, m.alive() ? ui::kText : ui::kDanger);
-        py += 26;
-    }
-
-    // command menu
-    if (battle_->result() == BattleResult::Ongoing && battle_->actorReady()) {
-        const char* cmds[4] = { "Attack", "Skill", "Item", "Flee" };
-        for (int i = 0; i < 4; ++i) {
-            Color c = (i == battleSelection_ && !battleSubMenu_) ? ui::kAccentHi : ui::kText;
-            DrawText(TextFormat("%s%s", (i == battleSelection_ && !battleSubMenu_) ? "> " : "  ", cmds[i]),
-                     30, sh - 180 + i*34, 22, c);
-        }
-        if (battleSubMenu_) {
-            DrawRectangle(180, sh - 200, 260, 200, Fade(BLACK, 0.85f));
-            PartyMember& me = gs.party[battle_->currentActor()];
-            if (battleSelection_ == 1) {
-                const ActorDef* def = db.actor(me.actorId);
-                if (def) for (int i = 0; i < (int)def->skills.size(); ++i) {
-                    const Skill* sk = db.skill(def->skills[i]);
-                    Color c = i == battleSubSelection_ ? ui::kAccentHi : ui::kText;
-                    DrawText(TextFormat("%s%s (MP%d)", i==battleSubSelection_?"> ":"  ",
-                             sk?sk->name.c_str():"?", sk?sk->mpCost:0), 195, sh-190+i*30, 18, c);
-                }
-            } else {
-                auto items = gs.inventory.list();
-                for (int i = 0; i < (int)items.size(); ++i) {
-                    const Item* it = db.item(items[i].first);
-                    Color c = i == battleSubSelection_ ? ui::kAccentHi : ui::kText;
-                    DrawText(TextFormat("%s%s x%d", i==battleSubSelection_?"> ":"  ",
-                             it?it->name.c_str():"?", items[i].second), 195, sh-190+i*30, 18, c);
-                }
-            }
-        }
-    } else {
-        const char* msg = battle_->result() == BattleResult::Victory ? "VICTORY!  [Enter]"
-                        : battle_->result() == BattleResult::Defeat  ? "DEFEAT...  [Enter]"
-                        : "Escaped!  [Enter]";
-        DrawText(msg, 30, sh - 150, 28, ui::kAccentHi);
-    }
-
-    // battle log (last few lines)
-    const auto& log = battle_->log();
-    int n = (int)log.size();
-    for (int i = 0; i < 4 && i < n; ++i)
-        DrawText(log[n-1-i].c_str(), 30, 320 + (3-i)*22, 16, Fade(ui::kText, 0.5f + 0.12f*i));
-}
-
 void GamePlay::draw() {
-    if (phase_ == Phase::Battle && battle_) { drawBattle(); return; }
     if (phase_ == Phase::GameOver) {
         DrawRectangle(0,0,GetScreenWidth(),GetScreenHeight(), Color{0,0,0,255});
         const char* go = "GAME OVER";
