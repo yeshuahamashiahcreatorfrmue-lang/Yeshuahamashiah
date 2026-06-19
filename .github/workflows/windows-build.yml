@@ -55,6 +55,8 @@ jobs:
 
       - name: Smoke test WITH software GL (must succeed)
         shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
         run: |
           $dir = "${{ steps.find.outputs.dir }}"
           $exe = "${{ steps.find.outputs.exe }}"

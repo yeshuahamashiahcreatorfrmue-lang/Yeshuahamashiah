@@ -73,6 +73,15 @@ static void openLogs(const fs::path& exeDir) {
 
 int main(int argc, char** argv) {
     plat::installCrashHandler(onCrash);
+
+    // When the bundled Mesa software OpenGL is used, force the pure-software
+    // llvmpipe driver. Some environments (e.g. headless servers) otherwise pick
+    // Mesa's D3D12/WARP backend, which can crash on texture upload. Real GPU
+    // vendor drivers ignore this variable, so it is always safe to set.
+#ifdef _WIN32
+    _putenv_s("GALLIUM_DRIVER", "llvmpipe");
+#endif
+
     fs::path base;
     try { base = fs::path(GetApplicationDirectory()); } catch (...) { base = "."; }
 
