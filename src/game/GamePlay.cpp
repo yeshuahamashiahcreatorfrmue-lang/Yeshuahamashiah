@@ -41,6 +41,7 @@ void GamePlay::loadMap(int id) {
     if (!map_ && !engine_.project().maps.empty()) map_ = engine_.project().maps.front();
     engine_.state().currentMap = map_ ? map_->id : -1;
     monsters_.clear();
+    if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
 }
 
 // ----------------------------- spawning -----------------------------
@@ -108,8 +109,14 @@ void GamePlay::update(float dt) {
         case Phase::Field: updateField(dt); break;
         case Phase::Message:
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
-                phase_ = Phase::Field;
-                message_.clear();
+                if (msgPage_ + 1 < (int)msgPages_.size()) {
+                    ++msgPage_;
+                    message_ = msgPages_[msgPage_];
+                    engine_.audio().playSfx("select", 0.5f);
+                } else {
+                    phase_ = Phase::Field;
+                    message_.clear();
+                }
             }
             break;
         case Phase::Menu:
@@ -223,6 +230,7 @@ void GamePlay::playerAttack() {
     if (attackCd_ > 0) return;
     attackCd_ = 0.32f;
     attackTimer_ = 0.18f;
+    engine_.audio().playSfx("attack", 0.7f);
 
     Vec2i delta = dirToDelta((Direction)dir_);
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
@@ -244,13 +252,17 @@ void GamePlay::playerAttack() {
     monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
                     [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
 
-    if (!hit) interact(); // nothing to hit -> talk to an NPC in front
+    if (hit) engine_.audio().playSfx("hit", 0.8f);
+    else interact(); // nothing to hit -> talk to an NPC in front
 }
 
 void GamePlay::onMonsterKilled(const FieldMonster& m) {
     GameState& gs = engine_.state();
     gs.inventory.gold += m.goldReward;
+    int beforeLv = gs.party.empty() ? 0 : gs.party[0].level;
     for (auto& p : gs.party) if (p.alive()) p.gainExp(m.expReward);
+    engine_.audio().playSfx("defeat", 0.8f);
+    if (!gs.party.empty() && gs.party[0].level > beforeLv) engine_.audio().playSfx("levelup");
     toast_ = m.name + " defeated!  +" + std::to_string(m.expReward) + " EXP  +" +
              std::to_string(m.goldReward) + " G";
     toastTimer_ = 1.8f;
@@ -321,9 +333,25 @@ void GamePlay::updateMonsters(float dt) {
             PartyMember& hero = gs.party[0];
             hero.hp = std::max(0, hero.hp - dmg);
             playerHurt_ = 0.22f;
+            engine_.audio().playSfx("hurt", 0.7f);
             if (gs.partyWiped()) { phase_ = Phase::GameOver; return; }
         }
     }
+}
+
+void GamePlay::showMessage(const std::string& text) {
+    msgPages_.clear();
+    size_t start = 0;
+    while (true) {
+        size_t bar = text.find('|', start);
+        msgPages_.push_back(text.substr(start, bar == std::string::npos ? std::string::npos : bar - start));
+        if (bar == std::string::npos) break;
+        start = bar + 1;
+    }
+    msgPage_ = 0;
+    message_ = msgPages_.empty() ? "" : msgPages_[0];
+    phase_ = Phase::Message;
+    engine_.audio().playSfx("select", 0.5f);
 }
 
 void GamePlay::runEvent(Event& e) {
@@ -334,7 +362,7 @@ void GamePlay::runEvent(Event& e) {
 
     switch (e.type) {
         case EventType::Message:
-            message_ = e.text; phase_ = Phase::Message; break;
+            showMessage(e.text); break;
         case EventType::Teleport: {
             loadMap(e.targetMap);
             int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
@@ -347,12 +375,12 @@ void GamePlay::runEvent(Event& e) {
         }
         case EventType::GiveItem:
             gs.inventory.addItem(e.itemId, e.amount);
-            message_ = e.text.empty() ? "Got an item!" : e.text;
-            phase_ = Phase::Message;
+            engine_.audio().playSfx("coin");
+            showMessage(e.text.empty() ? "Got an item!" : e.text);
             break;
         case EventType::SetSwitch:
             gs.setSwitch(e.switchId, e.switchValue);
-            if (!e.text.empty()) { message_ = e.text; phase_ = Phase::Message; }
+            if (!e.text.empty()) showMessage(e.text);
             break;
         case EventType::StartBattle: {
             // Repurposed: spawn live monsters on the field near the event.
@@ -379,10 +407,10 @@ void GamePlay::runEvent(Event& e) {
                 if (gs.inventory.gold >= it->price) {
                     gs.inventory.gold -= it->price;
                     gs.inventory.addItem(it->id, 1);
-                    message_ = "Bought " + it->name + "!";
-                } else message_ = "Not enough gold...";
-            } else message_ = e.text.empty() ? "Welcome!" : e.text;
-            phase_ = Phase::Message;
+                    engine_.audio().playSfx("coin");
+                    showMessage("Bought " + it->name + "!");
+                } else showMessage("Not enough gold...");
+            } else showMessage(e.text.empty() ? "Welcome!" : e.text);
             break;
         }
     }
@@ -492,6 +520,18 @@ void GamePlay::drawField() {
     // overhead layer (treetops, roof edges) on top of the player
     drawLayer(kLayerCount - 1);
     EndMode2D();
+
+    // darkness + torch-light (cave / night atmosphere)
+    if (map_->darkness > 0) {
+        unsigned char a = (unsigned char)std::min(245, map_->darkness);
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Color{ 6, 8, 16, a });
+        Vector2 ps = GetWorldToScreen2D({ pxX_ + TS/2.0f, pxY_ + TS/2.0f }, cam_);
+        BeginBlendMode(BLEND_ADDITIVE);
+        float R = TS * 5.0f;
+        DrawCircleGradient((int)ps.x, (int)ps.y, R, Color{ 255, 220, 150, 150 }, Color{ 0,0,0,0 });
+        DrawCircleGradient((int)ps.x, (int)ps.y, R*0.5f, Color{ 255, 230, 180, 120 }, Color{ 0,0,0,0 });
+        EndBlendMode();
+    }
 
     // HUD
     GameState& gs = engine_.state();

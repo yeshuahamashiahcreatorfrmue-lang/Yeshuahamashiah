@@ -39,6 +39,9 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
         project_ = Project::createNew(projectDir, "My RPG");
     }
 
+    audio_.init();
+    audio_.loadSfxFolder((std::filesystem::path(project_->dir) / "assets" / "sfx").string());
+
     editor_ = std::make_unique<Editor>(*this);
     play_   = std::make_unique<GamePlay>(*this);
     title_  = std::make_unique<TitleScreen>(*this);
@@ -54,6 +57,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
     int frame = 0;
     while (!WindowShouldClose() && !quit_) {
         float dt = GetFrameTime();
+        audio_.update();
         update(dt);
         BeginDrawing();
         ClearBackground(Color{ 18, 20, 26, 255 });
@@ -65,6 +69,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
         if (maxFrames > 0 && frame >= maxFrames) break;
     }
 
+    audio_.shutdown();
     textures_.clear();
     CloseWindow();
     return 0;

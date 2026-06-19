@@ -20,6 +20,8 @@ public:
     std::vector<int> encounterEnemies; // enemy ids that can appear
     int  encounterRate = 0;            // 0 = none; higher = more frequent (per step %)
     int  bgmAsset = -1;
+    int  darkness = 0;                 // 0 = daylight; >0 dims the map and lights only
+                                       // a radius around the player (cave/night atmosphere)
 
     // Animated tiles: each listed tile id cycles between id and id+1 over time
     // (the tileset stores the alternate frame right after the base tile).

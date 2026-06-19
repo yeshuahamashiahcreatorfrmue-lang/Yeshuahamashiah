@@ -9,6 +9,7 @@
 #include "project/Project.h"
 #include "game/GameState.h"
 #include "render/TextureCache.h"
+#include "core/Audio.h"
 
 namespace tsukuru {
 
@@ -40,8 +41,10 @@ public:
     Project&      project()  { return *project_; }
     GameState&    state()    { return state_; }
     TextureCache& textures() { return textures_; }
+    Audio&        audio()    { return audio_; }
 
     const Texture2D& assetTexture(int assetId); // convenience: asset id -> texture
+    std::string assetPath(int assetId) const { return project_->assetFullPath(assetId); }
 
     void requestQuit() { quit_ = true; }
 
@@ -52,6 +55,7 @@ private:
     std::shared_ptr<Project> project_;
     GameState                state_;
     TextureCache             textures_;
+    Audio                    audio_;
     Mode                     mode_ = Mode::Editor;
     bool                     quit_ = false;
     Mode                     startMode_ = Mode::Editor;

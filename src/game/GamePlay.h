@@ -53,6 +53,7 @@ private:
     void runEvent(Event& e);
     void drawField();
     void drawMessage();
+    void showMessage(const std::string& text); // splits on '|' into pages
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE);
 
     // --- field combat ---
@@ -90,8 +91,10 @@ private:
     std::string toast_;
     float toastTimer_ = 0;
 
-    // message box
+    // message box (supports multiple pages split on '|')
     std::string message_;
+    std::vector<std::string> msgPages_;
+    int msgPage_ = 0;
 
     std::unique_ptr<Menu> menu_;
 };

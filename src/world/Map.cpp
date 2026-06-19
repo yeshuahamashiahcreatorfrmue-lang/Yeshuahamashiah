@@ -26,6 +26,7 @@ json Map::toJson() const {
         {"encounterEnemies", encounterEnemies},
         {"encounterRate", encounterRate},
         {"bgmAsset", bgmAsset},
+        {"darkness", darkness},
         {"animTiles", animTiles}
     };
 }
@@ -41,6 +42,7 @@ void Map::fromJson(const json& j) {
     encounterEnemies = j.value("encounterEnemies", std::vector<int>{});
     encounterRate    = j.value("encounterRate", 0);
     bgmAsset         = j.value("bgmAsset", -1);
+    darkness         = j.value("darkness", 0);
     animTiles        = j.value("animTiles", std::vector<int>{});
 }
 

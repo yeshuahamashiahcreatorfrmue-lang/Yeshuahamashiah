@@ -7,7 +7,11 @@
 #include "project/Project.h"
 #include "database/Database.h"
 #include <string>
+#include <vector>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
 #include <filesystem>
 
 using namespace tsukuru;
@@ -126,6 +130,39 @@ static Image genTileset() {
 
 static void saveImg(Image im,const std::string&p){ ExportImage(im,p.c_str()); UnloadImage(im); }
 
+// ---------- procedural audio (16-bit mono WAV) ----------
+static const int RATE = 22050;
+static void note(std::vector<short>&b,double f,double dur,double vol,int wave=0){
+    int n=(int)(dur*RATE);
+    for(int i=0;i<n;i++){double t=(double)i/RATE; double env=1.0-(double)i/n;
+        double ph=f*t,s; if(wave==0)s=(fmod(ph,1.0)<0.5?1:-1); else if(wave==1)s=sin(ph*2*M_PI);
+        else s=((rand()%2001)-1000)/1000.0;
+        int v=(int)(s*vol*env*30000); if(v>32767)v=32767; if(v<-32768)v=-32768; b.push_back((short)v);}
+}
+static void rest(std::vector<short>&b,double dur){ b.insert(b.end(),(size_t)(dur*RATE),0); }
+static void saveWav(const std::vector<short>&s,const std::string&path){
+    Wave w; w.frameCount=(unsigned)s.size(); w.sampleRate=RATE; w.sampleSize=16; w.channels=1;
+    w.data=malloc(s.size()*sizeof(short)); memcpy(w.data,s.data(),s.size()*sizeof(short));
+    ExportWave(w,path.c_str()); free(w.data);
+}
+static void genAudio(const std::string& ad){
+    std::filesystem::create_directories(ad+"/sfx");
+    std::vector<short> b;
+    b.clear(); note(b,900,0.05,0.5,2); note(b,500,0.06,0.4,2); saveWav(b,ad+"/sfx/attack.wav");
+    b.clear(); note(b,200,0.09,0.7,0); saveWav(b,ad+"/sfx/hit.wav");
+    b.clear(); note(b,420,0.09,0.6,0); note(b,300,0.09,0.6,0); note(b,170,0.16,0.6,0); saveWav(b,ad+"/sfx/defeat.wav");
+    b.clear(); note(b,140,0.14,0.6,0); saveWav(b,ad+"/sfx/hurt.wav");
+    b.clear(); note(b,880,0.05,0.5,1); note(b,1320,0.07,0.5,1); saveWav(b,ad+"/sfx/coin.wav");
+    b.clear(); note(b,523,0.07,0.5,0); note(b,659,0.07,0.5,0); note(b,784,0.07,0.5,0); note(b,1047,0.13,0.5,0); saveWav(b,ad+"/sfx/levelup.wav");
+    b.clear(); note(b,1000,0.04,0.4,1); saveWav(b,ad+"/sfx/select.wav");
+    // BGM: village (gentle major loop)
+    { std::vector<short> m; double q=0.26; int mel[]={523,659,784,659,587,659,523,392, 523,659,784,880,784,659,587,523};
+      for(int rep=0;rep<2;rep++) for(int i=0;i<16;i++){ note(m,mel[i],q,0.30,1); note(m,mel[i]/2.0,q*0.0+0.0,0,1);} saveWav(m,ad+"/bgm_village.wav"); }
+    // BGM: cave (slow eerie minor loop)
+    { std::vector<short> m; double q=0.42; int mel[]={220,262,196,247,220,175,196,165};
+      for(int rep=0;rep<3;rep++) for(int i=0;i<8;i++){ note(m,mel[i],q,0.26,0); rest(m,0.04);} saveWav(m,ad+"/bgm_cave.wav"); }
+}
+
 int main(int argc,char**argv){
     std::string out = argc>1?argv[1]:"projects/willowbrook";
     SetTraceLogLevel(LOG_WARNING);
@@ -143,7 +180,8 @@ int main(int argc,char**argv){
     saveImg(gen::enemySprite({110,200,120,255}), ad+"/slime.png");
     saveImg(gen::enemySprite({130,90,170,255}),  ad+"/bat.png");
     saveImg(gen::enemySprite({190,120,80,255}),  ad+"/boar.png");
-    printf("art generated\n");
+    genAudio(ad);
+    printf("art + audio generated\n");
 
     auto p = std::make_shared<Project>();
     p->dir = out; p->name = "Willowbrook";
@@ -156,6 +194,8 @@ int main(int argc,char**argv){
     int A_sl   = p->assets.addExisting(AssetType::Image,"slime","assets/slime.png");
     int A_bat  = p->assets.addExisting(AssetType::Image,"bat","assets/bat.png");
     int A_boar = p->assets.addExisting(AssetType::Image,"boar","assets/boar.png");
+    int A_bgmV = p->assets.addExisting(AssetType::Audio,"bgm_village","assets/bgm_village.wav");
+    int A_bgmC = p->assets.addExisting(AssetType::Audio,"bgm_cave","assets/bgm_cave.wav");
 
     // database
     Database& db = p->database;
@@ -263,10 +303,49 @@ int main(int argc,char**argv){
     door(h4,"Home sweet home.");
 
     // field monsters in the open east area
-    m->encounterEnemies = {1,2,3};
+    m->encounterEnemies = {1,2};
+    m->bgmAsset = A_bgmV; m->darkness = 0;
+
+    // ===== Map 2: Whispering Cave (dark, torch-lit, tougher) =====
+    auto cave = p->addMap("Whispering Cave", 32, 26);
+    cave->tileset.assetId=A_ts; cave->tileset.tileWidth=32; cave->tileset.tileHeight=32;
+    cave->tileset.columns=8; cave->tileset.rows=6;
+    cave->animTiles={WATER,SHALLOW}; cave->bgmAsset=A_bgmC; cave->darkness=185;
+    cave->encounterEnemies={3,2};
+    Tilemap& cm=cave->tilemap; int CW=32,CH=26;
+    auto cset=[&](int l,int x,int y,int t){cm.setTile(l,x,y,t);};
+    auto cblk=[&](int x,int y,bool b=true){cm.setBlocked(x,y,b);};
+    auto crect=[&](int l,int x,int y,int w,int h,int t){for(int j=y;j<y+h;j++)for(int i=x;i<x+w;i++)if(cm.inBounds(i,j))cset(l,i,j,t);};
+    crect(0,0,0,CW,CH,COBBLE);
+    for(int x=0;x<CW;x++){cset(1,x,0,ROCK);cblk(x,0);cset(1,x,CH-1,ROCK);cblk(x,CH-1);}
+    for(int y=0;y<CH;y++){cset(1,0,y,ROCK);cblk(0,y);cset(1,CW-1,y,ROCK);cblk(CW-1,y);}
+    int rocks[][2]={{6,6},{7,6},{6,7},{20,5},{21,5},{12,14},{13,14},{24,18},{25,18},{25,19},{9,18},{16,9},{10,11},{22,12}};
+    for(auto&r:rocks){cset(1,r[0],r[1],ROCK);cblk(r[0],r[1]);}
+    crect(0,17,11,5,4,WATER); for(int j=11;j<15;j++)for(int i=17;i<22;i++)cblk(i,j);
+    crect(0,16,11,7,1,SHALLOW);
+    cset(1,16,2,STAIRS);     // sealed gate (return)
+    cset(1,16,23,STAIRS);    // entrance from village
+    cset(1,26,6,LAMP);       // a lit brazier landmark near the lever
+    cset(1,5,5,CHEST);
+    int ceid=1; auto cev=[&](Event e){e.id=ceid++;cave->events.push_back(e);};
+    // chest -> Hi-Potion (once)
+    { Event e;e.x=5;e.y=5;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=2;e.once=true;e.text="A glint in the dark...|You found 2 Hi-Potions!"; cev(e); }
+    // lever -> opens the gate (sets switch 1)
+    { Event e;e.x=26;e.y=7;e.type=EventType::SetSwitch;e.trigger=TriggerType::ActionButton;e.switchId=1;e.switchValue=true;e.graphicAsset=A_eld; e.text="You pull a mossy lever.|A heavy gate grinds open to the north."; cev(e); }
+    // sealed gate -> returns to village, only when switch 1 is on
+    { Event e;e.x=16;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=m->id;e.targetX=22;e.targetY=3;e.conditionSwitch=1;e.conditionValue=true; cev(e); }
+    // sign by the gate
+    { cset(1,14,2,SIGN);cblk(14,2); Event e;e.x=14;e.y=2;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text="A sealed stone gate.|Some lever must work it..."; cev(e); }
+    // lost miner npc
+    { Event e;e.x=9;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v2;e.text="Miner: Boars in here are vicious!|Pull the lever east to open the way out."; cev(e); }
+
+    // village -> cave entrance (top of the road)
+    setT(1,22,2,STAIRS);
+    { Event e;e.id=eid++;e.x=22;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=cave->id;e.targetX=16;e.targetY=23; m->events.push_back(e); }
+    sign(20,3,"Cave entrance ->|Beware what whispers within.");
 
     p->startMap=m->id; p->startX=22; p->startY=20; p->startActor=1; p->playerSprite=A_hero;
     p->save();
-    printf("Built '%s' (%dx%d, %d events) at %s\n", p->name.c_str(), W, H, (int)m->events.size(), out.c_str());
+    printf("Built '%s': village(%d ev) + cave(%d ev) at %s\n", p->name.c_str(), (int)m->events.size(), (int)cave->events.size(), out.c_str());
     return 0;
 }

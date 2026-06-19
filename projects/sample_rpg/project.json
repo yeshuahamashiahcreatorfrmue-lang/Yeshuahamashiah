@@ -54,12 +54,25 @@
         "name": "boar",
         "path": "assets/boar.png",
         "type": "image"
+      },
+      {
+        "id": 10,
+        "name": "bgm_village",
+        "path": "assets/bgm_village.wav",
+        "type": "audio"
+      },
+      {
+        "id": 11,
+        "name": "bgm_cave",
+        "path": "assets/bgm_cave.wav",
+        "type": "audio"
       }
     ],
-    "nextId": 10
+    "nextId": 12
   },
   "maps": [
-    1
+    1,
+    2
   ],
   "name": "Willowbrook",
   "playerSprite": 2,
