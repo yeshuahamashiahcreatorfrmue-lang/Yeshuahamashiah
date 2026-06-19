@@ -1,0 +1,130 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Potion",
+      "description": "Restores 50 HP.",
+      "price": 30,
+      "iconAsset": -1,
+      "effect": "healHP",
+      "power": 50,
+      "consumable": true
+    },
+    {
+      "id": 2,
+      "name": "Hi-Potion",
+      "description": "Restores 150 HP.",
+      "price": 100,
+      "iconAsset": -1,
+      "effect": "healHP",
+      "power": 150,
+      "consumable": true
+    },
+    {
+      "id": 3,
+      "name": "Ether",
+      "description": "Restores 30 MP.",
+      "price": 80,
+      "iconAsset": -1,
+      "effect": "healMP",
+      "power": 30,
+      "consumable": true
+    }
+  ],
+  "equipment": [
+    {
+      "id": 1,
+      "name": "Bronze Sword",
+      "slot": "weapon",
+      "price": 50,
+      "iconAsset": -1,
+      "atk": 6,
+      "def": 0
+    },
+    {
+      "id": 4,
+      "name": "Iron Sword",
+      "slot": "weapon",
+      "price": 200,
+      "iconAsset": -1,
+      "atk": 14,
+      "def": 0
+    },
+    {
+      "id": 2,
+      "name": "Leather Armor",
+      "slot": "armor",
+      "price": 60,
+      "iconAsset": -1,
+      "atk": 0,
+      "def": 6
+    },
+    {
+      "id": 3,
+      "name": "Iron Armor",
+      "slot": "armor",
+      "price": 220,
+      "iconAsset": -1,
+      "atk": 0,
+      "def": 13
+    }
+  ],
+  "skills": [
+    {
+      "id": 1,
+      "name": "Fireball",
+      "mpCost": 5,
+      "power": 22,
+      "healing": false
+    },
+    {
+      "id": 2,
+      "name": "Heal",
+      "mpCost": 8,
+      "power": 45,
+      "healing": true
+    }
+  ],
+  "actors": [
+    {
+      "id": 1,
+      "name": "Hero",
+      "spriteAsset": 2,
+      "maxHp": 120,
+      "maxMp": 30,
+      "atk": 14,
+      "def": 7,
+      "spd": 6,
+      "skills": [
+        1,
+        2
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "id": 1,
+      "name": "Slime",
+      "spriteAsset": 5,
+      "maxHp": 30,
+      "maxMp": 0,
+      "atk": 8,
+      "def": 3,
+      "spd": 4,
+      "expReward": 8,
+      "goldReward": 6
+    },
+    {
+      "id": 2,
+      "name": "Bat",
+      "spriteAsset": 6,
+      "maxHp": 22,
+      "maxMp": 0,
+      "atk": 10,
+      "def": 2,
+      "spd": 8,
+      "expReward": 10,
+      "goldReward": 8
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Build output
+/build/
+/bin/
+*.o
+*.obj
+*.exe
+*.ilk
+*.pdb
+
+# Screenshots at repo root (kept ones live in docs/screenshots)
+/shot_*.png
+
+# Runtime save files of the sample project
+/projects/*/save/
+
+# Editor/OS noise
+.vscode/
+.idea/
+.DS_Store
