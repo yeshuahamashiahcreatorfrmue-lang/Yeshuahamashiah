@@ -1,6 +1,9 @@
 # Build output
 /build/
+/build-win/
+/build*/
 /bin/
+/dist/
 *.o
 *.obj
 *.exe

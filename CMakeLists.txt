@@ -93,9 +93,16 @@ if(BUILD_ENGINE)
         target_link_libraries(TsukuruEngine PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")
     endif()
 
-    # Headless asset generator (CPU image API only).
-    add_executable(gen_assets ${CMAKE_SOURCE_DIR}/tools/gen_assets.cpp)
-    target_link_libraries(gen_assets PRIVATE raylib)
+    # On MinGW (incl. cross builds) make it a GUI app so no console window pops up.
+    if(MINGW)
+        target_link_options(TsukuruEngine PRIVATE -mwindows)
+    endif()
+
+    # Headless asset generator (CPU image API only) — host tool, skip when cross-compiling.
+    if(NOT CMAKE_CROSSCOMPILING)
+        add_executable(gen_assets ${CMAKE_SOURCE_DIR}/tools/gen_assets.cpp)
+        target_link_libraries(gen_assets PRIVATE raylib)
+    endif()
 
     # Copy assets/projects next to the binary for "double-click and run"
     add_custom_command(TARGET TsukuruEngine POST_BUILD
