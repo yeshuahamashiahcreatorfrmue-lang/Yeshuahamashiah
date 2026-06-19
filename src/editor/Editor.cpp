@@ -1,4 +1,5 @@
 #include "editor/Editor.h"
+#include "editor/Prefabs.h"
 #include "core/Engine.h"
 #include "render/UI.h"
 #include "render/AssetGen.h"
@@ -25,6 +26,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
+    if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
 }
 
 std::shared_ptr<Map> Editor::activeMap() {
@@ -60,6 +62,36 @@ void Editor::doRedo() {
     setStatus("Redo");
 }
 
+// ---- prefab stamps (multi-tile / multi-layer building blocks) ----
+void Editor::stampPrefab(int ox, int oy) {
+    auto m = activeMap();
+    if (!m) return;
+    const auto& list = prefabs();
+    if (prefabSel_ < 0 || prefabSel_ >= (int)list.size()) return;
+    pushUndo();
+    for (const auto& c : list[prefabSel_].cells) {
+        int x = ox + c.dx, y = oy + c.dy;
+        if (!m->tilemap.inBounds(x, y)) continue;
+        if (c.tile >= 0) m->tilemap.setTile(c.layer, x, y, c.tile);
+        if (c.blocked)   m->tilemap.setBlocked(x, y, true);
+    }
+}
+
+void Editor::drawPrefabPalette(Rectangle area) {
+    ui::panel(area, ui::kPanel);
+    ui::label("Stamps", (int)area.x + 10, (int)area.y + 8, 16, ui::kAccent);
+    const auto& list = prefabs();
+    float y = area.y + 32;
+    for (int i = 0; i < (int)list.size(); ++i) {
+        if (ui::button({ area.x + 10, y, area.width - 20, 24 }, list[i].name, prefabSel_ == i))
+            prefabSel_ = i;
+        y += 27;
+    }
+    ui::label("Click map to place.", (int)area.x + 10, (int)(y + 6), 13, ui::kTextDim);
+    ui::label("(Tree/House/Pond set", (int)area.x + 10, (int)(y + 24), 12, ui::kTextDim);
+    ui::label(" tiles + collision)", (int)area.x + 10, (int)(y + 40), 12, ui::kTextDim);
+}
+
 // ============================ update ============================
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
@@ -80,6 +112,7 @@ void Editor::update(float dt) {
         if (IsKeyPressed(KEY_E)) { tool_ = Tool::Erase;  collisionMode_ = false; }
         if (IsKeyPressed(KEY_G)) { tool_ = Tool::Fill;   collisionMode_ = false; }
         if (IsKeyPressed(KEY_R)) { tool_ = Tool::Rect;   collisionMode_ = false; }
+        if (IsKeyPressed(KEY_T)) { tool_ = Tool::Stamp;  collisionMode_ = false; }
         if (IsKeyPressed(KEY_C)) collisionMode_ = !collisionMode_;
     }
     if (IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
@@ -172,16 +205,11 @@ void Editor::drawToolbar() {
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {
-        float bw = 58, gap = 60;
-        float rx = sw - 8 - 5*gap;
-        if (ui::button({ rx, 6, bw, 28 }, "Pencil", tool_ == Tool::Pencil && !collisionMode_)) { tool_ = Tool::Pencil; collisionMode_ = false; }
-        rx += gap;
-        if (ui::button({ rx, 6, bw, 28 }, "Erase",  tool_ == Tool::Erase && !collisionMode_)) { tool_ = Tool::Erase; collisionMode_ = false; }
-        rx += gap;
-        if (ui::button({ rx, 6, bw, 28 }, "Fill",   tool_ == Tool::Fill && !collisionMode_)) { tool_ = Tool::Fill; collisionMode_ = false; }
-        rx += gap;
-        if (ui::button({ rx, 6, bw, 28 }, "Rect",   tool_ == Tool::Rect && !collisionMode_)) { tool_ = Tool::Rect; collisionMode_ = false; }
-        rx += gap;
+        float bw = 54, gap = 56;
+        float rx = sw - 8 - 6*gap;
+        auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_)){tool_=t;collisionMode_=false;} rx+=gap; };
+        tbtn("Pencil",Tool::Pencil); tbtn("Erase",Tool::Erase); tbtn("Fill",Tool::Fill);
+        tbtn("Rect",Tool::Rect); tbtn("Stamp",Tool::Stamp);
         if (ui::button({ rx, 6, bw, 28 }, "Collide", collisionMode_)) collisionMode_ = !collisionMode_;
     }
 }
@@ -192,7 +220,8 @@ void Editor::drawMapTab() {
     Rectangle canvasArea  = { kPaletteW, kToolbarH, (float)GetScreenWidth() - kPaletteW,
                               (float)GetScreenHeight() - kToolbarH };
     drawMapCanvas(canvasArea);
-    drawTilePalette(paletteArea);
+    if (tool_ == Tool::Stamp) drawPrefabPalette(paletteArea);
+    else drawTilePalette(paletteArea);
 }
 
 void Editor::drawTilePalette(Rectangle area) {
@@ -225,7 +254,16 @@ void Editor::drawTilePalette(Rectangle area) {
     }
     ty += 54;
     ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "Cols", m->tileset.columns, 1, 1, 64); ty += 28;
-    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "Rows", m->tileset.rows, 1, 1, 64); ty += 32;
+    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "Rows", m->tileset.rows, 1, 1, 64); ty += 30;
+
+    // mark the selected tile as animated (cycles tile <-> tile+1 in play)
+    bool isAnim = std::find(m->animTiles.begin(), m->animTiles.end(), selectedTile_) != m->animTiles.end();
+    if (ui::button({ area.x + 10, ty, area.width - 20, 24 },
+                   isAnim ? "Animated: ON" : "Animated: OFF", isAnim)) {
+        if (isAnim) m->animTiles.erase(std::remove(m->animTiles.begin(), m->animTiles.end(), selectedTile_), m->animTiles.end());
+        else m->animTiles.push_back(selectedTile_);
+    }
+    ty += 32;
 
     // Tile grid
     if (set.assetId < 0) {
@@ -318,6 +356,11 @@ void Editor::drawMapCanvas(Rectangle area) {
             DrawRectangleLinesEx({ (float)x0*TS,(float)y0*TS,(float)(x1-x0+1)*TS,(float)(y1-y0+1)*TS },
                                  2, ui::kAccentHi);
         }
+        if (tool_ == Tool::Stamp && inMap) {                  // prefab footprint preview
+            const Prefab& pf = prefabs()[prefabSel_];
+            DrawRectangle(tx*TS, ty*TS, pf.w*TS, pf.h*TS, Fade(ui::kAccent, 0.25f));
+            DrawRectangleLinesEx({ (float)tx*TS,(float)ty*TS,(float)pf.w*TS,(float)pf.h*TS }, 2, ui::kAccentHi);
+        }
         EndMode2D();
 
         if (inMap) {
@@ -325,6 +368,11 @@ void Editor::drawMapCanvas(Rectangle area) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     int t = m->tilemap.tile(activeLayer_, tx, ty);
                     if (t >= 0) { selectedTile_ = t; setStatus("Picked tile " + std::to_string(t)); }
+                }
+            } else if (tool_ == Tool::Stamp) {              // prefab stamp
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    stampPrefab(tx, ty);
+                    setStatus("Stamped " + prefabs()[prefabSel_].name);
                 }
             } else if (tool_ == Tool::Rect) {               // rectangle fill (drag)
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { rectDragging_ = true; rectStartX_ = tx; rectStartY_ = ty; }

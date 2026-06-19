@@ -20,7 +20,7 @@ public:
 
 private:
     enum class Tab { World, Map, Events, Chars, Assets, Database };
-    enum class Tool { Pencil, Erase, Fill, Rect };
+    enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
     void drawWorldTab();
@@ -62,6 +62,7 @@ private:
     int  undoMap_ = -1;             // which map id the undo stacks belong to
     bool rectDragging_ = false;
     int  rectStartX_ = 0, rectStartY_ = 0;
+    int  prefabSel_ = 0;            // selected stamp/prefab index
     std::string status_;
     float statusTimer_ = 0;
 
@@ -69,6 +70,8 @@ private:
     void pushUndo();   // snapshot current map before an edit
     void doUndo();
     void doRedo();
+    void stampPrefab(int ox, int oy); // place the selected prefab at a tile
+    void drawPrefabPalette(Rectangle area);
 };
 
 } // namespace tsukuru
