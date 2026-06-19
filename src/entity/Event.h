@@ -10,10 +10,12 @@ namespace tsukuru {
 enum class EventType {
     Message,    // show dialogue text
     Teleport,   // move player to another map/position
-    GiveItem,   // add an item to inventory
+    GiveItem,   // add an item to inventory (also sets switchId if >= 0)
     SetSwitch,  // turn a switch on/off
-    StartBattle,// begin a battle with given enemies
-    Shop        // open a shop
+    StartBattle,// spawn field monsters (switchId = defeat switch, set when cleared)
+    Shop,       // open a shop
+    Quest,      // set the on-screen quest objective (and show the text)
+    Ending      // roll the victory / game-clear screen
 };
 
 enum class TriggerType {

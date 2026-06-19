@@ -57,18 +57,24 @@
       },
       {
         "id": 10,
+        "name": "guardian",
+        "path": "assets/guardian.png",
+        "type": "image"
+      },
+      {
+        "id": 11,
         "name": "bgm_village",
         "path": "assets/bgm_village.wav",
         "type": "audio"
       },
       {
-        "id": 11,
+        "id": 12,
         "name": "bgm_cave",
         "path": "assets/bgm_cave.wav",
         "type": "audio"
       }
     ],
-    "nextId": 12
+    "nextId": 13
   },
   "maps": [
     1,

@@ -181,6 +181,7 @@ int main(int argc,char**argv){
     saveImg(gen::enemySprite({110,200,120,255}), ad+"/slime.png");
     saveImg(gen::enemySprite({130,90,170,255}),  ad+"/bat.png");
     saveImg(gen::enemySprite({190,120,80,255}),  ad+"/boar.png");
+    saveImg(gen::enemySprite({150,40,60,255}),   ad+"/guardian.png");
     genAudio(ad);
     printf("art + audio generated\n");
 
@@ -195,6 +196,7 @@ int main(int argc,char**argv){
     int A_sl   = p->assets.addExisting(AssetType::Image,"slime","assets/slime.png");
     int A_bat  = p->assets.addExisting(AssetType::Image,"bat","assets/bat.png");
     int A_boar = p->assets.addExisting(AssetType::Image,"boar","assets/boar.png");
+    int A_guard= p->assets.addExisting(AssetType::Image,"guardian","assets/guardian.png");
     int A_bgmV = p->assets.addExisting(AssetType::Audio,"bgm_village","assets/bgm_village.wav");
     int A_bgmC = p->assets.addExisting(AssetType::Audio,"bgm_cave","assets/bgm_cave.wav");
 
@@ -203,6 +205,7 @@ int main(int argc,char**argv){
     db.items.push_back({1,"Potion","Restores 60 HP.",30,-1,ItemEffect::HealHP,60,true});
     db.items.push_back({2,"Hi-Potion","Restores 200 HP.",120,-1,ItemEffect::HealHP,200,true});
     db.items.push_back({3,"Ether","Restores 40 MP.",80,-1,ItemEffect::HealMP,40,true});
+    db.items.push_back({4,"Crystal","The village's sacred Crystal.",0,-1,ItemEffect::None,0,false});
     db.equipment.push_back({1,"Iron Sword",EquipSlot::Weapon,140,-1,12,0});
     db.equipment.push_back({2,"Leather Armor",EquipSlot::Armor,120,-1,0,8});
     db.skills.push_back({1,"Slash",4,18,false});
@@ -211,6 +214,7 @@ int main(int argc,char**argv){
     db.enemies.push_back({1,"Slime",A_sl,34,0,9,4,4,9,7});
     db.enemies.push_back({2,"Bat",A_bat,26,0,12,3,7,11,9});
     db.enemies.push_back({3,"Boar",A_boar,60,0,15,6,5,22,18});
+    db.enemies.push_back({4,"Cave Guardian",A_guard,220,0,18,9,4,150,120});
 
     auto m = p->addMap("Willowbrook Village", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;
@@ -288,9 +292,12 @@ int main(int argc,char**argv){
     npc(28,20,A_v2,"Farmer: My flowers bloom nicely|even in this gentle rain.",true);
     npc(8,16,A_girl,"Girl: I saw a shiny box near the trees!|Hee hee.",true);
 
-    // autorun intro (a tiny cutscene that plays once on arrival)
-    { Event e; e.x=22;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::Autorun;
-      e.text="* Willowbrook Village *|Arrows/WASD to move, Space to attack or talk.|Find the cave to the north."; ev(e); }
+    // autorun intro (cutscene + quest objective, plays once on arrival)
+    { Event e; e.x=22;e.y=20;e.type=EventType::Quest;e.trigger=TriggerType::Autorun;
+      e.text="The village Crystal was stolen by a cave beast! Recover it from the northern cave."; ev(e); }
+    // autorun ending: fires when you return with the Crystal (switch 3)
+    { Event e; e.x=22;e.y=20;e.type=EventType::Ending;e.trigger=TriggerType::Autorun;
+      e.conditionSwitch=3;e.conditionValue=true; ev(e); }
 
     // shopkeeper (sells a potion via Shop event)
     { Event e; e.x=30;e.y=18;e.type=EventType::Shop;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v1;e.itemId=1;e.text="Shop: Buy a Potion?"; ev(e); }
@@ -334,17 +341,26 @@ int main(int argc,char**argv){
     cset(1,16,23,STAIRS);    // entrance from village
     cset(1,26,6,LAMP);       // a lit brazier landmark near the lever
     cset(1,5,5,CHEST);
+    cset(1,5,4,CHEST);       // crystal chest (revealed after the boss)
     int ceid=1; auto cev=[&](Event e){e.id=ceid++;cave->events.push_back(e);};
-    // chest -> Hi-Potion (once)
+    // potion chest near entrance (once)
     { Event e;e.x=5;e.y=5;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=2;e.once=true;e.text="A glint in the dark...|You found 2 Hi-Potions!"; cev(e); }
-    // lever -> opens the gate (sets switch 1)
-    { Event e;e.x=26;e.y=7;e.type=EventType::SetSwitch;e.trigger=TriggerType::ActionButton;e.switchId=1;e.switchValue=true;e.graphicAsset=A_eld; e.text="You pull a mossy lever.|A heavy gate grinds open to the north."; cev(e); }
-    // sealed gate -> returns to village, only when switch 1 is on
-    { Event e;e.x=16;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=m->id;e.targetX=22;e.targetY=3;e.conditionSwitch=1;e.conditionValue=true; cev(e); }
-    // sign by the gate
-    { cset(1,14,2,SIGN);cblk(14,2); Event e;e.x=14;e.y=2;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text="A sealed stone gate.|Some lever must work it..."; cev(e); }
-    // lost miner npc
-    { Event e;e.x=9;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v2;e.text="Miner: Boars in here are vicious!|Pull the lever east to open the way out."; cev(e); }
+    // BOSS: stepping into the inner cavern summons the Cave Guardian (once).
+    //       Defeating it sets switch 2 (clears the way + reveals the Crystal).
+    { Event e;e.x=16;e.y=16;e.type=EventType::StartBattle;e.trigger=TriggerType::PlayerTouch;e.once=true;
+      e.itemId=4;e.amount=1;e.switchId=2; cev(e); }
+    // Crystal: only obtainable after the Guardian falls (switch 2). Sets switch 3.
+    { Event e;e.x=5;e.y=4;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.once=true;
+      e.itemId=4;e.amount=1;e.switchId=3;e.conditionSwitch=2;e.conditionValue=true;
+      e.text="The stolen Crystal!|You reclaim it.|Carry it back through the gate to the village."; cev(e); }
+    // Guardian still alive -> the Crystal pedestal won't budge (event page on same tile)
+    { Event e;e.x=5;e.y=4;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;
+      e.text="A crystal pedestal, sealed by the Guardian's magic."; cev(e); }
+    // return gate: opens once the Guardian is defeated (switch 2)
+    { Event e;e.x=16;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=m->id;e.targetX=22;e.targetY=3;e.conditionSwitch=2;e.conditionValue=true; cev(e); }
+    { cset(1,14,2,SIGN);cblk(14,2); Event e;e.x=14;e.y=2;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text="A sealed gate.|It will open when the cave's guardian is slain."; cev(e); }
+    // lost miner npc (wanders)
+    { Event e;e.x=9;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v2;e.wander=true;e.text="Miner: A Guardian hoards the Crystal deeper in!|Strike it down to pass."; cev(e); }
 
     // village -> cave entrance (top of the road)
     setT(1,22,2,STAIRS);

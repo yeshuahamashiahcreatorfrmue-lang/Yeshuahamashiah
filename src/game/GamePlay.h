@@ -31,6 +31,7 @@ struct FieldMonster {
     float moveCd = 0;          // time until next move decision
     float atkCd = 0;           // time until it can hit the player again
     float hurtFlash = 0;       // white/red flash timer when struck
+    int  defeatSwitch = -1;    // when this troop is cleared, set this switch (boss gate)
     bool alive() const { return hp > 0; }
 };
 
@@ -59,12 +60,13 @@ public:
     void draw();
 
 private:
-    enum class Phase { Field, Message, Menu, GameOver };
+    enum class Phase { Field, Message, Menu, GameOver, GameClear };
 
     void loadMap(int id);
     void updateField(float dt);
     void tryMove(Direction d);
     void interact();
+    Event* actionEventAt(int x, int y);
     void runEvent(Event& e);
     void drawField();
     void drawMessage();

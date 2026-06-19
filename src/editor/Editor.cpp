@@ -478,9 +478,9 @@ void Editor::drawEventsTab() {
                return; }
 
     float y = panel.y + 44;
-    const char* typeNames[] = { "Message", "Teleport", "GiveItem", "SetSwitch", "Battle", "Shop" };
+    const char* typeNames[] = { "Message", "Teleport", "GiveItem", "SetSwitch", "Battle", "Shop", "Quest", "Ending" };
     if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("Type: %s", typeNames[(int)ev->type]))) {
-        ev->type = (EventType)(((int)ev->type + 1) % 6);
+        ev->type = (EventType)(((int)ev->type + 1) % 8);
     }
     y += 32;
     const char* trigNames[] = { "Action", "Touch", "Autorun" };
@@ -507,6 +507,7 @@ void Editor::drawEventsTab() {
         case EventType::GiveItem:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "ItemId", ev->itemId, 1, -1, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "Amount", ev->amount, 1, 1, 99); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "SetSwitch", ev->switchId, 1, -1, 999); y += 28;
             break;
         case EventType::SetSwitch:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "SwitchId", ev->switchId, 1, 0, 999); y += 28;
@@ -517,9 +518,17 @@ void Editor::drawEventsTab() {
         case EventType::StartBattle:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "EnemyId", ev->itemId, 1, -1, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "Count", ev->amount, 1, 1, 6); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "DefeatSw", ev->switchId, 1, -1, 999); y += 28;
             break;
         case EventType::Shop:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "ItemId", ev->itemId, 1, -1, 999); y += 28;
+            break;
+        case EventType::Quest:
+            DrawText("Text = objective shown on HUD.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "SetSwitch", ev->switchId, 1, -1, 999); y += 28;
+            break;
+        case EventType::Ending:
+            DrawText("Shows the game-clear screen.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
             break;
         default: break;
     }

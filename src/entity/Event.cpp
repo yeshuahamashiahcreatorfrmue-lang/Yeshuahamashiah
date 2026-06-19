@@ -12,6 +12,8 @@ static const char* eventTypeName(EventType t) {
         case EventType::SetSwitch:   return "setSwitch";
         case EventType::StartBattle: return "startBattle";
         case EventType::Shop:        return "shop";
+        case EventType::Quest:       return "quest";
+        case EventType::Ending:      return "ending";
     }
     return "message";
 }
@@ -21,6 +23,8 @@ static EventType eventTypeFrom(const std::string& s) {
     if (s == "setSwitch")   return EventType::SetSwitch;
     if (s == "startBattle") return EventType::StartBattle;
     if (s == "shop")        return EventType::Shop;
+    if (s == "quest")       return EventType::Quest;
+    if (s == "ending")      return EventType::Ending;
     return EventType::Message;
 }
 static const char* triggerName(TriggerType t) {

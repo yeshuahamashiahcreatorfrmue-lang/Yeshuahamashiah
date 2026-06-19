@@ -52,9 +52,8 @@ void GamePlay::loadMap(int id) {
 void GamePlay::spawnMonsters() {
     monsters_.clear();
     if (!map_) { targetMonsters_ = 0; return; }
-    const Database& db = engine_.project().database;
-    bool haveEnemies = !map_->encounterEnemies.empty() || !db.enemies.empty();
-    if (!haveEnemies) { targetMonsters_ = 0; return; }
+    // only maps that explicitly list encounter enemies spawn random field monsters
+    if (map_->encounterEnemies.empty()) { targetMonsters_ = 0; return; }
     int area = map_->tilemap.width() * map_->tilemap.height();
     targetMonsters_ = std::min(8, std::max(3, area / 45));
     for (int i = 0; i < targetMonsters_; ++i) spawnOne();
@@ -63,8 +62,7 @@ void GamePlay::spawnMonsters() {
 void GamePlay::spawnOne() {
     if (!map_) return;
     const Database& db = engine_.project().database;
-    std::vector<int> pool = map_->encounterEnemies;
-    if (pool.empty()) for (const auto& e : db.enemies) pool.push_back(e.id);
+    const std::vector<int>& pool = map_->encounterEnemies;
     if (pool.empty()) return;
     int enemyId = pool[std::rand() % pool.size()];
     const EnemyDef* def = db.enemy(enemyId);
@@ -128,6 +126,7 @@ void GamePlay::update(float dt) {
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
         case Phase::GameOver:
+        case Phase::GameClear:
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
                 engine_.setMode(Mode::Title);
             break;
@@ -223,17 +222,31 @@ void GamePlay::tryMove(Direction d) {
     destX_ = nx; destY_ = ny; moving_ = true;
 }
 
+// pick the first ActionButton event at (x,y) whose condition is satisfied
+// (multiple events on one tile act like RPG-Maker "event pages").
+Event* GamePlay::actionEventAt(int x, int y) {
+    GameState& gs = engine_.state();
+    Event* fallback = nullptr;
+    for (auto& e : map_->events) {
+        if (e.x != x || e.y != y || e.trigger != TriggerType::ActionButton) continue;
+        bool condOk = (e.conditionSwitch < 0) || (gs.getSwitch(e.conditionSwitch) == e.conditionValue);
+        if (condOk) return &e;
+        if (!fallback) fallback = &e;
+    }
+    return fallback;
+}
+
 void GamePlay::interact() {
     Vec2i delta = dirToDelta((Direction)dir_);
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
-    // a wandering NPC may have moved off its event tile — interact by live position
+    // a wandering NPC may have moved off its event tile — resolve by live position
     if (NpcInst* n = npcAt(fx, fy)) {
-        for (auto& e : map_->events)
-            if (e.id == n->eventId && e.trigger == TriggerType::ActionButton) { runEvent(e); return; }
+        Event* best = actionEventAt(n->x, n->y);
+        if (best) { runEvent(*best); return; }
     }
-    Event* e = map_->eventAt(fx, fy);
-    if (!e) e = map_->eventAt(destX_, destY_);
-    if (e && e->trigger == TriggerType::ActionButton) runEvent(*e);
+    Event* e = actionEventAt(fx, fy);
+    if (!e) e = actionEventAt(destX_, destY_);
+    if (e) runEvent(*e);
 }
 
 // ----------------------------- combat -----------------------------
@@ -274,6 +287,18 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
     for (auto& p : gs.party) if (p.alive()) p.gainExp(m.expReward);
     engine_.audio().playSfx("defeat", 0.8f);
     if (!gs.party.empty() && gs.party[0].level > beforeLv) engine_.audio().playSfx("levelup");
+    // boss gate: when the last monster of a tagged troop dies, flip its switch
+    if (m.defeatSwitch >= 0) {
+        bool anyLeft = false;
+        for (const auto& o : monsters_)
+            if (&o != &m && o.alive() && o.defeatSwitch == m.defeatSwitch) { anyLeft = true; break; }
+        if (!anyLeft) {
+            gs.setSwitch(m.defeatSwitch, true);
+            toast_ = "The path ahead is clear!"; toastTimer_ = 2.5f;
+            engine_.audio().playSfx("levelup");
+            return;
+        }
+    }
     toast_ = m.name + " defeated!  +" + std::to_string(m.expReward) + " EXP  +" +
              std::to_string(m.goldReward) + " G";
     toastTimer_ = 1.8f;
@@ -527,6 +552,7 @@ void GamePlay::runEvent(Event& e) {
         }
         case EventType::GiveItem:
             gs.inventory.addItem(e.itemId, e.amount);
+            if (e.switchId >= 0) gs.setSwitch(e.switchId, true);   // mark quest progress
             engine_.audio().playSfx("coin");
             showMessage(e.text.empty() ? "Got an item!" : e.text);
             break;
@@ -548,6 +574,7 @@ void GamePlay::runEvent(Event& e) {
                 m.px = m.x * (float)TS; m.py = m.y * (float)TS;
                 m.hp = m.maxHp = def->maxHp; m.atk = def->atk; m.def = def->def;
                 m.expReward = def->expReward; m.goldReward = def->goldReward;
+                m.defeatSwitch = e.switchId;       // boss gate: set switch when cleared
                 monsters_.push_back(m);
                 targetMonsters_ = std::max(targetMonsters_, (int)monsters_.size());
             }
@@ -565,6 +592,16 @@ void GamePlay::runEvent(Event& e) {
             } else showMessage(e.text.empty() ? "Welcome!" : e.text);
             break;
         }
+        case EventType::Quest:
+            gs.objective = e.text;
+            if (e.switchId >= 0) gs.setSwitch(e.switchId, true);
+            showMessage(e.text);
+            break;
+        case EventType::Ending:
+            gs.objective.clear();
+            engine_.audio().playSfx("levelup");
+            phase_ = Phase::GameClear;
+            break;
     }
     if (e.once) g_firedOnce.insert(key);
 }
@@ -707,6 +744,10 @@ void GamePlay::drawField() {
                  m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold),
                  12, 8, 16, ui::kText);
     }
+    if (!gs.objective.empty()) {
+        DrawRectangle(0, 32, MeasureText(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
+        DrawText(TextFormat("Objective: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
+    }
     DrawText("Space:Attack  Arrows/WASD:Move  Enter:Talk  ESC:Menu  F2:Editor",
              12, GetScreenHeight() - 24, 15, Fade(ui::kText, 0.7f));
 
@@ -727,6 +768,19 @@ void GamePlay::drawMessage() {
 }
 
 void GamePlay::draw() {
+    if (phase_ == Phase::GameClear) {
+        int sw = GetScreenWidth(), sh = GetScreenHeight();
+        DrawRectangleGradientV(0, 0, sw, sh, Color{ 30, 30, 60, 255 }, Color{ 10, 10, 24, 255 });
+        const char* a = "THE END";
+        int aw = MeasureText(a, 72);
+        DrawText(a, sw/2 - aw/2, sh/3, 72, Color{ 255, 220, 120, 255 });
+        const char* b = "Willowbrook is saved. Thank you for playing!";
+        int bw = MeasureText(b, 22);
+        DrawText(b, sw/2 - bw/2, sh/3 + 96, 22, ui::kText);
+        const char* c = "Press Enter";
+        DrawText(c, sw/2 - MeasureText(c,18)/2, sh/3 + 150, 18, ui::kTextDim);
+        return;
+    }
     if (phase_ == Phase::GameOver) {
         DrawRectangle(0,0,GetScreenWidth(),GetScreenHeight(), Color{0,0,0,255});
         const char* go = "GAME OVER";

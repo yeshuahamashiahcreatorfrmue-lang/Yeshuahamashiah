@@ -51,6 +51,18 @@
       "name": "Boar",
       "spd": 5,
       "spriteAsset": 9
+    },
+    {
+      "atk": 18,
+      "def": 9,
+      "expReward": 150,
+      "goldReward": 120,
+      "id": 4,
+      "maxHp": 220,
+      "maxMp": 0,
+      "name": "Cave Guardian",
+      "spd": 4,
+      "spriteAsset": 10
     }
   ],
   "equipment": [
@@ -103,6 +115,16 @@
       "name": "Ether",
       "power": 40,
       "price": 80
+    },
+    {
+      "consumable": false,
+      "description": "The village's sacred Crystal.",
+      "effect": "none",
+      "iconAsset": -1,
+      "id": 4,
+      "name": "Crystal",
+      "power": 0,
+      "price": 0
     }
   ],
   "skills": [

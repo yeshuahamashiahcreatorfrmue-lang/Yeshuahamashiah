@@ -42,6 +42,7 @@ public:
     int  currentMap = -1;
     int  playerX = 0, playerY = 0;
     int  playerDir = 0; // Direction
+    std::string objective;   // current quest objective shown on the HUD
 
     void setSwitch(int id, bool value) { switches_[id] = value; }
     bool getSwitch(int id) const {

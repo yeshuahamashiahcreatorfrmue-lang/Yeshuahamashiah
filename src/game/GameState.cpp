@@ -66,6 +66,7 @@ void GameState::newGame(const Database& db, int startActorId, int startMap, int 
         party.push_back(PartyMember::fromActor(db.actors.front()));
     currentMap = startMap;
     playerX = sx; playerY = sy; playerDir = 0;
+    objective.clear();
 }
 
 bool GameState::partyWiped() const {
@@ -82,7 +83,8 @@ json GameState::toJson() const {
     for (const auto& m : party) pt.push_back(m.toJson());
     return {{"inventory", inventory.toJson()}, {"party", pt},
             {"currentMap", currentMap}, {"playerX", playerX}, {"playerY", playerY},
-            {"playerDir", playerDir}, {"switches", sw}, {"variables", vr}};
+            {"playerDir", playerDir}, {"switches", sw}, {"variables", vr},
+            {"objective", objective}};
 }
 
 void GameState::fromJson(const json& j) {
@@ -92,6 +94,7 @@ void GameState::fromJson(const json& j) {
     currentMap = j.value("currentMap", -1);
     playerX = j.value("playerX", 0); playerY = j.value("playerY", 0);
     playerDir = j.value("playerDir", 0);
+    objective = j.value("objective", std::string());
     switches_.clear();
     for (const auto& s : j.value("switches", json::array())) switches_[s.value("id",-1)] = s.value("v", false);
     variables_.clear();
