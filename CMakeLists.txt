@@ -13,10 +13,14 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # Optimization flags (C++ 최적화)
+# /utf-8 (MSVC) and -fexec-charset (GCC/Clang default) ensure the Korean
+# UTF-8 string literals in the source are stored as UTF-8 at runtime, which is
+# what the font renderer (DrawTextU) expects.
 if(MSVC)
-    add_compile_options($<$<CONFIG:Release>:/O2> /W3)
+    add_compile_options($<$<CONFIG:Release>:/O2> /W3 /utf-8)
 else()
-    add_compile_options($<$<CONFIG:Release>:-O2> -Wall -Wextra -Wno-unused-parameter)
+    add_compile_options($<$<CONFIG:Release>:-O2> -Wall -Wextra -Wno-unused-parameter
+                        -finput-charset=UTF-8 -fexec-charset=UTF-8)
 endif()
 
 # Link-time optimization for Release
