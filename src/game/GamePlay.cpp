@@ -36,6 +36,7 @@ void GamePlay::onEnter() {
     attackTimer_ = playerHurt_ = 0;
     for (float& c : skillCd_) c = 0;
     projectiles_.clear(); fx_.clear();
+    loadSkills();
     spawnMonsters();
     runAutoruns();
 }
@@ -161,12 +162,14 @@ void GamePlay::updateField(float dt) {
 
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
 
-    // Skills: Z/Space = melee, X = ranged, C = dash, V = ultimate.
+    // Skills: Z/Space slot0, X slot1, C slot2, V slot3, F slot4, G slot5.
     if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_LEFT_CONTROL))
-        castSkill(SK_Attack);
-    if (IsKeyPressed(KEY_X)) castSkill(SK_Ranged);
-    if (IsKeyPressed(KEY_C)) castSkill(SK_Dash);
-    if (IsKeyPressed(KEY_V)) castSkill(SK_Ult);
+        castSlot(0);
+    if (IsKeyPressed(KEY_X)) castSlot(1);
+    if (IsKeyPressed(KEY_C)) castSlot(2);
+    if (IsKeyPressed(KEY_V)) castSlot(3);
+    if (IsKeyPressed(KEY_F)) castSlot(4);
+    if (IsKeyPressed(KEY_G)) castSlot(5);
     handleSkillClicks();                 // touch / mouse click on the skill panel
     if (IsKeyPressed(KEY_ENTER)) interact();
 
@@ -181,13 +184,24 @@ void GamePlay::updateField(float dt) {
         }
         if (near) {
             int ddx = near->x - destX_, ddy = near->y - destY_;
+            int cheb = std::max(std::abs(ddx), std::abs(ddy));
             if (std::abs(ddx) >= std::abs(ddy) && ddx != 0)
                 autoDir = ddx > 0 ? Direction::Right : Direction::Left;
             else if (ddy != 0)
                 autoDir = ddy > 0 ? Direction::Down : Direction::Up;
             dir_ = (int)autoDir;
             autoMove = true;
-            if (best <= 1) playerAttack();
+            // attack any orthogonally-adjacent monster (face it first)
+            for (auto& m : monsters_) {
+                if (!m.alive()) continue;
+                int adx = m.x - destX_, ady = m.y - destY_;
+                if (std::abs(adx) + std::abs(ady) != 1) continue;
+                dir_ = adx>0?(int)Direction::Right : adx<0?(int)Direction::Left
+                     : ady>0?(int)Direction::Down  : (int)Direction::Up;
+                castSlot(0);
+                break;
+            }
+            (void)cheb;
         }
     }
 
@@ -199,7 +213,14 @@ void GamePlay::updateField(float dt) {
         else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) d = Direction::Right;
         else press = false;
         if (!press && autoMove) { d = autoDir; press = true; }
-        if (press) tryMove(d);
+        if (press) {
+            tryMove(d);
+            // autowalk: if blocked, try other directions so it doesn't get stuck
+            if (autowalk && !moving_) {
+                Direction alts[4] = { Direction::Up, Direction::Down, Direction::Left, Direction::Right };
+                for (Direction a : alts) { tryMove(a); if (moving_) break; }
+            }
+        }
     }
 
     if (moving_) {
@@ -285,127 +306,95 @@ void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float
     fx_.push_back(f);
 }
 
-// Central dispatch so both keys and panel clicks/touches share one path.
-void GamePlay::castSkill(int slot) {
-    switch (slot) {
-        case SK_Attack:   playerAttack(); break;
-        case SK_Ranged:   castRanged();   break;
-        case SK_Dash:     castDash();      break;
-        case SK_Ult:      castUltimate();  break;
-    }
+// Build the active skill set: project's defined field skills, or the built-in
+// defaults if none are defined (keeps old projects working).
+void GamePlay::loadSkills() {
+    const Database& db = engine_.project().database;
+    if (!db.fieldSkills.empty()) skills_ = db.fieldSkills;
+    else skills_ = Database::defaultFieldSkills();
 }
 
-void GamePlay::playerAttack() {
-    if (skillCd_[SK_Attack] > 0) return;
-    skillCd_[SK_Attack] = 0.32f;
+// Rotate a canonical "facing-up" tile offset to the player's current facing.
+Vec2i GamePlay::rotateToFacing(int ox, int oy, int dir) {
+    switch (dir) {                          // Direction: Down0 Left1 Right2 Up3
+        case 3: return { ox,  oy};          // up    (canonical)
+        case 0: return {-ox, -oy};          // down  (180)
+        case 2: return {-oy,  ox};          // right (90 CW)
+        case 1: return { oy, -ox};          // left  (90 CCW)
+    }
+    return { ox, oy };
+}
+
+void GamePlay::playerAttack() { castSlot(0); }
+
+// Cast whatever skill is bound to a key slot (shared by keys + clicks/touch).
+void GamePlay::castSlot(int slot) {
+    if (slot < 0 || slot >= kSkillSlots) return;
+    for (const auto& s : skills_) if (s.slot == slot) { castFieldSkill(s, slot); return; }
+}
+
+// Generic, data-driven skill execution.
+void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
+    if (skillCd_[slot] > 0) return;
+    GameState& gs = engine_.state();
+    if (gs.party.empty()) return;
+    if (s.mpCost > 0 && gs.party[0].mp < s.mpCost) {
+        toast_ = "MP가 부족합니다 (" + std::to_string(s.mpCost) + ")"; toastTimer_ = 1.1f;
+        return;
+    }
+    gs.party[0].mp -= s.mpCost;
+    skillCd_[slot] = s.cooldown;
     attackTimer_ = 0.18f;
-    engine_.audio().playSfx("attack", 0.7f);
 
-    Vec2i delta = dirToDelta((Direction)dir_);
-    int fx = destX_ + delta.x, fy = destY_ + delta.y;
+    // sound: registered asset if set, else built-in
+    if (s.soundAsset >= 0) engine_.audio().playSfxFile(engine_.assetPath(s.soundAsset), 0.8f);
+    else                   engine_.audio().playSfx("attack", 0.7f);
+
     int TS = map_->tileset.tileWidth;
-    spawnFx(0, fx * (float)TS, fy * (float)TS, dir_, engine_.project().attackEffect, 0.18f);
-
     const Database& db = engine_.project().database;
-    int atk = engine_.state().party.empty() ? 10 : engine_.state().party[0].totalAtk(db);
+    int atk = gs.party[0].totalAtk(db);
+    int dmg = std::max(1, atk * s.powerPct / 100);
 
-    bool hit = false;
-    for (auto& m : monsters_) {
-        if (!m.alive()) continue;
-        if ((m.x == fx && m.y == fy) || (m.x == destX_ && m.y == destY_)) {
-            damageMonster(m, atk - m.def);
-            hit = true;
+    // 1) blink: teleport forward up to `blink` open tiles
+    if (s.blink > 0) {
+        Vec2i d = dirToDelta((Direction)dir_);
+        int nx = destX_, ny = destY_;
+        for (int i = 0; i < s.blink; ++i) {
+            int tx = nx + d.x, ty = ny + d.y;
+            if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
+            if (npcAt(tx, ty)) break;
+            nx = tx; ny = ty;
+            spawnFx(2, nx*(float)TS, ny*(float)TS, dir_, s.effectAsset, 0.28f);
         }
+        destX_ = nx; destY_ = ny;
+        pxX_ = nx*(float)TS; pxY_ = ny*(float)TS; moving_ = false;
+        gs.playerX = nx; gs.playerY = ny;
+    }
+
+    // 2) projectile: fire a bolt forward
+    if (s.projectile) {
+        Projectile pr; pr.dir = dir_; pr.px = pxX_; pr.py = pxY_;
+        pr.life = s.range * 0.085f + 0.05f; pr.dmg = dmg;
+        projectiles_.push_back(pr);
+        return;
+    }
+
+    // 3) instant pattern: damage every monster on a rotated pattern tile
+    bool hit = false;
+    bool aoe = s.patX.size() > 4;
+    if (aoe) spawnFx(3, destX_*(float)TS, destY_*(float)TS, dir_, s.effectAsset, 0.5f, TS*2.6f);
+    for (size_t i = 0; i < s.patX.size(); ++i) {
+        Vec2i r = rotateToFacing(s.patX[i], s.patY[i], dir_);
+        int tx = destX_ + r.x, ty = destY_ + r.y;
+        if (!aoe) spawnFx(0, tx*(float)TS, ty*(float)TS, dir_, s.effectAsset, 0.2f);
+        if (s.powerPct <= 0) continue;
+        if (FieldMonster* m = monsterAt(tx, ty)) { damageMonster(*m, dmg - m->def); hit = true; }
     }
     monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
                     [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
 
     if (hit) engine_.audio().playSfx("hit", 0.8f);
-    else interact(); // nothing to hit -> talk to an NPC in front
-}
-
-// X — ranged bolt: fires a projectile in the facing direction (costs MP).
-void GamePlay::castRanged() {
-    if (skillCd_[SK_Ranged] > 0) return;
-    GameState& gs = engine_.state();
-    if (gs.party.empty()) return;
-    const int cost = 4;
-    if (gs.party[0].mp < cost) { toast_ = "MP가 부족합니다"; toastTimer_ = 1.0f; return; }
-    gs.party[0].mp -= cost;
-    skillCd_[SK_Ranged] = 0.9f;
-    engine_.audio().playSfx("attack", 0.6f);
-
-    const Database& db = engine_.project().database;
-    int atk = gs.party[0].totalAtk(db);
-    Projectile pr;
-    pr.dir = dir_;
-    pr.px = pxX_; pr.py = pxY_;
-    pr.life = 0.8f;
-    pr.dmg = (int)(atk * 1.3f);
-    projectiles_.push_back(pr);
-}
-
-// C — dodge dash: quickly slides up to 4 tiles in the facing direction,
-// passing over hazards, leaving a trail effect. No MP, medium cooldown.
-void GamePlay::castDash() {
-    if (skillCd_[SK_Dash] > 0) return;
-    skillCd_[SK_Dash] = 1.6f;
-    engine_.audio().playSfx("select", 0.8f);
-    Vec2i d = dirToDelta((Direction)dir_);
-    int TS = map_->tileset.tileWidth;
-    int nx = destX_, ny = destY_;
-    for (int i = 0; i < 4; ++i) {
-        int tx = nx + d.x, ty = ny + d.y;
-        if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
-        if (monsterAt(tx, ty) || npcAt(tx, ty)) break;
-        nx = tx; ny = ty;
-        spawnFx(2, nx * (float)TS, ny * (float)TS, dir_, engine_.project().dashEffect, 0.30f);
-    }
-    destX_ = nx; destY_ = ny;
-    pxX_ = nx * (float)TS; pxY_ = ny * (float)TS;
-    moving_ = false;
-    engine_.state().playerX = nx; engine_.state().playerY = ny;
-    playerHurt_ = 0; // brief safety
-}
-
-// V — ultimate: blink forward to the farthest open tile (up to 5), then deal
-// area-of-effect damage to every monster within radius 2. Costs MP, long CD.
-void GamePlay::castUltimate() {
-    if (skillCd_[SK_Ult] > 0) return;
-    GameState& gs = engine_.state();
-    if (gs.party.empty()) return;
-    const int cost = 16;
-    if (gs.party[0].mp < cost) { toast_ = "MP가 부족합니다 (16)"; toastTimer_ = 1.2f; return; }
-    gs.party[0].mp -= cost;
-    skillCd_[SK_Ult] = 8.0f;
-    engine_.audio().playSfx("levelup", 0.9f);
-
-    Vec2i d = dirToDelta((Direction)dir_);
-    int TS = map_->tileset.tileWidth;
-    int nx = destX_, ny = destY_;
-    for (int i = 0; i < 5; ++i) {
-        int tx = nx + d.x, ty = ny + d.y;
-        if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
-        if (npcAt(tx, ty)) break;
-        nx = tx; ny = ty;
-    }
-    destX_ = nx; destY_ = ny;
-    pxX_ = nx * (float)TS; pxY_ = ny * (float)TS;
-    moving_ = false;
-    gs.playerX = nx; gs.playerY = ny;
-
-    // big AoE burst at the landing point
-    spawnFx(3, nx * (float)TS, ny * (float)TS, dir_, engine_.project().ultEffect, 0.5f, TS * 2.6f);
-    const Database& db = engine_.project().database;
-    int atk = gs.party[0].totalAtk(db);
-    for (auto& m : monsters_) {
-        if (!m.alive()) continue;
-        int cheb = std::max(std::abs(m.x - nx), std::abs(m.y - ny));
-        if (cheb <= 2) damageMonster(m, atk * 2 - m.def);
-    }
-    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
-                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
-    engine_.audio().playSfx("defeat", 0.7f);
+    else if (slot == 0 && s.powerPct > 0) interact(); // basic attack hit nothing -> talk
 }
 
 void GamePlay::updateProjectiles(float dt) {
@@ -575,7 +564,7 @@ void GamePlay::updateNpcs(float dt) {
                 n.moveCd -= dt;
                 if (n.moveCd <= 0) {
                     n.moveCd = 1.0f + (std::rand()%150)/100.0f;
-                    int r = std::rand()%4; int dx=(r==2)-(r==1)? 0:0; // pick a dir
+                    int r = std::rand()%4;          // pick a random direction
                     int ddx=0, ddy=0;
                     if (r==0) ddy=1; else if (r==1) ddx=-1; else if (r==2) ddx=1; else ddy=-1;
                     int nx=n.x+ddx, ny=n.y+ddy;
@@ -828,12 +817,12 @@ void GamePlay::drawFx() {
         float k = f.dur > 0 ? f.t / f.dur : 1.0f;          // 0..1 progress
         if (f.assetId >= 0) {
             const Texture2D& tex = engine_.assetTexture(f.assetId);
-            int frames = 4;
-            float fw = tex.width / (float)frames, fh = tex.height / 4.0f;
+            const AssetEntry* ae = engine_.project().assets.find(f.assetId);
+            int frames = (ae && ae->frames > 1) ? ae->frames : 1;  // single-row anim
+            float fw = tex.width / (float)frames, fh = (float)tex.height;
             int fr = std::min(frames-1, (int)(k * frames));
-            int row = std::min(3, f.dir);
-            Rectangle src = { fr*fw, row*fh, fw, fh };
-            float sz = (f.type == 3) ? f.radius*2 : TS*1.2f;
+            Rectangle src = { fr*fw, 0, fw, fh };
+            float sz = (f.type == 3) ? f.radius*2 : TS*1.3f;
             Rectangle dst = { f.px + TS/2 - sz/2, f.py + TS/2 - sz/2, sz, sz };
             DrawTexturePro(tex, src, dst, {0,0}, 0, Fade(WHITE, 1.0f - k*0.3f));
             continue;
@@ -857,47 +846,56 @@ void GamePlay::drawFx() {
 }
 
 // Right-side skill panel: key, name, MP cost, cooldown sweep, description.
+// Data-driven: one slot per bound skill (Z/X/C/V/F/G).
 void GamePlay::drawSkillPanel() {
-    static const char* keys[SK_COUNT]  = { "Z", "X", "C", "V" };
-    static const char* names[SK_COUNT] = { "공격", "원거리", "회피 이동", "궁극기" };
-    static const char* desc[SK_COUNT]  = {
-        "근접 공격", "MP4 원거리 일격", "전방 4칸 회피", "MP16 순간이동+광역" };
-    static const float maxCd[SK_COUNT] = { 0.32f, 0.9f, 1.6f, 8.0f };
-    static const int   mpCost[SK_COUNT] = { 0, 4, 0, 16 };
+    static const char* keys[kSkillSlots] = { "Z", "X", "C", "V", "F", "G" };
+    for (auto& r : skillBtn_) r = {};      // reset; only bound slots get rects
+
+    // collect skills that are bound to a key, in slot order
+    const FieldSkill* bound[kSkillSlots] = {};
+    int nBound = 0;
+    for (int slot = 0; slot < kSkillSlots; ++slot)
+        for (const auto& s : skills_) if (s.slot == slot) { bound[slot] = &s; ++nBound; break; }
+    if (nBound == 0) return;
 
     int sw = GetScreenWidth(), sh = GetScreenHeight();
-    float pw = 168, ph = 76, gap = 8;
+    float pw = 178, ph = 72, gap = 7;
     float px = sw - pw - 12;
-    float py = sh - (ph + gap) * SK_COUNT - 14;
+    float py = sh - (ph + gap) * nBound - 14;
 
     GameState& gs = engine_.state();
     int mp = gs.party.empty() ? 0 : gs.party[0].mp;
 
-    for (int i = 0; i < SK_COUNT; ++i) {
-        Rectangle r = { px, py + i*(ph+gap), pw, ph };
-        skillBtn_[i] = r;
+    int row = 0;
+    for (int slot = 0; slot < kSkillSlots; ++slot) {
+        const FieldSkill* s = bound[slot];
+        if (!s) continue;
+        Rectangle r = { px, py + row*(ph+gap), pw, ph };
+        skillBtn_[slot] = r; ++row;
         bool hover = CheckCollisionPointRec(GetMousePosition(), r);
-        bool ready = skillCd_[i] <= 0 && mp >= mpCost[i];
+        bool ready = skillCd_[slot] <= 0 && mp >= s->mpCost;
         Color bg = ready ? (hover ? ui::kPanelHi : ui::kPanel) : Color{40,30,30,235};
         DrawRectangleRec(r, Fade(bg, 0.95f));
         DrawRectangleLinesEx(r, 2, ready ? ui::kAccent : Fade(ui::kDanger,0.7f));
 
-        // key badge
         DrawRectangle((int)r.x+8, (int)r.y+8, 30, 30, Fade(ui::kAccent, ready?0.9f:0.4f));
-        DrawTextU(keys[i], (int)r.x+17, (int)r.y+13, 22, BLACK);
-        // name + cost + description
-        DrawTextU(names[i], (int)r.x+46, (int)r.y+8, 19, ui::kText);
-        if (mpCost[i] > 0)
-            DrawTextU(TextFormat("MP %d", mpCost[i]), (int)r.x+46, (int)r.y+32, 13,
-                      mp >= mpCost[i] ? ui::kGood : ui::kDanger);
-        DrawTextU(desc[i], (int)r.x+8, (int)r.y+52, 12, ui::kTextDim);
+        DrawTextU(keys[slot], (int)r.x+17, (int)r.y+13, 22, BLACK);
+        DrawTextU(s->name.c_str(), (int)r.x+46, (int)r.y+8, 18, ui::kText);
+        if (s->mpCost > 0)
+            DrawTextU(TextFormat("MP %d", s->mpCost), (int)r.x+46, (int)r.y+32, 13,
+                      mp >= s->mpCost ? ui::kGood : ui::kDanger);
+        // short auto description
+        std::string d = s->projectile ? TextFormat("원거리 %d칸", s->range)
+                      : s->blink > 0 && s->powerPct<=0 ? TextFormat("전방 %d칸 이동", s->blink)
+                      : s->blink > 0 ? TextFormat("순간이동+광역 %d", (int)s->patX.size())
+                      : TextFormat("범위 %d칸", (int)s->patX.size());
+        DrawTextU(d.c_str(), (int)r.x+8, (int)r.y+50, 12, ui::kTextDim);
 
-        // cooldown sweep overlay (top -> bottom fill while recharging)
-        if (skillCd_[i] > 0) {
-            float frac = skillCd_[i] / maxCd[i];
+        if (skillCd_[slot] > 0) {
+            float frac = s->cooldown > 0 ? skillCd_[slot] / s->cooldown : 0;
             if (frac > 1) frac = 1;
             DrawRectangle((int)r.x, (int)r.y, (int)r.width, (int)(r.height*frac), Fade(BLACK, 0.55f));
-            DrawTextU(TextFormat("%.1f", skillCd_[i]), (int)(r.x+r.width-40), (int)r.y+8, 16, ui::kTextDim);
+            DrawTextU(TextFormat("%.1f", skillCd_[slot]), (int)(r.x+r.width-40), (int)r.y+8, 16, ui::kTextDim);
         }
     }
     DrawTextU("스킬: 키 또는 클릭/터치", (int)px, (int)py - 20, 13, Fade(ui::kText,0.7f));
@@ -909,8 +907,8 @@ void GamePlay::handleSkillClicks() {
     int touches = GetTouchPointCount();
     if (!pressed && touches == 0) return;
     Vector2 mp = pressed ? GetMousePosition() : GetTouchPosition(0);
-    for (int i = 0; i < SK_COUNT; ++i)
-        if (CheckCollisionPointRec(mp, skillBtn_[i])) { castSkill(i); return; }
+    for (int i = 0; i < kSkillSlots; ++i)
+        if (skillBtn_[i].width > 0 && CheckCollisionPointRec(mp, skillBtn_[i])) { castSlot(i); return; }
 }
 
 void GamePlay::drawField() {

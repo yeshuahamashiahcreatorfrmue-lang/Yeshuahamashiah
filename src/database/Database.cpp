@@ -41,6 +41,24 @@ const EnemyDef* Database::enemy(int id) const {
     for (const auto& e : enemies) if (e.id == id) return &e;
     return nullptr;
 }
+const FieldSkill* Database::fieldSkillForSlot(int slot) const {
+    for (const auto& s : fieldSkills) if (s.slot == slot) return &s;
+    return nullptr;
+}
+
+std::vector<FieldSkill> Database::defaultFieldSkills() {
+    FieldSkill atk;  atk.id=1; atk.name="공격"; atk.slot=0; atk.cooldown=0.32f;
+        atk.powerPct=100; atk.patX={0,0}; atk.patY={0,-1};         // own + front tile
+    FieldSkill rng;  rng.id=2; rng.name="원거리"; rng.slot=1; rng.projectile=true;
+        rng.range=8; rng.mpCost=4; rng.cooldown=0.9f; rng.powerPct=130;
+    FieldSkill dsh;  dsh.id=3; dsh.name="회피 이동"; dsh.slot=2; dsh.blink=4;
+        dsh.cooldown=1.6f; dsh.powerPct=0;                          // movement only
+    FieldSkill ult;  ult.id=4; ult.name="궁극기"; ult.slot=3; ult.blink=5;
+        ult.mpCost=16; ult.cooldown=8.0f; ult.powerPct=200;
+        for (int dy=-2; dy<=2; ++dy) for (int dx=-2; dx<=2; ++dx)   // 5x5 area
+            { ult.patX.push_back(dx); ult.patY.push_back(dy); }
+    return { atk, rng, dsh, ult };
+}
 
 // ---- serialization ----
 json Database::toJson() const {
@@ -73,11 +91,20 @@ json Database::toJson() const {
         j["enemies"].push_back({{"id", e.id}, {"name", e.name}, {"spriteAsset", e.spriteAsset},
             {"maxHp", e.maxHp}, {"maxMp", e.maxMp}, {"atk", e.atk}, {"def", e.def},
             {"spd", e.spd}, {"expReward", e.expReward}, {"goldReward", e.goldReward}});
+
+    j["fieldSkills"] = json::array();
+    for (const auto& s : fieldSkills)
+        j["fieldSkills"].push_back({{"id", s.id}, {"name", s.name}, {"slot", s.slot},
+            {"projectile", s.projectile}, {"blink", s.blink}, {"range", s.range},
+            {"mpCost", s.mpCost}, {"cooldown", s.cooldown}, {"powerPct", s.powerPct},
+            {"patX", s.patX}, {"patY", s.patY},
+            {"effectAsset", s.effectAsset}, {"soundAsset", s.soundAsset}});
     return j;
 }
 
 void Database::fromJson(const json& j) {
     items.clear(); equipment.clear(); skills.clear(); actors.clear(); enemies.clear();
+    fieldSkills.clear();
 
     for (const auto& i : j.value("items", json::array())) {
         Item it;
@@ -119,6 +146,19 @@ void Database::fromJson(const json& j) {
         en.atk = e.value("atk", 8); en.def = e.value("def", 3); en.spd = e.value("spd", 4);
         en.expReward = e.value("expReward", 10); en.goldReward = e.value("goldReward", 5);
         enemies.push_back(en);
+    }
+    for (const auto& s : j.value("fieldSkills", json::array())) {
+        FieldSkill fs;
+        fs.id = s.value("id", -1); fs.name = s.value("name", "스킬");
+        fs.slot = s.value("slot", -1); fs.projectile = s.value("projectile", false);
+        fs.blink = s.value("blink", 0); fs.range = s.value("range", 6);
+        fs.mpCost = s.value("mpCost", 0); fs.cooldown = s.value("cooldown", 0.5f);
+        fs.powerPct = s.value("powerPct", 100);
+        fs.patX = s.value("patX", std::vector<int>{});
+        fs.patY = s.value("patY", std::vector<int>{});
+        fs.effectAsset = s.value("effectAsset", -1);
+        fs.soundAsset = s.value("soundAsset", -1);
+        fieldSkills.push_back(fs);
     }
 }
 

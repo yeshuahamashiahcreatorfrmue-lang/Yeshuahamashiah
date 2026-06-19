@@ -37,31 +37,30 @@ inline Image characterSheet(Color shirt, Color skin) {
     return img;
 }
 
-// A skill-effect sheet laid out like a character sheet (FRAMES x 4 dirs) so it
-// plays back directionally and animated. style: 0 slash 1 bolt 2 dash 3 burst.
-// Lets users create effect ("skill") assets in-engine without external art.
-inline Image effectSheet(Color tint, int style = 0) {
-    const int F = 32, FRAMES = 4, DIRS = 4;
-    Image img = GenImageColor(FRAMES * F, DIRS * F, BLANK);
-    for (int d = 0; d < DIRS; ++d) {
-        for (int f = 0; f < FRAMES; ++f) {
-            int ox = f * F, oy = d * F, cx = ox + F/2, cy = oy + F/2;
-            float k = (f + 1) / (float)FRAMES;
-            unsigned char a = (unsigned char)(255 * (1.0f - 0.45f*k));
-            Color c = { tint.r, tint.g, tint.b, a };
-            Color wh = { 255, 255, 255, a };
-            if (style == 0) {                       // slash: growing arc
-                ImageDrawCircle(&img, cx, cy, (int)(3 + k*11), c);
-                ImageDrawCircle(&img, cx, cy, (int)(1 + k*7),  wh);
-            } else if (style == 1) {                // bolt: comet
-                ImageDrawCircle(&img, cx, cy, (int)(3 + k*6), c);
-                ImageDrawCircle(&img, cx, cy, (int)(1 + k*3), wh);
-            } else if (style == 2) {                // dash: streak
-                ImageDrawRectangle(&img, ox+3, cy-2, (int)(F*0.85f*k), 4, c);
-            } else {                                // burst: expanding ring
-                ImageDrawCircle(&img, cx, cy, (int)(k*F*0.5f), c);
-                ImageDrawCircle(&img, cx, cy, (int)(k*F*0.32f), wh);
-            }
+// A skill-effect strip: a single row of `frames` animation frames (direction-
+// agnostic; the engine rotates the hit pattern, not the sprite). style:
+// 0 slash 1 bolt 2 dash 3 burst. Lets users create effect assets in-engine.
+inline Image effectSheet(Color tint, int style = 0, int frames = 6) {
+    const int F = 48;
+    if (frames < 1) frames = 1;
+    Image img = GenImageColor(frames * F, F, BLANK);
+    for (int f = 0; f < frames; ++f) {
+        int ox = f * F, cx = ox + F/2, cy = F/2;
+        float k = (f + 1) / (float)frames;
+        unsigned char a = (unsigned char)(255 * (1.0f - 0.4f*k));
+        Color c = { tint.r, tint.g, tint.b, a };
+        Color wh = { 255, 255, 255, a };
+        if (style == 0) {                       // slash: growing arc
+            ImageDrawCircle(&img, cx, cy, (int)(4 + k*16), c);
+            ImageDrawCircle(&img, cx, cy, (int)(2 + k*10), wh);
+        } else if (style == 1) {                // bolt: comet
+            ImageDrawCircle(&img, cx, cy, (int)(4 + k*9), c);
+            ImageDrawCircle(&img, cx, cy, (int)(2 + k*4), wh);
+        } else if (style == 2) {                // dash: streak
+            ImageDrawRectangle(&img, ox+4, cy-3, (int)(F*0.85f*k), 6, c);
+        } else {                                // burst: expanding ring
+            ImageDrawCircle(&img, cx, cy, (int)(k*F*0.5f), c);
+            ImageDrawCircle(&img, cx, cy, (int)(k*F*0.34f), wh);
         }
     }
     return img;

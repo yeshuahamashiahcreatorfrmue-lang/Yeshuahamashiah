@@ -215,6 +215,7 @@ int main(int argc,char**argv){
     db.enemies.push_back({2,"박쥐",A_bat,26,0,12,3,7,11,9});
     db.enemies.push_back({3,"멧돼지",A_boar,60,0,15,6,5,22,18});
     db.enemies.push_back({4,"동굴 수호자",A_guard,220,0,18,9,4,150,120});
+    db.fieldSkills = Database::defaultFieldSkills(); // Z/X/C/V real-time skills
 
     auto m = p->addMap("윌로우브룩 마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;

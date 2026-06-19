@@ -55,6 +55,14 @@ int AssetManager::addExisting(AssetType type, const std::string& name, const std
     return e.id;
 }
 
+void AssetManager::setAnim(int id, int frames, int fps) {
+    for (auto& a : assets_) if (a.id == id) {
+        a.frames = frames < 1 ? 1 : frames;
+        a.fps = fps < 1 ? 1 : fps;
+        return;
+    }
+}
+
 void AssetManager::remove(int id) {
     assets_.erase(std::remove_if(assets_.begin(), assets_.end(),
                   [id](const AssetEntry& a){ return a.id == id; }), assets_.end());
@@ -75,7 +83,8 @@ json AssetManager::toJson() const {
     json arr = json::array();
     for (const auto& a : assets_) {
         arr.push_back({{"id", a.id}, {"type", typeName(a.type)},
-                       {"name", a.name}, {"path", a.relPath}});
+                       {"name", a.name}, {"path", a.relPath},
+                       {"frames", a.frames}, {"fps", a.fps}});
     }
     return {{"nextId", nextId_}, {"items", arr}};
 }
@@ -90,6 +99,8 @@ void AssetManager::fromJson(const json& j) {
             e.type    = typeFromName(it.value("type", "image"));
             e.name    = it.value("name", "");
             e.relPath = it.value("path", "");
+            e.frames  = it.value("frames", 1);
+            e.fps     = it.value("fps", 8);
             assets_.push_back(e);
         }
     }

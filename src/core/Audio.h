@@ -16,6 +16,7 @@ public:
 
     void loadSfxFolder(const std::string& dir);     // load every .wav in dir by stem name
     void playSfx(const std::string& name, float volume = 1.0f);
+    void playSfxFile(const std::string& path, float volume = 1.0f); // cache + play by path
 
     void playBgm(const std::string& path);          // streams + loops; ignores repeats
     void stopBgm();

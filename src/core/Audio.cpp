@@ -43,6 +43,19 @@ void Audio::playSfx(const std::string& name, float volume) {
     PlaySound(it->second);
 }
 
+void Audio::playSfxFile(const std::string& path, float volume) {
+    if (!ready_ || path.empty()) return;
+    auto it = sfx_.find(path);
+    if (it == sfx_.end()) {                 // load + cache by full path on first use
+        std::error_code ec;
+        if (!fs::exists(path, ec)) return;
+        Sound s = LoadSound(path.c_str());
+        it = sfx_.emplace(path, s).first;
+    }
+    SetSoundVolume(it->second, volume);
+    PlaySound(it->second);
+}
+
 void Audio::playBgm(const std::string& path) {
     if (!ready_) return;
     if (bgmLoaded_ && path == bgmPath_) return; // already playing this track

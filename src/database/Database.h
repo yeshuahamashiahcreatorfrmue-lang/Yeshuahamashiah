@@ -40,6 +40,25 @@ struct Skill {
     bool        healing = false;
 };
 
+// A real-time field skill: a player-relative tile pattern + behaviour, fully
+// data-driven so users can design new skills (pattern, effect, sound) in the
+// editor. `patX/patY` are tile offsets in a canonical "facing up" frame and are
+// rotated to the player's facing at cast time.
+struct FieldSkill {
+    int         id   = -1;
+    std::string name = "스킬";
+    int         slot = -1;       // key binding 0..5 = Z,X,C,V,F,G (-1 = unbound)
+    bool        projectile = false; // travels forward `range` tiles
+    int         blink = 0;       // teleport forward N tiles before applying pattern
+    int         range = 6;       // projectile travel distance
+    int         mpCost = 0;
+    float       cooldown = 0.5f;
+    int         powerPct = 100;  // damage = ATK * powerPct/100
+    std::vector<int> patX, patY; // relative tiles (canonical facing-up)
+    int         effectAsset = -1;// sprite drawn on each hit tile (-1 = procedural)
+    int         soundAsset  = -1;// audio asset to play (-1 = built-in "attack")
+};
+
 struct ActorDef {
     int         id = -1;
     std::string name = "Hero";
@@ -61,20 +80,26 @@ struct EnemyDef {
 
 class Database {
 public:
-    std::vector<Item>      items;
-    std::vector<Equipment> equipment;
-    std::vector<Skill>     skills;
-    std::vector<ActorDef>  actors;
-    std::vector<EnemyDef>  enemies;
+    std::vector<Item>       items;
+    std::vector<Equipment>  equipment;
+    std::vector<Skill>      skills;
+    std::vector<ActorDef>   actors;
+    std::vector<EnemyDef>   enemies;
+    std::vector<FieldSkill> fieldSkills;
 
     const Item*      item(int id) const;
     const Equipment* equip(int id) const;
     const Skill*     skill(int id) const;
     const ActorDef*  actor(int id) const;
     const EnemyDef*  enemy(int id) const;
+    const FieldSkill* fieldSkillForSlot(int slot) const; // first bound skill for a key
 
     nlohmann::json toJson() const;
     void fromJson(const nlohmann::json& j);
+
+    // The 4 built-in skills (melee/ranged/dash/ultimate), used as defaults for
+    // new/old projects that have no field skills defined yet.
+    static std::vector<FieldSkill> defaultFieldSkills();
 };
 
 } // namespace tsukuru

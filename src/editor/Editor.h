@@ -19,7 +19,7 @@ public:
     void draw();
 
 private:
-    enum class Tab { World, Map, Events, Chars, Assets, Database };
+    enum class Tab { World, Map, Events, Chars, Assets, Database, Skills };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
@@ -29,6 +29,7 @@ private:
     void drawCharsTab();
     void drawAssetsTab();
     void drawDatabaseTab();
+    void drawSkillsTab();
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
@@ -59,6 +60,9 @@ private:
     int  newMapTier_ = 0;           // standardized size tier for a new map (0..6)
     // Character generation
     int  charColor_ = 0;
+    // Skills tab (field-skill designer)
+    int  skillSel_ = -1;
+    bool skillNameFocus_ = false;
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to

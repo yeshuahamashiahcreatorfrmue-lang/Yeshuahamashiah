@@ -9,6 +9,7 @@
 #include "raylib.h"
 #include "world/Map.h"
 #include "core/Types.h"
+#include "database/Database.h"
 
 namespace tsukuru {
 
@@ -69,8 +70,9 @@ struct SkillFx {
     float radius = 0;       // for aoe ring
 };
 
-// Player skill slots (Z/X/C/V).
-enum SkillSlot { SK_Attack = 0, SK_Ranged = 1, SK_Dash = 2, SK_Ult = 3, SK_COUNT = 4 };
+// Player skill key slots: Z, X, C, V, F, G.
+static constexpr int kSkillSlots = 6;
+enum SkillSlot { SK_Attack = 0, SK_Ranged = 1, SK_Dash = 2, SK_Ult = 3 };
 
 class GamePlay {
 public:
@@ -99,17 +101,16 @@ private:
     void spawnMonsters();
     void spawnOne();
     void updateMonsters(float dt);
-    void playerAttack();
     void drawMonsters();
     FieldMonster* monsterAt(int x, int y);
     bool walkable(int x, int y);            // not blocked / not occupied
     void onMonsterKilled(const FieldMonster& m);
 
-    // --- skills (Z/X/C/V), cooldowns, ranged bolts, blink+AoE ----
-    void castSkill(int slot);               // dispatch by SkillSlot
-    void castRanged();
-    void castDash();
-    void castUltimate();
+    // --- data-driven skills (Z/X/C/V/F/G): pattern, projectile, blink, FX ----
+    void loadSkills();                       // pull from db (or built-in defaults)
+    void castSlot(int slot);                 // cast the skill bound to a key slot
+    void castFieldSkill(const FieldSkill& s, int slot);
+    void playerAttack();                     // convenience: cast slot 0
     bool damageMonster(FieldMonster& m, int dmg); // returns true if killed
     void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0);
     void updateProjectiles(float dt);
@@ -118,6 +119,7 @@ private:
     void drawFx();
     void drawSkillPanel();                   // right-side cooldown/description panel
     void handleSkillClicks();                // touch/click to cast
+    static Vec2i rotateToFacing(int ox, int oy, int dir); // canonical up -> facing
 
     // --- NPCs / atmosphere / hud ---
     void spawnNpcs();
@@ -147,10 +149,11 @@ private:
     float attackTimer_ = 0;     // >0 while the slash effect shows
     float playerHurt_ = 0;      // red flash when the player takes damage
 
-    // Skills: per-slot cooldown remaining (Z/X/C/V).
-    float skillCd_[SK_COUNT] = { 0, 0, 0, 0 };
-    Rectangle skillBtn_[SK_COUNT] = {}; // screen rects for click/touch casting
+    // Skills: per-slot cooldown remaining (Z/X/C/V/F/G).
+    float skillCd_[kSkillSlots] = {};
+    Rectangle skillBtn_[kSkillSlots] = {}; // screen rects for click/touch casting
     float mpRegen_ = 0;         // MP regenerates slowly over time
+    std::vector<FieldSkill> skills_;       // active skill set (from db or defaults)
 
     std::vector<FieldMonster> monsters_;
     std::vector<NpcInst>      npcs_;

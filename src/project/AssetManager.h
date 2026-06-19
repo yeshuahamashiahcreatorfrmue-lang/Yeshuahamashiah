@@ -15,6 +15,8 @@ struct AssetEntry {
     AssetType   type = AssetType::Image;
     std::string name;           // display name
     std::string relPath;        // path relative to project dir, e.g. "assets/town.png"
+    int         frames = 1;     // >1 = animated (horizontal sprite-sheet of N frames)
+    int         fps    = 8;     // playback speed for animated assets
 };
 
 class AssetManager {
@@ -28,6 +30,9 @@ public:
 
     // Register an asset that already lives inside the project (no copy).
     int addExisting(AssetType type, const std::string& name, const std::string& relPath);
+
+    // Mark an asset as an animated sprite-sheet (N frames laid horizontally).
+    void setAnim(int id, int frames, int fps = 8);
 
     void remove(int id);
 
