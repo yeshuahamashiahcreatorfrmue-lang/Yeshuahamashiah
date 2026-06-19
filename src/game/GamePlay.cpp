@@ -34,6 +34,7 @@ void GamePlay::onEnter() {
     phase_ = Phase::Field;
     attackTimer_ = attackCd_ = playerHurt_ = 0;
     spawnMonsters();
+    runAutoruns();
 }
 
 void GamePlay::loadMap(int id) {
@@ -41,6 +42,8 @@ void GamePlay::loadMap(int id) {
     if (!map_ && !engine_.project().maps.empty()) map_ = engine_.project().maps.front();
     engine_.state().currentMap = map_ ? map_->id : -1;
     monsters_.clear();
+    weatherP_.clear();
+    spawnNpcs();
     if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
 }
 
@@ -94,8 +97,7 @@ bool GamePlay::walkable(int x, int y) {
     if (!map_ || !map_->tilemap.inBounds(x, y)) return false;
     if (map_->tilemap.blocked(x, y)) return false;
     if (monsterAt(x, y)) return false;
-    if (Event* e = map_->eventAt(x, y))
-        if (e->graphicAsset >= 0 && e->trigger != TriggerType::PlayerTouch) return false;
+    if (npcAt(x, y)) return false;
     return true;
 }
 
@@ -107,8 +109,9 @@ void GamePlay::update(float dt) {
 
     switch (phase_) {
         case Phase::Field: updateField(dt); break;
-        case Phase::Message:
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
+        case Phase::Message: {
+            static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
+            if (autodismiss || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
                 if (msgPage_ + 1 < (int)msgPages_.size()) {
                     ++msgPage_;
                     message_ = msgPages_[msgPage_];
@@ -119,6 +122,7 @@ void GamePlay::update(float dt) {
                 }
             }
             break;
+        }
         case Phase::Menu:
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
@@ -203,7 +207,9 @@ void GamePlay::updateField(float dt) {
     }
     engine_.state().playerDir = dir_;
 
+    worldTime_ += dt;
     updateMonsters(dt);
+    updateNpcs(dt);
 }
 
 void GamePlay::tryMove(Direction d) {
@@ -212,14 +218,18 @@ void GamePlay::tryMove(Direction d) {
     int nx = destX_ + delta.x, ny = destY_ + delta.y;
     if (map_->tilemap.blocked(nx, ny)) return;
     if (monsterAt(nx, ny)) return;                    // can't walk through monsters
-    if (Event* e = map_->eventAt(nx, ny))             // solid NPC-style event
-        if (e->graphicAsset >= 0 && e->trigger != TriggerType::PlayerTouch) return;
+    if (npcAt(nx, ny)) return;                        // ...or NPCs
     destX_ = nx; destY_ = ny; moving_ = true;
 }
 
 void GamePlay::interact() {
     Vec2i delta = dirToDelta((Direction)dir_);
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
+    // a wandering NPC may have moved off its event tile — interact by live position
+    if (NpcInst* n = npcAt(fx, fy)) {
+        for (auto& e : map_->events)
+            if (e.id == n->eventId && e.trigger == TriggerType::ActionButton) { runEvent(e); return; }
+    }
     Event* e = map_->eventAt(fx, fy);
     if (!e) e = map_->eventAt(destX_, destY_);
     if (e && e->trigger == TriggerType::ActionButton) runEvent(*e);
@@ -339,6 +349,133 @@ void GamePlay::updateMonsters(float dt) {
     }
 }
 
+// ----------------------------- NPCs -----------------------------
+void GamePlay::spawnNpcs() {
+    npcs_.clear();
+    if (!map_) return;
+    int TS = map_->tileset.tileWidth;
+    for (auto& e : map_->events) {
+        if (e.graphicAsset < 0) continue;           // only events with a sprite are NPCs
+        NpcInst n;
+        n.eventId = e.id; n.spriteAsset = e.graphicAsset; n.wander = e.wander;
+        n.x = n.destX = e.x; n.y = n.destY = e.y;
+        n.px = e.x * (float)TS; n.py = e.y * (float)TS;
+        n.moveCd = 0.6f + (std::rand() % 100) / 80.0f;
+        npcs_.push_back(n);
+    }
+}
+
+NpcInst* GamePlay::npcAt(int x, int y) {
+    for (auto& n : npcs_) if (n.x == x && n.y == y) return &n;
+    return nullptr;
+}
+
+void GamePlay::updateNpcs(float dt) {
+    if (!map_) return;
+    int TS = map_->tileset.tileWidth;
+    for (auto& n : npcs_) {
+        if (n.moving) {
+            float tx = n.destX*(float)TS, ty = n.destY*(float)TS;
+            float dx = tx-n.px, dy = ty-n.py, dist = std::sqrt(dx*dx+dy*dy), step = TS*2.2f*dt;
+            if (dist <= step) { n.px=tx; n.py=ty; n.x=n.destX; n.y=n.destY; n.moving=false; }
+            else { n.px += dx/dist*step; n.py += dy/dist*step; }
+            n.animTime += dt; if (n.animTime>0.18f){ n.animTime=0; n.frame=(n.frame+1)%4; }
+        } else {
+            n.frame = 0;
+            // face the player when adjacent
+            int cheb = std::max(std::abs(n.x-destX_), std::abs(n.y-destY_));
+            if (cheb == 1) {
+                int dx=destX_-n.x, dy=destY_-n.y;
+                n.dir = std::abs(dx)>=std::abs(dy) ? (dx>0?2:1) : (dy>0?0:3);
+            } else if (n.wander) {
+                n.moveCd -= dt;
+                if (n.moveCd <= 0) {
+                    n.moveCd = 1.0f + (std::rand()%150)/100.0f;
+                    int r = std::rand()%4; int dx=(r==2)-(r==1)? 0:0; // pick a dir
+                    int ddx=0, ddy=0;
+                    if (r==0) ddy=1; else if (r==1) ddx=-1; else if (r==2) ddx=1; else ddy=-1;
+                    int nx=n.x+ddx, ny=n.y+ddy;
+                    if (walkable(nx,ny) && !(nx==destX_&&ny==destY_)) {
+                        n.destX=nx; n.destY=ny; n.moving=true;
+                        n.dir = ddy>0?0: ddy<0?3: ddx<0?1:2;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void GamePlay::drawNpcs() {
+    for (auto& n : npcs_)
+        drawCharacter(n.spriteAsset, n.dir, n.moving ? n.frame : 0, n.px, n.py);
+}
+
+void GamePlay::runAutoruns() {
+    if (!map_) return;
+    GameState& gs = engine_.state();
+    for (auto& e : map_->events) {
+        if (e.trigger != TriggerType::Autorun) continue;
+        if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) continue;
+        long key = ((long)map_->id << 16) | (e.id & 0xffff);
+        if (g_firedOnce.count(key)) continue;        // autoruns fire once per session
+        g_firedOnce.insert(key);
+        runEvent(e);
+        break;                                       // one autorun at a time
+    }
+}
+
+// ----------------------------- atmosphere -----------------------------
+void GamePlay::drawWeather(float dt) {
+    if (!map_ || map_->weather == 0) return;
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    bool rain = map_->weather == 1;
+    int target = rain ? 220 : 120;
+    while ((int)weatherP_.size() < target) {
+        Particle p; p.x = (float)(std::rand()%sw); p.y = (float)(std::rand()%sh);
+        if (rain) { p.vx=-120; p.vy=900; } else { p.vx=(float)(std::rand()%40-20); p.vy=70; }
+        p.life=1; weatherP_.push_back(p);
+    }
+    for (auto& p : weatherP_) {
+        p.x += p.vx*dt; p.y += p.vy*dt;
+        if (p.y > sh) { p.y = -5; p.x = (float)(std::rand()%sw); }
+        if (p.x < 0) p.x = (float)sw;
+        if (rain) DrawLine((int)p.x,(int)p.y,(int)(p.x+3),(int)(p.y+12), Fade(Color{160,190,230,255},0.5f));
+        else      DrawCircle((int)p.x,(int)p.y,2, Fade(WHITE,0.7f));
+    }
+    if (rain) DrawRectangle(0,0,sw,sh, Fade(Color{40,50,80,255},0.12f));
+}
+
+void GamePlay::drawMinimap() {
+    if (!map_) return;
+    int w = map_->tilemap.width(), h = map_->tilemap.height();
+    int mmW = 132, mmH = 100;
+    float sx = (float)mmW/w, sy = (float)mmH/h, s = std::min(sx,sy);
+    int ox = GetScreenWidth() - (int)(w*s) - 12, oy = 40;
+    DrawRectangle(ox-3, oy-3, (int)(w*s)+6, (int)(h*s)+6, Fade(BLACK,0.55f));
+    for (int y=0;y<h;y++) for (int x=0;x<w;x++) {
+        Color c{60,90,60,255}; bool any=false;
+        for (int l=0;l<kLayerCount;l++){ int t=map_->tilemap.tile(l,x,y); if(t>=0){any=true;
+            if(t==6||t==7||t==8||t==9) c=Color{70,110,190,255};       // water
+            else if(t==3||t==4) c=Color{170,150,110,255};             // path/cobble
+            else if(t>=16&&t<=24) c=Color{150,80,70,255};             // building
+            else if(t==32||t==33||t==12) c=Color{50,100,50,255}; } }   // trees/hedge
+        if (map_->tilemap.blocked(x,y) && !any) c=Color{40,40,48,255};
+        DrawRectangle(ox+(int)(x*s), oy+(int)(y*s), (int)s+1, (int)s+1, c);
+    }
+    // events + player
+    for (auto& n : npcs_) DrawRectangle(ox+(int)(n.x*s), oy+(int)(n.y*s), 3,3, YELLOW);
+    DrawRectangle(ox+(int)(destX_*s)-1, oy+(int)(destY_*s)-1, 4,4, WHITE);
+}
+
+void GamePlay::visibleRange(int& x0,int& y0,int& x1,int& y1) const {
+    int TS = map_->tileset.tileWidth;
+    Vector2 tl = GetScreenToWorld2D({0,0}, cam_);
+    Vector2 br = GetScreenToWorld2D({(float)GetScreenWidth(),(float)GetScreenHeight()}, cam_);
+    x0 = std::max(0, (int)(tl.x/TS) - 1);  y0 = std::max(0, (int)(tl.y/TS) - 1);
+    x1 = std::min(map_->tilemap.width()-1,  (int)(br.x/TS) + 1);
+    y1 = std::min(map_->tilemap.height()-1, (int)(br.y/TS) + 1);
+}
+
 void GamePlay::showMessage(const std::string& text) {
     msgPages_.clear();
     size_t start = 0;
@@ -371,6 +508,7 @@ void GamePlay::runEvent(Event& e) {
             moving_ = false;
             gs.playerX = destX_; gs.playerY = destY_;
             spawnMonsters();
+            runAutoruns();
             break;
         }
         case EventType::GiveItem:
@@ -479,10 +617,11 @@ void GamePlay::drawField() {
     // animated tiles: cycle base id <-> id+1
     int phase = (int)(GetTime() * 2.5) % 2;
 
+    int vx0, vy0, vx1, vy1; visibleRange(vx0, vy0, vx1, vy1); // cull to viewport
     BeginMode2D(cam_);
     auto drawLayer = [&](int layer) {
-        for (int y = 0; y < h; ++y)
-            for (int x = 0; x < w; ++x) {
+        for (int y = vy0; y <= vy1; ++y)
+            for (int x = vx0; x <= vx1; ++x) {
                 int t = map_->tilemap.tile(layer, x, y);
                 if (t < 0) continue;
                 if (phase == 1)
@@ -497,13 +636,11 @@ void GamePlay::drawField() {
     // "overhead" layer drawn above them so the player can walk behind treetops/roofs.
     for (int layer = 0; layer < kLayerCount - 1; ++layer) drawLayer(layer);
 
-    for (auto& e : map_->events) {
-        if (e.graphicAsset >= 0)
-            drawCharacter(e.graphicAsset, 0, 0, (float)e.x*TS, (float)e.y*TS);
-        else if (e.type == EventType::Teleport)
+    for (auto& e : map_->events)               // teleport markers (NPCs drawn separately)
+        if (e.graphicAsset < 0 && e.type == EventType::Teleport)
             DrawRectangleLines(e.x*TS+2, e.y*TS+2, TS-4, TS-4, Fade(ui::kAccent, 0.5f));
-    }
 
+    drawNpcs();
     drawMonsters();
 
     // player (red flash when hurt)
@@ -532,6 +669,20 @@ void GamePlay::drawField() {
         DrawCircleGradient((int)ps.x, (int)ps.y, R*0.5f, Color{ 255, 230, 180, 120 }, Color{ 0,0,0,0 });
         EndBlendMode();
     }
+
+    // day/night ambient cycle (outdoor maps)
+    if (map_->dayNight) {
+        float t = fmodf(worldTime_, 120.0f) / 120.0f;        // full cycle every 2 min
+        float night = 0.5f - 0.5f * cosf(t * 2.0f * PI);     // 0 noon -> 1 midnight
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
+                      Color{ 20, 24, 64, (unsigned char)(night * 150) });
+    }
+
+    // weather particles
+    drawWeather(GetFrameTime());
+
+    // minimap
+    drawMinimap();
 
     // HUD
     GameState& gs = engine_.state();

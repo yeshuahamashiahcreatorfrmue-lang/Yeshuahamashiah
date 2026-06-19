@@ -5,6 +5,7 @@
   ],
   "bgmAsset": 11,
   "darkness": 185,
+  "dayNight": false,
   "encounterEnemies": [
     3,
     2
@@ -27,6 +28,7 @@
       "text": "A glint in the dark...|You found 2 Hi-Potions!",
       "trigger": "action",
       "type": "giveItem",
+      "wander": false,
       "x": 5,
       "y": 5
     },
@@ -46,6 +48,7 @@
       "text": "You pull a mossy lever.|A heavy gate grinds open to the north.",
       "trigger": "action",
       "type": "setSwitch",
+      "wander": false,
       "x": 26,
       "y": 7
     },
@@ -65,6 +68,7 @@
       "text": "",
       "trigger": "action",
       "type": "teleport",
+      "wander": false,
       "x": 16,
       "y": 2
     },
@@ -84,6 +88,7 @@
       "text": "A sealed stone gate.|Some lever must work it...",
       "trigger": "action",
       "type": "message",
+      "wander": false,
       "x": 14,
       "y": 2
     },
@@ -103,6 +108,7 @@
       "text": "Miner: Boars in here are vicious!|Pull the lever east to open the way out.",
       "trigger": "action",
       "type": "message",
+      "wander": false,
       "x": 9,
       "y": 20
     }
@@ -3457,5 +3463,6 @@
     "rows": 6,
     "tileHeight": 32,
     "tileWidth": 32
-  }
+  },
+  "weather": 0
 }

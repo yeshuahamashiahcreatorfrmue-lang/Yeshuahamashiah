@@ -279,14 +279,18 @@ int main(int argc,char**argv){
     // ---- events: NPCs, shop, chest, signs, house doors ----
     int eid=1;
     auto ev=[&](Event e){ e.id=eid++; m->events.push_back(e); };
-    auto npc=[&](int x,int y,int gfx,const std::string&txt){ Event e; e.x=x;e.y=y;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=gfx;e.text=txt; ev(e); };
+    auto npc=[&](int x,int y,int gfx,const std::string&txt,bool wander=false){ Event e; e.x=x;e.y=y;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=gfx;e.text=txt;e.wander=wander; ev(e); };
     auto sign=[&](int x,int y,const std::string&txt){ setT(1,x,y,SIGN);blk(x,y); Event e;e.x=x;e.y=y;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
     auto door=[&](std::pair<int,int> pos,const std::string&txt){ Event e;e.x=pos.first;e.y=pos.second;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
 
-    npc(23,16,A_eld,"Elder: Welcome to Willowbrook, young hero! Wild beasts roam the eastern fields.");
-    npc(19,15,A_v1,"Villager: The well water is cold and sweet. Try the shop to the east!");
-    npc(28,20,A_v2,"Farmer: My garden's flowers are blooming nicely this season.");
-    npc(8,16,A_girl,"Girl: I saw a shiny box near the trees up north! Hee hee.");
+    npc(23,16,A_eld,"Elder: Welcome to Willowbrook, young hero!|Wild beasts roam the eastern fields,|and something stirs in the northern cave...");
+    npc(19,15,A_v1,"Villager: The well water is cold and sweet.|Try the shop to the east!",true);
+    npc(28,20,A_v2,"Farmer: My flowers bloom nicely|even in this gentle rain.",true);
+    npc(8,16,A_girl,"Girl: I saw a shiny box near the trees!|Hee hee.",true);
+
+    // autorun intro (a tiny cutscene that plays once on arrival)
+    { Event e; e.x=22;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::Autorun;
+      e.text="* Willowbrook Village *|Arrows/WASD to move, Space to attack or talk.|Find the cave to the north."; ev(e); }
 
     // shopkeeper (sells a potion via Shop event)
     { Event e; e.x=30;e.y=18;e.type=EventType::Shop;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v1;e.itemId=1;e.text="Shop: Buy a Potion?"; ev(e); }
@@ -306,6 +310,8 @@ int main(int argc,char**argv){
     // field monsters in the open east area
     m->encounterEnemies = {1,2};
     m->bgmAsset = A_bgmV; m->darkness = 0;
+    m->dayNight = true;       // slow day->night ambient cycle
+    m->weather = 1;           // gentle rain
 
     // ===== Map 2: Whispering Cave (dark, torch-lit, tougher) =====
     auto cave = p->addMap("Whispering Cave", 32, 26);

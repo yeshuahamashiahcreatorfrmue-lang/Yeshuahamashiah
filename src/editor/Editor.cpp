@@ -312,13 +312,19 @@ void Editor::drawMapCanvas(Rectangle area) {
     const Tileset& set = m->tileset;
     int w = m->tilemap.width(), h = m->tilemap.height();
 
+    // viewport culling: only iterate tiles visible in the canvas
+    Vector2 tl = GetScreenToWorld2D({ area.x, area.y }, cam_);
+    Vector2 br = GetScreenToWorld2D({ area.x + area.width, area.y + area.height }, cam_);
+    int cx0 = std::max(0, (int)(tl.x/TS) - 1), cy0 = std::max(0, (int)(tl.y/TS) - 1);
+    int cx1 = std::min(w-1, (int)(br.x/TS) + 1), cy1 = std::min(h-1, (int)(br.y/TS) + 1);
+
     // map background
     DrawRectangle(0, 0, w*TS, h*TS, Color{ 30, 33, 42, 255 });
     for (int layer = 0; layer < kLayerCount; ++layer) {
         // dim layers above the active one for clarity
         unsigned char a = (layer == activeLayer_ || !collisionMode_) ? 255 : 120;
-        for (int y = 0; y < h; ++y)
-            for (int x = 0; x < w; ++x) {
+        for (int y = cy0; y <= cy1; ++y)
+            for (int x = cx0; x <= cx1; ++x) {
                 int t = m->tilemap.tile(layer, x, y);
                 if (t < 0 || set.assetId < 0) continue;
                 int sx, sy; set.srcOf(t, sx, sy);
@@ -331,8 +337,8 @@ void Editor::drawMapCanvas(Rectangle area) {
     for (int y = 0; y <= h; ++y) DrawLine(0, y*TS, w*TS, y*TS, Fade(BLACK, 0.25f));
     // collision overlay
     if (collisionMode_)
-        for (int y = 0; y < h; ++y)
-            for (int x = 0; x < w; ++x)
+        for (int y = cy0; y <= cy1; ++y)
+            for (int x = cx0; x <= cx1; ++x)
                 if (m->tilemap.blocked(x, y))
                     DrawRectangle(x*TS, y*TS, TS, TS, Fade(ui::kDanger, 0.45f));
     EndMode2D();
@@ -417,9 +423,13 @@ void Editor::drawEventsTab() {
         const Texture2D& tex = engine_.assetTexture(m->tileset.assetId);
         const Tileset& set = m->tileset;
         int w = m->tilemap.width(), h = m->tilemap.height();
+        Vector2 etl = GetScreenToWorld2D({ canvasArea.x, canvasArea.y }, cam_);
+        Vector2 ebr = GetScreenToWorld2D({ canvasArea.x+canvasArea.width, canvasArea.y+canvasArea.height }, cam_);
+        int ex0=std::max(0,(int)(etl.x/TS)-1), ey0=std::max(0,(int)(etl.y/TS)-1);
+        int ex1=std::min(w-1,(int)(ebr.x/TS)+1), ey1=std::min(h-1,(int)(ebr.y/TS)+1);
         for (int layer = 0; layer < kLayerCount; ++layer)
-            for (int y = 0; y < h; ++y)
-                for (int x = 0; x < w; ++x) {
+            for (int y = ey0; y <= ey1; ++y)
+                for (int x = ex0; x <= ex1; ++x) {
                     int t = m->tilemap.tile(layer, x, y);
                     if (t < 0 || set.assetId < 0) continue;
                     int sx, sy; set.srcOf(t, sx, sy);

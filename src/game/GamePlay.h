@@ -34,6 +34,21 @@ struct FieldMonster {
     bool alive() const { return hp > 0; }
 };
 
+// A live NPC instance (from a map event) that can wander autonomously.
+struct NpcInst {
+    int eventId = -1;
+    int spriteAsset = -1;
+    bool wander = false;
+    int x = 0, y = 0, destX = 0, destY = 0;
+    float px = 0, py = 0;
+    bool moving = false;
+    int dir = 0;
+    float moveCd = 0;
+    int frame = 0; float animTime = 0;
+};
+
+struct Particle { float x, y, vx, vy, life; };
+
 class GamePlay {
 public:
     explicit GamePlay(Engine& engine);
@@ -66,6 +81,16 @@ private:
     bool walkable(int x, int y);            // not blocked / not occupied
     void onMonsterKilled(const FieldMonster& m);
 
+    // --- NPCs / atmosphere / hud ---
+    void spawnNpcs();
+    void updateNpcs(float dt);
+    void drawNpcs();
+    NpcInst* npcAt(int x, int y);
+    void runAutoruns();
+    void drawWeather(float dt);
+    void drawMinimap();
+    void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling
+
     Engine& engine_;
     std::shared_ptr<Map> map_;
     Camera2D cam_{};
@@ -86,6 +111,9 @@ private:
     float playerHurt_ = 0;      // red flash when the player takes damage
 
     std::vector<FieldMonster> monsters_;
+    std::vector<NpcInst>      npcs_;
+    std::vector<Particle>     weatherP_;
+    float worldTime_ = 0;       // seconds, drives day/night cycle
     float spawnTimer_ = 0;
     int   targetMonsters_ = 0;
     std::string toast_;

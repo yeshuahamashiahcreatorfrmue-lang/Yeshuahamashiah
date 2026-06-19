@@ -47,7 +47,8 @@ json Event::toJson() const {
         {"itemId", itemId}, {"amount", amount},
         {"switchId", switchId}, {"switchValue", switchValue},
         {"conditionSwitch", conditionSwitch}, {"conditionValue", conditionValue},
-        {"once", once}
+        {"once", once},
+        {"wander", wander}
     };
 }
 
@@ -70,6 +71,7 @@ Event Event::fromJson(const json& j) {
     e.conditionSwitch = j.value("conditionSwitch", -1);
     e.conditionValue  = j.value("conditionValue", true);
     e.once            = j.value("once", false);
+    e.wander          = j.value("wander", false);
     return e;
 }
 

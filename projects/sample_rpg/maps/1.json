@@ -5,6 +5,7 @@
   ],
   "bgmAsset": 10,
   "darkness": 0,
+  "dayNight": true,
   "encounterEnemies": [
     1,
     2
@@ -24,9 +25,10 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Elder: Welcome to Willowbrook, young hero! Wild beasts roam the eastern fields.",
+      "text": "Elder: Welcome to Willowbrook, young hero!|Wild beasts roam the eastern fields,|and something stirs in the northern cave...",
       "trigger": "action",
       "type": "message",
+      "wander": false,
       "x": 23,
       "y": 16
     },
@@ -43,9 +45,10 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Villager: The well water is cold and sweet. Try the shop to the east!",
+      "text": "Villager: The well water is cold and sweet.|Try the shop to the east!",
       "trigger": "action",
       "type": "message",
+      "wander": true,
       "x": 19,
       "y": 15
     },
@@ -62,9 +65,10 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Farmer: My garden's flowers are blooming nicely this season.",
+      "text": "Farmer: My flowers bloom nicely|even in this gentle rain.",
       "trigger": "action",
       "type": "message",
+      "wander": true,
       "x": 28,
       "y": 20
     },
@@ -81,9 +85,10 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Girl: I saw a shiny box near the trees up north! Hee hee.",
+      "text": "Girl: I saw a shiny box near the trees!|Hee hee.",
       "trigger": "action",
       "type": "message",
+      "wander": true,
       "x": 8,
       "y": 16
     },
@@ -91,8 +96,28 @@
       "amount": 1,
       "conditionSwitch": -1,
       "conditionValue": true,
-      "graphicAsset": 3,
+      "graphicAsset": -1,
       "id": 5,
+      "itemId": -1,
+      "once": false,
+      "switchId": -1,
+      "switchValue": true,
+      "targetMap": -1,
+      "targetX": 0,
+      "targetY": 0,
+      "text": "* Willowbrook Village *|Arrows/WASD to move, Space to attack or talk.|Find the cave to the north.",
+      "trigger": "autorun",
+      "type": "message",
+      "wander": false,
+      "x": 22,
+      "y": 20
+    },
+    {
+      "amount": 1,
+      "conditionSwitch": -1,
+      "conditionValue": true,
+      "graphicAsset": 3,
+      "id": 6,
       "itemId": 1,
       "once": false,
       "switchId": -1,
@@ -103,6 +128,7 @@
       "text": "Shop: Buy a Potion?",
       "trigger": "action",
       "type": "shop",
+      "wander": false,
       "x": 30,
       "y": 18
     },
@@ -111,7 +137,7 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "graphicAsset": -1,
-      "id": 6,
+      "id": 7,
       "itemId": 2,
       "once": true,
       "switchId": -1,
@@ -122,27 +148,9 @@
       "text": "You found a Hi-Potion!",
       "trigger": "action",
       "type": "giveItem",
+      "wander": false,
       "x": 3,
       "y": 2
-    },
-    {
-      "amount": 1,
-      "conditionSwitch": -1,
-      "conditionValue": true,
-      "graphicAsset": -1,
-      "id": 7,
-      "itemId": -1,
-      "once": false,
-      "switchId": -1,
-      "switchValue": true,
-      "targetMap": -1,
-      "targetX": 0,
-      "targetY": 0,
-      "text": "Willowbrook Village  -  Plaza",
-      "trigger": "action",
-      "type": "message",
-      "x": 21,
-      "y": 18
     },
     {
       "amount": 1,
@@ -157,11 +165,12 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "East Field: Monsters ahead! Press Space to attack.",
+      "text": "Willowbrook Village  -  Plaza",
       "trigger": "action",
       "type": "message",
-      "x": 40,
-      "y": 17
+      "wander": false,
+      "x": 21,
+      "y": 18
     },
     {
       "amount": 1,
@@ -176,11 +185,12 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "A cozy cottage. The door is locked.",
+      "text": "East Field: Monsters ahead! Press Space to attack.",
       "trigger": "action",
       "type": "message",
-      "x": 5,
-      "y": 23
+      "wander": false,
+      "x": 40,
+      "y": 17
     },
     {
       "amount": 1,
@@ -195,10 +205,11 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "The carpenter is out today.",
+      "text": "A cozy cottage. The door is locked.",
       "trigger": "action",
       "type": "message",
-      "x": 35,
+      "wander": false,
+      "x": 5,
       "y": 23
     },
     {
@@ -214,11 +225,12 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Someone is napping inside...",
+      "text": "The carpenter is out today.",
       "trigger": "action",
       "type": "message",
+      "wander": false,
       "x": 35,
-      "y": 7
+      "y": 23
     },
     {
       "amount": 1,
@@ -233,11 +245,12 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "Home sweet home.",
+      "text": "Someone is napping inside...",
       "trigger": "action",
       "type": "message",
-      "x": 5,
-      "y": 29
+      "wander": false,
+      "x": 35,
+      "y": 7
     },
     {
       "amount": 1,
@@ -249,14 +262,15 @@
       "once": false,
       "switchId": -1,
       "switchValue": true,
-      "targetMap": 2,
-      "targetX": 16,
-      "targetY": 23,
-      "text": "",
+      "targetMap": -1,
+      "targetX": 0,
+      "targetY": 0,
+      "text": "Home sweet home.",
       "trigger": "action",
-      "type": "teleport",
-      "x": 22,
-      "y": 2
+      "type": "message",
+      "wander": false,
+      "x": 5,
+      "y": 29
     },
     {
       "amount": 1,
@@ -268,12 +282,33 @@
       "once": false,
       "switchId": -1,
       "switchValue": true,
+      "targetMap": 2,
+      "targetX": 16,
+      "targetY": 23,
+      "text": "",
+      "trigger": "action",
+      "type": "teleport",
+      "wander": false,
+      "x": 22,
+      "y": 2
+    },
+    {
+      "amount": 1,
+      "conditionSwitch": -1,
+      "conditionValue": true,
+      "graphicAsset": -1,
+      "id": 15,
+      "itemId": -1,
+      "once": false,
+      "switchId": -1,
+      "switchValue": true,
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
       "text": "Cave entrance ->|Beware what whispers within.",
       "trigger": "action",
       "type": "message",
+      "wander": false,
       "x": 20,
       "y": 3
     }
@@ -6284,5 +6319,6 @@
     "rows": 6,
     "tileHeight": 32,
     "tileWidth": 32
-  }
+  },
+  "weather": 1
 }

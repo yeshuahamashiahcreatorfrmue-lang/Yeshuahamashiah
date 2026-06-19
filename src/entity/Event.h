@@ -43,6 +43,7 @@ struct Event {
     int  conditionSwitch = -1;
     bool conditionValue  = true;
     bool once = false; // run only one time (sets a hidden flag)
+    bool wander = false; // NPC roams the map autonomously
 
     nlohmann::json toJson() const;
     static Event fromJson(const nlohmann::json& j);
