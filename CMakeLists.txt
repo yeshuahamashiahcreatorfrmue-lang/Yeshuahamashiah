@@ -93,9 +93,11 @@ if(BUILD_ENGINE)
         target_link_libraries(TsukuruEngine PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")
     endif()
 
-    # On MinGW (incl. cross builds) make it a GUI app so no console window pops up.
+    # Make it a GUI app (no console window) on both MinGW and MSVC.
     if(MINGW)
         target_link_options(TsukuruEngine PRIVATE -mwindows)
+    elseif(MSVC)
+        target_link_options(TsukuruEngine PRIVATE /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
     endif()
 
     # Headless asset generator (CPU image API only) — host tool, skip when cross-compiling.

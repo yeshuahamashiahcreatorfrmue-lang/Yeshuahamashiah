@@ -29,7 +29,8 @@ static void logf(const char* fmt, ...) {
     logRaw(g_buf);
 }
 static void stage(const char* s) { g_lastStage = s; logf("STAGE: %s", s); }
-static void popup(const char* title, const char* msg) { plat::popup(title, msg); }
+static bool g_allowPopup = true; // disabled in headless/test mode (--frames)
+static void popup(const char* title, const char* msg) { if (g_allowPopup) plat::popup(title, msg); }
 
 static void onCrash(unsigned long code) {
     logf("FATAL CRASH: exception code 0x%08lx during stage '%s'", code, g_lastStage.c_str());
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
         else if (a == "--shot" && i + 1 < argc) shotPath = argv[++i];
         else if (a.rfind("--", 0) != 0) projectDir = a;
     }
+    if (maxFrames > 0) g_allowPopup = false; // headless smoke-test: never block on a dialog
 
     stage("resolve project");
     if (projectDir.empty()) {

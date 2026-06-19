@@ -1,0 +1,98 @@
+name: Windows Build & Smoke Test
+
+# Builds the engine on a REAL Windows runner (no GPU -> only OpenGL 1.1, which
+# reproduces the "instantly closes" problem), then proves it runs once the
+# bundled Mesa software OpenGL is placed next to the exe. Produces a ready-to-run
+# Windows package as an artifact.
+on:
+  push:
+    branches: [ "claude/tsukuru-engine-assets-6nrjkk" ]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake, OpenGL 2.1)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DOPENGL_VERSION=2.1
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Locate exe
+        id: find
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build,bin -Recurse -Filter TsukuruEngine.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "TsukuruEngine.exe not found" }
+          echo "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          echo "dir=$($exe.DirectoryName)" >> $env:GITHUB_OUTPUT
+          Write-Host "Found: $($exe.FullName)"
+          Get-ChildItem $exe.DirectoryName
+
+      - name: Smoke test WITHOUT software GL (expected to fail on GPU-less runner)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $dir = "${{ steps.find.outputs.dir }}"
+          $exe = "${{ steps.find.outputs.exe }}"
+          Push-Location $dir
+          $p = Start-Process -FilePath $exe -ArgumentList "--frames","30","--shot","shot_nogl.png" -Wait -PassThru
+          Write-Host "Exit code (no software GL): $($p.ExitCode)"
+          if (Test-Path tsukuru_log.txt) { Write-Host "----- LOG -----"; Get-Content tsukuru_log.txt }
+          Pop-Location
+
+      - name: Download Mesa software OpenGL (llvmpipe)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/pal1000/mesa-dist-win/releases/download/26.1.2/mesa3d-26.1.2-release-msvc.7z"
+          Invoke-WebRequest -Uri $url -OutFile mesa.7z
+          7z e mesa.7z "x64/opengl32.dll" "x64/libgallium_wgl.dll" -o"${{ steps.find.outputs.dir }}" -y
+          Get-ChildItem "${{ steps.find.outputs.dir }}" -Filter *.dll
+
+      - name: Smoke test WITH software GL (must succeed)
+        shell: pwsh
+        run: |
+          $dir = "${{ steps.find.outputs.dir }}"
+          $exe = "${{ steps.find.outputs.exe }}"
+          Push-Location $dir
+          Remove-Item tsukuru_log.txt -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $exe -ArgumentList "--frames","40","--shot","shot_softgl.png" -Wait -PassThru
+          Write-Host "Exit code (software GL): $($p.ExitCode)"
+          if (Test-Path tsukuru_log.txt) { Write-Host "----- LOG -----"; Get-Content tsukuru_log.txt }
+          if ($p.ExitCode -ne 0) { throw "Engine did not exit cleanly on real Windows (rc=$($p.ExitCode))" }
+          if (-not (Test-Path shot_softgl.png)) { throw "No screenshot produced -> did not actually render" }
+          Write-Host "SUCCESS: engine ran and rendered on real Windows (software GL)."
+          Pop-Location
+
+      - name: Stage release package
+        shell: pwsh
+        run: |
+          $dir = "${{ steps.find.outputs.dir }}"
+          $out = "TsukuruEngine-Windows"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "$dir\TsukuruEngine.exe" $out
+          Copy-Item "$dir\opengl32.dll" $out
+          Copy-Item "$dir\libgallium_wgl.dll" $out
+          Copy-Item "$dir\assets" $out -Recurse -Force
+          Copy-Item "$dir\projects" $out -Recurse -Force
+          if (Test-Path "$dir\shot_softgl.png") { Copy-Item "$dir\shot_softgl.png" $out }
+          Copy-Item "README.md" $out -ErrorAction SilentlyContinue
+          Get-ChildItem $out -Recurse | Select-Object FullName
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TsukuruEngine-Windows
+          path: TsukuruEngine-Windows/**
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-and-logs
+          path: |
+            ${{ steps.find.outputs.dir }}/shot_*.png
+            ${{ steps.find.outputs.dir }}/tsukuru_log.txt
