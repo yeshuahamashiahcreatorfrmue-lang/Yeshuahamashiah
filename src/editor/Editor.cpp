@@ -539,6 +539,12 @@ void Editor::drawEventsTab() {
         }
     }
     y += 32;
+    // NPC wander toggle (only meaningful when the event has a sprite)
+    if (ui::button({ panel.x + 12, y, 296, 24 }, ev->wander ? "NPC Wander: ON" : "NPC Wander: OFF", ev->wander))
+        ev->wander = !ev->wander;
+    y += 30;
+    DrawText("Trigger 'Autorun' = plays once on map enter.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
+    y += 22;
     if (ui::button({ panel.x + 12, y, 296, 28 }, "Delete Event", false)) {
         auto& evs = m->events;
         evs.erase(std::remove_if(evs.begin(), evs.end(),
@@ -766,6 +772,38 @@ void Editor::drawWorldTab() {
     if ((nw != w || nh != h)) m->tilemap.resizePreserve(nw, nh);
 
     ui::intStepper({ dx, dy, 260, 26 }, "Encounter%", m->encounterRate, 5, 0, 100); dy += 34;
+
+    // ---- second column: atmosphere / audio / field monsters ----
+    float cx = dx + 300, cy = ly + 92;
+    ui::label("Atmosphere", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    ui::intStepper({ cx, cy, 250, 26 }, "Darkness", m->darkness, 15, 0, 255); cy += 32;
+    const char* wx[3] = { "Weather: None", "Weather: Rain", "Weather: Snow" };
+    if (ui::button({ cx, cy, 250, 26 }, wx[m->weather % 3])) m->weather = (m->weather + 1) % 3;
+    cy += 32;
+    if (ui::button({ cx, cy, 250, 26 }, m->dayNight ? "Day/Night: ON" : "Day/Night: OFF", m->dayNight))
+        m->dayNight = !m->dayNight;
+    cy += 38;
+
+    ui::label("Music (BGM)", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    auto auds = p.assets.byType(AssetType::Audio);
+    const AssetEntry* curB = p.assets.find(m->bgmAsset);
+    if (ui::button({ cx, cy, 250, 26 }, std::string("BGM: ") + (curB ? curB->name : "None"))) {
+        int idx = -1;
+        for (int i = 0; i < (int)auds.size(); ++i) if (auds[i]->id == m->bgmAsset) idx = i;
+        idx++;
+        m->bgmAsset = (idx >= (int)auds.size()) ? -1 : auds[idx]->id;
+    }
+    cy += 40;
+
+    ui::label("Field Monsters", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    for (auto& en : p.database.enemies) {
+        bool on = std::find(m->encounterEnemies.begin(), m->encounterEnemies.end(), en.id) != m->encounterEnemies.end();
+        if (ui::button({ cx, cy, 250, 24 }, (on ? "[x] " : "[  ] ") + en.name, on)) {
+            if (on) m->encounterEnemies.erase(std::remove(m->encounterEnemies.begin(), m->encounterEnemies.end(), en.id), m->encounterEnemies.end());
+            else m->encounterEnemies.push_back(en.id);
+        }
+        cy += 27;
+    }
 
     if (ui::button({ dx, dy, 220, 30 }, p.startMap == m->id ? "Start Map (current)" : "Set as Start Map",
                    p.startMap == m->id)) {

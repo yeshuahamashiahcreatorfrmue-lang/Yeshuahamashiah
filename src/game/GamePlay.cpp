@@ -43,6 +43,7 @@ void GamePlay::loadMap(int id) {
     engine_.state().currentMap = map_ ? map_->id : -1;
     monsters_.clear();
     weatherP_.clear();
+    if (minimapValid_) { UnloadTexture(minimapTex_); minimapValid_ = false; }
     spawnNpcs();
     if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
 }
@@ -448,22 +449,35 @@ void GamePlay::drawWeather(float dt) {
 void GamePlay::drawMinimap() {
     if (!map_) return;
     int w = map_->tilemap.width(), h = map_->tilemap.height();
+
+    // Build the terrain layer once per map into a cached texture (1px per tile),
+    // instead of issuing ~w*h rectangle draw calls every frame.
+    if (!minimapValid_ || minimapW_ != w || minimapH_ != h) {
+        if (minimapValid_) UnloadTexture(minimapTex_);
+        Image img = GenImageColor(w, h, Color{ 46, 62, 46, 255 });
+        for (int y=0;y<h;y++) for (int x=0;x<w;x++) {
+            Color c{60,90,60,255}; bool any=false;
+            for (int l=0;l<kLayerCount;l++){ int t=map_->tilemap.tile(l,x,y); if(t>=0){any=true;
+                if(t==6||t==7||t==8||t==9) c=Color{70,110,190,255};
+                else if(t==3||t==4) c=Color{170,150,110,255};
+                else if(t>=16&&t<=24) c=Color{150,80,70,255};
+                else if(t==32||t==33||t==12) c=Color{50,100,50,255}; } }
+            if (map_->tilemap.blocked(x,y) && !any) c=Color{40,40,48,255};
+            ImageDrawPixel(&img, x, y, c);
+        }
+        minimapTex_ = LoadTextureFromImage(img);
+        UnloadImage(img);
+        minimapW_ = w; minimapH_ = h; minimapValid_ = true;
+    }
+
     int mmW = 132, mmH = 100;
-    float sx = (float)mmW/w, sy = (float)mmH/h, s = std::min(sx,sy);
+    float s = std::min((float)mmW/w, (float)mmH/h);
     int ox = GetScreenWidth() - (int)(w*s) - 12, oy = 40;
     DrawRectangle(ox-3, oy-3, (int)(w*s)+6, (int)(h*s)+6, Fade(BLACK,0.55f));
-    for (int y=0;y<h;y++) for (int x=0;x<w;x++) {
-        Color c{60,90,60,255}; bool any=false;
-        for (int l=0;l<kLayerCount;l++){ int t=map_->tilemap.tile(l,x,y); if(t>=0){any=true;
-            if(t==6||t==7||t==8||t==9) c=Color{70,110,190,255};       // water
-            else if(t==3||t==4) c=Color{170,150,110,255};             // path/cobble
-            else if(t>=16&&t<=24) c=Color{150,80,70,255};             // building
-            else if(t==32||t==33||t==12) c=Color{50,100,50,255}; } }   // trees/hedge
-        if (map_->tilemap.blocked(x,y) && !any) c=Color{40,40,48,255};
-        DrawRectangle(ox+(int)(x*s), oy+(int)(y*s), (int)s+1, (int)s+1, c);
-    }
-    // events + player
+    DrawTexturePro(minimapTex_, { 0,0,(float)w,(float)h },
+                   { (float)ox,(float)oy,(float)w*s,(float)h*s }, {0,0}, 0, WHITE);
     for (auto& n : npcs_) DrawRectangle(ox+(int)(n.x*s), oy+(int)(n.y*s), 3,3, YELLOW);
+    for (auto& mo : monsters_) DrawRectangle(ox+(int)(mo.x*s), oy+(int)(mo.y*s), 3,3, RED);
     DrawRectangle(ox+(int)(destX_*s)-1, oy+(int)(destY_*s)-1, 4,4, WHITE);
 }
 

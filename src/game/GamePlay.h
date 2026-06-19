@@ -113,6 +113,9 @@ private:
     std::vector<FieldMonster> monsters_;
     std::vector<NpcInst>      npcs_;
     std::vector<Particle>     weatherP_;
+    Texture2D minimapTex_{};    // cached minimap terrain (rebuilt once per map)
+    bool minimapValid_ = false;
+    int  minimapW_ = 0, minimapH_ = 0;
     float worldTime_ = 0;       // seconds, drives day/night cycle
     float spawnTimer_ = 0;
     int   targetMonsters_ = 0;
