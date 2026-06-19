@@ -1,54 +1,57 @@
 {
-  "name": "Hero's Adventure",
-  "startMap": 1,
-  "startX": 9,
-  "startY": 9,
-  "startActor": 1,
-  "playerSprite": 2,
   "assets": {
-    "nextId": 7,
     "items": [
       {
         "id": 1,
-        "type": "image",
         "name": "tileset",
-        "path": "assets/tileset.png"
+        "path": "assets/tileset.png",
+        "type": "image"
       },
       {
         "id": 2,
-        "type": "image",
         "name": "hero",
-        "path": "assets/hero.png"
+        "path": "assets/hero.png",
+        "type": "image"
       },
       {
         "id": 3,
-        "type": "image",
         "name": "npc",
-        "path": "assets/npc.png"
+        "path": "assets/npc.png",
+        "type": "image"
       },
       {
         "id": 4,
-        "type": "image",
         "name": "oldman",
-        "path": "assets/oldman.png"
+        "path": "assets/oldman.png",
+        "type": "image"
       },
       {
         "id": 5,
-        "type": "image",
         "name": "slime",
-        "path": "assets/slime.png"
+        "path": "assets/slime.png",
+        "type": "image"
       },
       {
         "id": 6,
-        "type": "image",
         "name": "bat",
-        "path": "assets/bat.png"
+        "path": "assets/bat.png",
+        "type": "image"
       }
-    ]
+    ],
+    "nextId": 7
   },
   "maps": [
     1,
     2,
-    3
-  ]
+    3,
+    4,
+    5,
+    6
+  ],
+  "name": "Realm of Tsukuru",
+  "playerSprite": 2,
+  "startActor": 1,
+  "startMap": 1,
+  "startX": 24,
+  "startY": 20
 }

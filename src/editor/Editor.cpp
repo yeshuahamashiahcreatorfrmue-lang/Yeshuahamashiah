@@ -1,8 +1,12 @@
 #include "editor/Editor.h"
 #include "core/Engine.h"
 #include "render/UI.h"
+#include "render/AssetGen.h"
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace tsukuru {
 
@@ -14,6 +18,12 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     cam_.offset = { kPaletteW + 20, kToolbarH + 20 };
     auto m = activeMap();
     if (m) activeMapId_ = m->id;
+    if (const char* t = getenv("TSUKURU_TAB")) { // debug: pick initial tab
+        std::string s = t;
+        if (s == "world") tab_ = Tab::World;     else if (s == "events") tab_ = Tab::Events;
+        else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
+        else if (s == "db") tab_ = Tab::Database;
+    }
 }
 
 std::shared_ptr<Map> Editor::activeMap() {
@@ -83,8 +93,10 @@ void Editor::handleAssetDrop() {
 // ============================ draw ============================
 void Editor::draw() {
     switch (tab_) {
+        case Tab::World:    drawWorldTab();    break;
         case Tab::Map:      drawMapTab();      break;
         case Tab::Events:   drawEventsTab();   break;
+        case Tab::Chars:    drawCharsTab();    break;
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
@@ -103,15 +115,17 @@ void Editor::drawToolbar() {
 
     float x = 8;
     auto tabBtn = [&](const char* name, Tab t) {
-        if (ui::button({ x, 6, 90, 28 }, name, tab_ == t)) tab_ = t;
-        x += 94;
+        if (ui::button({ x, 6, 78, 28 }, name, tab_ == t)) tab_ = t;
+        x += 80;
     };
+    tabBtn("World", Tab::World);
     tabBtn("Map", Tab::Map);
     tabBtn("Events", Tab::Events);
+    tabBtn("Chars", Tab::Chars);
     tabBtn("Assets", Tab::Assets);
     tabBtn("Database", Tab::Database);
 
-    x += 16;
+    x += 12;
     if (ui::button({ x, 6, 90, 28 }, "Save")) { engine_.project().save(); setStatus("Saved."); }
     x += 94;
     if (ui::button({ x, 6, 110, 28 }, "Play (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
@@ -552,6 +566,166 @@ void Editor::drawDatabaseTab() {
              dbCategory_==2?db.skills[dbSelected_].id:
              dbCategory_==3?db.actors[dbSelected_].id:db.enemies[dbSelected_].id),
              (int)dx, (int)dy + 6, 14, ui::kTextDim);
+}
+
+// ---------------------------- WORLD (map management) ----------------------------
+void Editor::drawWorldTab() {
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
+    Project& p = engine_.project();
+
+    // ---- left: map list ----
+    float lx = 12, ly = kToolbarH + 12, lw = 300;
+    ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
+    ui::label("MAPS", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
+    DrawText(TextFormat("%d maps", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
+
+    float y = ly + 46;
+    for (int i = 0; i < (int)p.maps.size(); ++i) {
+        auto& m = p.maps[i];
+        bool isStart = (m->id == p.startMap);
+        bool isActive = (m->id == activeMapId_);
+        Rectangle r = { lx + 10, y, lw - 20, 28 };
+        std::string label = (isStart ? "* " : "  ") + m->name + "  (#" + std::to_string(m->id) + ")";
+        if (ui::button(r, label, worldSelected_ == i || isActive)) {
+            worldSelected_ = i; activeMapId_ = m->id; mapNameFocus_ = false;
+        }
+        y += 32;
+    }
+
+    // new map controls
+    y += 8;
+    ui::intStepper({ lx + 10, y, (lw-30)/2, 26 }, "W", newMapW_, 5, 5, 200);
+    ui::intStepper({ lx + 10 + (lw-30)/2 + 10, y, (lw-30)/2, 26 }, "H", newMapH_, 5, 5, 200);
+    y += 34;
+    if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ New Map")) {
+        auto nm = p.addMap("Map" + std::to_string(p.nextMapId()), newMapW_, newMapH_);
+        // copy tileset from current map so it is paintable immediately
+        if (auto cur = activeMap()) nm->tileset = cur->tileset;
+        activeMapId_ = nm->id;
+        worldSelected_ = (int)p.maps.size() - 1;
+        p.save();
+        setStatus("Created " + nm->name);
+        tab_ = Tab::Map;
+    }
+
+    // ---- right: selected map details ----
+    if (worldSelected_ < 0 || worldSelected_ >= (int)p.maps.size())
+        worldSelected_ = activeMap() ? 0 : -1;
+    if (worldSelected_ < 0) return;
+    auto m = p.maps[worldSelected_];
+
+    float dx = lx + lw + 24, dy = ly;
+    ui::panel({ dx - 8, ly, area.width - dx - 4, area.height - 24 }, ui::kPanel);
+    ui::label("MAP SETTINGS", (int)dx + 4, (int)dy + 10, 22, ui::kAccent);
+    dy += 46;
+
+    ui::label("Name:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
+    Rectangle tf = { dx, dy, 360, 28 };
+    if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) mapNameFocus_ = true;
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) mapNameFocus_ = false;
+    ui::textField(tf, m->name, mapNameFocus_, 40);
+    dy += 40;
+
+    int w = m->tilemap.width(), h = m->tilemap.height();
+    DrawText(TextFormat("Size: %d x %d tiles", w, h), (int)dx, (int)dy, 16, ui::kText); dy += 28;
+    int nw = w, nh = h;
+    ui::intStepper({ dx, dy, 220, 26 }, "Width", nw, 5, 5, 200); dy += 30;
+    ui::intStepper({ dx, dy, 220, 26 }, "Height", nh, 5, 5, 200); dy += 32;
+    if ((nw != w || nh != h)) m->tilemap.resizePreserve(nw, nh);
+
+    ui::intStepper({ dx, dy, 260, 26 }, "Encounter%", m->encounterRate, 5, 0, 100); dy += 34;
+
+    if (ui::button({ dx, dy, 220, 30 }, p.startMap == m->id ? "Start Map (current)" : "Set as Start Map",
+                   p.startMap == m->id)) {
+        p.startMap = m->id; p.startX = w/2; p.startY = h/2; setStatus("Start map set.");
+    }
+    dy += 38;
+    if (ui::button({ dx, dy, 220, 30 }, "Edit this Map")) { activeMapId_ = m->id; tab_ = Tab::Map; }
+    dy += 38;
+    if ((int)p.maps.size() > 1) {
+        if (ui::button({ dx, dy, 220, 30 }, "Delete Map", false)) {
+            int delId = m->id;
+            p.maps.erase(p.maps.begin() + worldSelected_);
+            std::error_code ec;
+            fs::remove(fs::path(p.dir) / "maps" / (std::to_string(delId) + ".json"), ec);
+            if (p.startMap == delId) p.startMap = p.maps.front()->id;
+            if (activeMapId_ == delId) activeMapId_ = p.maps.front()->id;
+            worldSelected_ = 0;
+            p.save();
+            setStatus("Map deleted.");
+            return;
+        }
+    }
+    DrawText("Tip: connect maps with Teleport events (Events tab).",
+             (int)dx, (int)(ly + area.height - 60), 14, ui::kTextDim);
+}
+
+// ---------------------------- CHARS (character assets) ----------------------------
+int Editor::generateCharacter() {
+    Project& p = engine_.project();
+    static const Color shirts[] = {
+        {80,140,220,255}, {200,90,90,255}, {90,180,110,255}, {200,160,70,255},
+        {170,110,200,255}, {90,190,200,255}, {220,130,180,255}, {110,120,130,255}
+    };
+    static const Color skins[] = { {240,200,160,255}, {225,180,140,255}, {200,150,120,255} };
+    Color shirt = shirts[charColor_ % 8];
+    Color skin  = skins[(charColor_ / 8) % 3];
+    charColor_++;
+
+    // unique filename in the project's assets folder
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir) / "assets" / ("char_" + std::to_string(n++) + ".png"); }
+    while (fs::exists(dest));
+
+    Image img = gen::characterSheet(shirt, skin);
+    ExportImage(img, dest.string().c_str());
+    UnloadImage(img);
+
+    std::string rel = (fs::path("assets") / dest.filename()).generic_string();
+    int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+    p.save();
+    setStatus("Character created: " + dest.stem().string());
+    return id;
+}
+
+void Editor::drawCharsTab() {
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
+    Project& p = engine_.project();
+
+    ui::label("CHARACTERS", 20, (int)kToolbarH + 14, 24, ui::kAccent);
+    DrawText("Generate new characters in-engine, or drag a PNG sprite-sheet (4 frames x 4 dirs) onto the window.",
+             20, (int)kToolbarH + 44, 16, ui::kTextDim);
+    if (ui::button({ 20, kToolbarH + 70, 240, 32 }, "+ Generate New Character"))
+        generateCharacter();
+    handleAssetDrop(); // allow dropping character sheets here too
+
+    // grid of image assets (characters), with the 'facing-down' frame preview
+    auto imgs = p.assets.byType(AssetType::Image);
+    float x = 20, y = kToolbarH + 118, cell = 150;
+    for (auto* a : imgs) {
+        Rectangle c = { x, y, cell, cell + 56 };
+        bool isPlayer = (a->id == p.playerSprite);
+        ui::panel(c, isPlayer ? ui::kPanelHi : ui::kPanel);
+        const Texture2D& tex = engine_.assetTexture(a->id);
+        // draw the down-facing first frame (sheet is 4x4); scale to ~96px
+        float fw = tex.width / 4.0f, fh = tex.height / 4.0f;
+        float sc = 96.0f / (fh > 0 ? fh : 1);
+        Rectangle src = { 0, 0, fw, fh };
+        Rectangle dst = { x + (cell - fw*sc)/2, y + 8, fw*sc, fh*sc };
+        DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
+        DrawText(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
+        if (ui::button({ x + 8, y + cell - 16, cell - 16, 26 },
+                       isPlayer ? "PLAYER" : "Set Player", isPlayer)) {
+            p.playerSprite = a->id; p.save(); setStatus("Player character set.");
+        }
+        x += cell + 14;
+        if (x + cell > area.width - 20) { x = 20; y += cell + 70; }
+    }
+    if (imgs.empty())
+        ui::label("(no characters yet - click Generate)", 20, (int)kToolbarH + 120, 18, ui::kTextDim);
 }
 
 } // namespace tsukuru

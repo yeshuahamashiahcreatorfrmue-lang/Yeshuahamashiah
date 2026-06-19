@@ -15,6 +15,7 @@ public:
     Tilemap(int w, int h) { resize(w, h); }
 
     void resize(int w, int h);
+    void resizePreserve(int w, int h); // resize keeping existing tiles/collision
 
     int width()  const { return width_; }
     int height() const { return height_; }

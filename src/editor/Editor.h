@@ -18,17 +18,20 @@ public:
     void draw();
 
 private:
-    enum class Tab { Map, Events, Assets, Database };
+    enum class Tab { World, Map, Events, Chars, Assets, Database };
     enum class Tool { Pencil, Erase, Fill };
 
     void drawToolbar();
+    void drawWorldTab();
     void drawMapTab();
     void drawEventsTab();
+    void drawCharsTab();
     void drawAssetsTab();
     void drawDatabaseTab();
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
+    int  generateCharacter();          // make + register a new character sheet
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
@@ -47,6 +50,12 @@ private:
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;
     int  dbNameFocus_ = -1;
+    // World / map management
+    int  worldSelected_ = -1;       // map index selected in the World tab
+    bool mapNameFocus_ = false;
+    int  newMapW_ = 30, newMapH_ = 24;
+    // Character generation
+    int  charColor_ = 0;
     std::string status_;
     float statusTimer_ = 0;
 

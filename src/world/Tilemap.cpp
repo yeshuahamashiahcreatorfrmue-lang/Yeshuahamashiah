@@ -12,6 +12,27 @@ void Tilemap::resize(int w, int h) {
     collision_.assign(width_ * height_, 0);
 }
 
+void Tilemap::resizePreserve(int w, int h) {
+    w = w < 1 ? 1 : w; h = h < 1 ? 1 : h;
+    std::vector<int>     old[kLayerCount];
+    std::vector<uint8_t> oldCol = collision_;
+    for (int i = 0; i < kLayerCount; ++i) old[i] = layers_[i];
+    int ow = width_, oh = height_;
+
+    int nw = w, nh = h;
+    width_ = nw; height_ = nh;
+    for (auto& l : layers_) l.assign(nw * nh, -1);
+    collision_.assign(nw * nh, 0);
+
+    int cw = ow < nw ? ow : nw, ch = oh < nh ? oh : nh;
+    for (int y = 0; y < ch; ++y)
+        for (int x = 0; x < cw; ++x) {
+            for (int i = 0; i < kLayerCount; ++i)
+                layers_[i][y * nw + x] = old[i][y * ow + x];
+            collision_[y * nw + x] = oldCol[y * ow + x];
+        }
+}
+
 int Tilemap::tile(int layer, int x, int y) const {
     if (layer < 0 || layer >= kLayerCount || !inBounds(x, y)) return -1;
     return layers_[layer][idx(x, y)];

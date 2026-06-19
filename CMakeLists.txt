@@ -114,3 +114,9 @@ if(BUILD_ENGINE)
             ${CMAKE_SOURCE_DIR}/projects $<TARGET_FILE_DIR:TsukuruEngine>/projects
     )
 endif()
+
+# World generator (data only; links core, no graphics) — host tool.
+if(NOT CMAKE_CROSSCOMPILING)
+    add_executable(gen_world ${CMAKE_SOURCE_DIR}/tools/gen_world.cpp)
+    target_link_libraries(gen_world PRIVATE tsukuru_core)
+endif()
