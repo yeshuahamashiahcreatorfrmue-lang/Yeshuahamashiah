@@ -152,10 +152,20 @@
 - [x] 텍스처/사운드 캐시 (재로딩 방지)
 - [x] 타일 렌더 뷰포트 컬링 (맵/이벤트 캔버스 양쪽)
 - [x] 미니맵 텍스처 1회 생성 후 캐싱
-- [x] 연속 메모리(`std::vector`) 자료구조
+- [x] 프리팹 목록 1회 생성 후 캐싱(static)
+- [x] 연속 메모리(`std::vector`) 자료구조 + 컨테이너 reserve로 재할당 방지
+      (monsters/projectiles/fx/npcs/weather)
 - [x] 폰트 글리프 아틀라스 최소화 (사용 글자만)
 - [x] `hsh()` 부호 오버플로 UB 제거 (ASan으로 진단)
 - [x] 빈 조우 목록 시 스폰 생략 (보스 누출 버그 수정)
+
+## 16b. 코드 구조 — 기능별 모듈화 (리팩토링)
+- [x] 거대 단일 파일을 기능별 번역 단위로 분리 (동작 100% 동일, 빌드 검증)
+  - GamePlay → `GamePlay.cpp`(루프/이벤트) + `GamePlayCombat.cpp`(전투/스킬)
+    + `GamePlayWorld.cpp`(NPC/연출/렌더)
+  - Editor → `Editor.cpp`(코어) + 탭별 `EditorMap/Events/Assets/Database/World/
+    Chars/Skills.cpp` + 공용 `EditorInternal.h`
+- [x] 분리 후 컴파일 병렬화 향상, 경고 0, 셀프테스트 통과로 무변경 확인
 
 ## 17. 빌드 / 패키징 / 검증
 - [x] CMake + FetchContent (raylib 5.5, nlohmann/json 3.11.3)

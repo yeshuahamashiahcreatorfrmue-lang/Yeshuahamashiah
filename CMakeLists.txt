@@ -85,6 +85,8 @@ if(BUILD_ENGINE)
         ${CMAKE_SOURCE_DIR}/src/core/*.cpp
         ${CMAKE_SOURCE_DIR}/src/editor/*.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlay.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayCombat.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayWorld.cpp
         ${CMAKE_SOURCE_DIR}/src/game/TitleScreen.cpp
         ${CMAKE_SOURCE_DIR}/src/game/Menu.cpp
         ${CMAKE_SOURCE_DIR}/src/render/*.cpp

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 #include "raylib.h"
 #include "world/Map.h"
 #include "core/Types.h"
@@ -136,6 +137,7 @@ private:
     Camera2D cam_{};
 
     Phase phase_ = Phase::Field;
+    std::set<long> firedOnce_;   // (mapId<<16 | eventId) one-shot events this session
 
     // Player smooth movement (grid -> pixel interpolation)
     float pxX_ = 0, pxY_ = 0;
