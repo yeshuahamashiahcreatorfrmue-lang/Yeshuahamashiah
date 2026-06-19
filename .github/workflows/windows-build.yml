@@ -16,7 +16,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure (CMake, OpenGL 2.1)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DOPENGL_VERSION=2.1
+        shell: pwsh
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DOPENGL_VERSION=2.1'
 
       - name: Build
         run: cmake --build build --config Release -j
