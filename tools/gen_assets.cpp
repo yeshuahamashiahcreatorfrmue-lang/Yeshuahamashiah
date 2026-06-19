@@ -59,6 +59,15 @@ static void genTileset(const std::string& path) {
     { auto p=cell(10); rect(&img,(int)p.x,(int)p.y,T,T,{40,86,150,255}); }
     { auto p=cell(11); rect(&img,(int)p.x,(int)p.y,T,T,{180,70,60,255});
       for(int y=0;y<T;y+=6) rect(&img,(int)p.x,(int)p.y+y,T,2,{150,54,46,255}); }
+    // 12 tree canopy (overhead, transparent bg) — drawn ABOVE the player
+    { auto p=cell(12);
+      Color leaf={56,120,56,255}, leaf2={72,148,72,255};
+      rect(&img,(int)p.x+3,(int)p.y+6,26,24,leaf);
+      rect(&img,(int)p.x+6,(int)p.y+3,20,10,leaf2);
+      rect(&img,(int)p.x+9,(int)p.y+9,14,8,{96,176,96,255}); }
+    // 13 tree trunk on grass (solid base, below the player)
+    { auto p=cell(13); rect(&img,(int)p.x,(int)p.y,T,T,grass1);
+      rect(&img,(int)p.x+13,(int)p.y+10,6,20,{120,84,52,255}); }
 
     ExportImage(img, path.c_str());
     UnloadImage(img);

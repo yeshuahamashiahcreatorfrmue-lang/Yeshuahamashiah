@@ -13,7 +13,15 @@ using namespace tsukuru;
 
 // tile indices in the sample tileset (8 cols x 2 rows)
 enum { GRASS=0, PATH=1, WATER=2, TREE=3, BRICK=4, WOOD=5, FLOWER=6, STONE=7,
-       DGRASS=8, SAND=9, DWATER=10, ROOF=11 };
+       DGRASS=8, SAND=9, DWATER=10, ROOF=11, CANOPY=12, TRUNK=13 };
+
+// A tree the player can walk behind: trunk/base below (solid), canopy overhead.
+static void tree(Map& m, int x, int y) {
+    if (!m.tilemap.inBounds(x, y)) return;
+    m.tilemap.setTile(1, x, y, TRUNK);      // deco layer (below player)
+    m.tilemap.setTile(2, x, y, CANOPY);     // overhead layer (above player)
+    m.tilemap.setBlocked(x, y, true);
+}
 
 static void fill(Map& m, int layer, int x, int y, int w, int h, int tile) {
     for (int j = y; j < y + h; ++j)
@@ -118,10 +126,14 @@ int main(int argc, char** argv) {
     fill(*over, 0, 24, 1, 2, 36, PATH);     // vertical road
     fill(*over, 0, 1, 18, 48, 2, PATH);     // horizontal road
     fill(*over, 0, 6, 27, 9, 7, WATER);  collide(*over, 6, 27, 9, 7);   // lake
-    for (int i = 0; i < 18; ++i) {          // scattered trees
+    for (int i = 0; i < 26; ++i) {          // scattered trees (walk-behind canopy)
         int tx = 3 + (i*7) % 44, ty = 3 + (i*5) % 32;
-        if (tx >= 23 && tx <= 26) continue;
-        over->tilemap.setTile(1, tx, ty, TREE); over->tilemap.setBlocked(tx, ty, true);
+        if (tx >= 23 && tx <= 26) continue; // keep the road clear
+        if (ty >= 17 && ty <= 19) continue;
+        tree(*over, tx, ty);
+    }
+    for (int i = 0; i < 6; ++i) {           // flower decoration on the deco layer
+        over->tilemap.setTile(1, 28 + i*2, 24 + (i%2)*2, FLOWER);
     }
     over->encounterEnemies = {1,2}; over->encounterRate = 0;
     tele(*over, 24, 3, 2, 17, 23);          // -> Town

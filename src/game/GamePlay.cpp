@@ -441,8 +441,8 @@ void GamePlay::drawField() {
 
     BeginMode2D(cam_);
     int w = map_->tilemap.width(), h = map_->tilemap.height();
-    for (int layer = 0; layer < kLayerCount; ++layer) {
-        for (int y = 0; y < h; ++y) {
+    auto drawLayer = [&](int layer) {
+        for (int y = 0; y < h; ++y)
             for (int x = 0; x < w; ++x) {
                 int t = map_->tilemap.tile(layer, x, y);
                 if (t < 0) continue;
@@ -451,8 +451,11 @@ void GamePlay::drawField() {
                 Rectangle dst = { (float)x*TS, (float)y*TS, (float)TS, (float)TS };
                 DrawTexturePro(ts, src, dst, {0,0}, 0, WHITE);
             }
-        }
-    }
+    };
+    // Ground + decoration layers render below entities; the top layer is an
+    // "overhead" layer drawn above them so the player can walk behind treetops/roofs.
+    for (int layer = 0; layer < kLayerCount - 1; ++layer) drawLayer(layer);
+
     for (auto& e : map_->events) {
         if (e.graphicAsset >= 0)
             drawCharacter(e.graphicAsset, 0, 0, (float)e.x*TS, (float)e.y*TS);
@@ -473,6 +476,8 @@ void GamePlay::drawField() {
         DrawRectangle((int)fx, (int)fy, TS, TS, Fade(Color{ 255, 240, 160, 255 }, 0.45f));
         DrawRectangleLinesEx({ fx, fy, (float)TS, (float)TS }, 2, Fade(WHITE, 0.8f));
     }
+    // overhead layer (treetops, roof edges) on top of the player
+    drawLayer(kLayerCount - 1);
     EndMode2D();
 
     // HUD

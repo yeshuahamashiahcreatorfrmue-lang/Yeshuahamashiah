@@ -3,6 +3,7 @@
 #include "render/UI.h"
 #include "render/AssetGen.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 
@@ -33,14 +34,53 @@ std::shared_ptr<Map> Editor::activeMap() {
     return nullptr;
 }
 
+// ---- undo / redo (snapshots of the active map's tilemap) ----
+void Editor::pushUndo() {
+    auto m = activeMap();
+    if (!m) return;
+    if (undoMap_ != m->id) { undo_.clear(); redo_.clear(); undoMap_ = m->id; }
+    undo_.push_back(m->tilemap.toJson().dump());
+    if (undo_.size() > 80) undo_.erase(undo_.begin());
+    redo_.clear();
+}
+void Editor::doUndo() {
+    auto m = activeMap();
+    if (!m || undoMap_ != m->id || undo_.empty()) return;
+    redo_.push_back(m->tilemap.toJson().dump());
+    m->tilemap.fromJson(nlohmann::json::parse(undo_.back()));
+    undo_.pop_back();
+    setStatus("Undo");
+}
+void Editor::doRedo() {
+    auto m = activeMap();
+    if (!m || undoMap_ != m->id || redo_.empty()) return;
+    undo_.push_back(m->tilemap.toJson().dump());
+    m->tilemap.fromJson(nlohmann::json::parse(redo_.back()));
+    redo_.pop_back();
+    setStatus("Redo");
+}
+
 // ============================ update ============================
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
 
     // Global shortcuts
+    bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_;
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S)) {
         engine_.project().save();
         setStatus("Project saved.");
+    }
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) {
+        if (IsKeyDown(KEY_LEFT_SHIFT)) doRedo(); else doUndo();
+    }
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Y)) doRedo();
+    // Tool hotkeys while editing a map
+    if (tab_ == Tab::Map && !typingNow && !IsKeyDown(KEY_LEFT_CONTROL)) {
+        if (IsKeyPressed(KEY_B)) { tool_ = Tool::Pencil; collisionMode_ = false; }
+        if (IsKeyPressed(KEY_E)) { tool_ = Tool::Erase;  collisionMode_ = false; }
+        if (IsKeyPressed(KEY_G)) { tool_ = Tool::Fill;   collisionMode_ = false; }
+        if (IsKeyPressed(KEY_R)) { tool_ = Tool::Rect;   collisionMode_ = false; }
+        if (IsKeyPressed(KEY_C)) collisionMode_ = !collisionMode_;
     }
     if (IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
 
@@ -132,14 +172,17 @@ void Editor::drawToolbar() {
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {
-        float rx = sw - 8 - 4*64;
-        if (ui::button({ rx, 6, 60, 28 }, "Pencil", tool_ == Tool::Pencil && !collisionMode_)) { tool_ = Tool::Pencil; collisionMode_ = false; }
-        rx += 64;
-        if (ui::button({ rx, 6, 60, 28 }, "Erase",  tool_ == Tool::Erase && !collisionMode_)) { tool_ = Tool::Erase; collisionMode_ = false; }
-        rx += 64;
-        if (ui::button({ rx, 6, 60, 28 }, "Fill",   tool_ == Tool::Fill && !collisionMode_)) { tool_ = Tool::Fill; collisionMode_ = false; }
-        rx += 64;
-        if (ui::button({ rx, 6, 60, 28 }, "Collide", collisionMode_)) collisionMode_ = !collisionMode_;
+        float bw = 58, gap = 60;
+        float rx = sw - 8 - 5*gap;
+        if (ui::button({ rx, 6, bw, 28 }, "Pencil", tool_ == Tool::Pencil && !collisionMode_)) { tool_ = Tool::Pencil; collisionMode_ = false; }
+        rx += gap;
+        if (ui::button({ rx, 6, bw, 28 }, "Erase",  tool_ == Tool::Erase && !collisionMode_)) { tool_ = Tool::Erase; collisionMode_ = false; }
+        rx += gap;
+        if (ui::button({ rx, 6, bw, 28 }, "Fill",   tool_ == Tool::Fill && !collisionMode_)) { tool_ = Tool::Fill; collisionMode_ = false; }
+        rx += gap;
+        if (ui::button({ rx, 6, bw, 28 }, "Rect",   tool_ == Tool::Rect && !collisionMode_)) { tool_ = Tool::Rect; collisionMode_ = false; }
+        rx += gap;
+        if (ui::button({ rx, 6, bw, 28 }, "Collide", collisionMode_)) collisionMode_ = !collisionMode_;
     }
 }
 
@@ -259,25 +302,55 @@ void Editor::drawMapCanvas(Rectangle area) {
     // painting
     if (ui::mouseIn(area) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
         Vector2 world = GetScreenToWorld2D(GetMousePosition(), cam_);
-        int tx = (int)(world.x / TS), ty = (int)(world.y / TS);
-        if (world.x < 0) tx = -1;
-        if (world.y < 0) ty = -1;
-        if (m->tilemap.inBounds(tx, ty)) {
-            // hover highlight
-            BeginMode2D(cam_);
-            DrawRectangleLinesEx({ (float)tx*TS,(float)ty*TS,(float)TS,(float)TS }, 2, ui::kAccentHi);
-            EndMode2D();
-            bool paint = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
-            bool rclick = IsMouseButtonDown(MOUSE_RIGHT_BUTTON);
-            if (collisionMode_) {
-                if (paint)  m->tilemap.setBlocked(tx, ty, true);
-                if (rclick) m->tilemap.setBlocked(tx, ty, false);
-            } else if (tool_ == Tool::Fill) {
-                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) m->tilemap.fill(activeLayer_, tx, ty, selectedTile_);
-            } else {
-                if (paint)  m->tilemap.setTile(activeLayer_, tx, ty,
-                                               tool_ == Tool::Erase ? -1 : selectedTile_);
-                if (rclick) m->tilemap.setTile(activeLayer_, tx, ty, -1);
+        int tx = (int)std::floor(world.x / TS), ty = (int)std::floor(world.y / TS);
+        bool inMap = m->tilemap.inBounds(tx, ty);
+        bool eyedrop = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+
+        // hover highlight + rectangle preview
+        BeginMode2D(cam_);
+        if (inMap)
+            DrawRectangleLinesEx({ (float)tx*TS,(float)ty*TS,(float)TS,(float)TS }, 2,
+                                 eyedrop ? GREEN : ui::kAccentHi);
+        if (tool_ == Tool::Rect && rectDragging_ && inMap) {
+            int x0 = std::min(rectStartX_, tx), y0 = std::min(rectStartY_, ty);
+            int x1 = std::max(rectStartX_, tx), y1 = std::max(rectStartY_, ty);
+            DrawRectangle(x0*TS, y0*TS, (x1-x0+1)*TS, (y1-y0+1)*TS, Fade(ui::kAccent, 0.30f));
+            DrawRectangleLinesEx({ (float)x0*TS,(float)y0*TS,(float)(x1-x0+1)*TS,(float)(y1-y0+1)*TS },
+                                 2, ui::kAccentHi);
+        }
+        EndMode2D();
+
+        if (inMap) {
+            if (eyedrop) {                                  // eyedropper: pick a tile
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    int t = m->tilemap.tile(activeLayer_, tx, ty);
+                    if (t >= 0) { selectedTile_ = t; setStatus("Picked tile " + std::to_string(t)); }
+                }
+            } else if (tool_ == Tool::Rect) {               // rectangle fill (drag)
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { rectDragging_ = true; rectStartX_ = tx; rectStartY_ = ty; }
+                if (rectDragging_ && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                    rectDragging_ = false;
+                    pushUndo();
+                    int x0 = std::min(rectStartX_, tx), y0 = std::min(rectStartY_, ty);
+                    int x1 = std::max(rectStartX_, tx), y1 = std::max(rectStartY_, ty);
+                    for (int yy = y0; yy <= y1; ++yy)
+                        for (int xx = x0; xx <= x1; ++xx) {
+                            if (collisionMode_) m->tilemap.setBlocked(xx, yy, true);
+                            else m->tilemap.setTile(activeLayer_, xx, yy, selectedTile_);
+                        }
+                    setStatus("Rect filled");
+                }
+            } else if (collisionMode_) {                    // collision paint
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) pushUndo();
+                if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))  m->tilemap.setBlocked(tx, ty, true);
+                if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) m->tilemap.setBlocked(tx, ty, false);
+            } else if (tool_ == Tool::Fill) {               // bucket fill
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { pushUndo(); m->tilemap.fill(activeLayer_, tx, ty, selectedTile_); }
+            } else {                                        // pencil / erase
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) pushUndo();
+                if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))  m->tilemap.setTile(activeLayer_, tx, ty,
+                                                            tool_ == Tool::Erase ? -1 : selectedTile_);
+                if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) m->tilemap.setTile(activeLayer_, tx, ty, -1);
             }
         }
     }

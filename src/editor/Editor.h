@@ -3,6 +3,7 @@
 // Asset registration (drag & drop files), and the Database editor.
 #include <memory>
 #include <string>
+#include <vector>
 #include "raylib.h"
 #include "world/Map.h"
 
@@ -19,7 +20,7 @@ public:
 
 private:
     enum class Tab { World, Map, Events, Chars, Assets, Database };
-    enum class Tool { Pencil, Erase, Fill };
+    enum class Tool { Pencil, Erase, Fill, Rect };
 
     void drawToolbar();
     void drawWorldTab();
@@ -56,10 +57,18 @@ private:
     int  newMapW_ = 30, newMapH_ = 24;
     // Character generation
     int  charColor_ = 0;
+    // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
+    std::vector<std::string> undo_, redo_;
+    int  undoMap_ = -1;             // which map id the undo stacks belong to
+    bool rectDragging_ = false;
+    int  rectStartX_ = 0, rectStartY_ = 0;
     std::string status_;
     float statusTimer_ = 0;
 
     void setStatus(const std::string& s) { status_ = s; statusTimer_ = 3.0f; }
+    void pushUndo();   // snapshot current map before an edit
+    void doUndo();
+    void doRedo();
 };
 
 } // namespace tsukuru
