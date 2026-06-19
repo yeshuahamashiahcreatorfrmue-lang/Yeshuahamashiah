@@ -35,64 +35,6 @@ std::shared_ptr<Map> Editor::activeMap() {
     if (!p.maps.empty()) { activeMapId_ = p.maps.front()->id; return p.maps.front(); }
     return nullptr;
 }
-
-// ---- undo / redo (snapshots of the active map's tilemap) ----
-void Editor::pushUndo() {
-    auto m = activeMap();
-    if (!m) return;
-    if (undoMap_ != m->id) { undo_.clear(); redo_.clear(); undoMap_ = m->id; }
-    undo_.push_back(m->tilemap.toJson().dump());
-    if (undo_.size() > kUndoLimit) undo_.erase(undo_.begin());
-    redo_.clear();
-}
-void Editor::doUndo() {
-    auto m = activeMap();
-    if (!m || undoMap_ != m->id || undo_.empty()) return;
-    redo_.push_back(m->tilemap.toJson().dump());
-    m->tilemap.fromJson(nlohmann::json::parse(undo_.back()));
-    undo_.pop_back();
-    setStatus("실행 취소");
-}
-void Editor::doRedo() {
-    auto m = activeMap();
-    if (!m || undoMap_ != m->id || redo_.empty()) return;
-    undo_.push_back(m->tilemap.toJson().dump());
-    m->tilemap.fromJson(nlohmann::json::parse(redo_.back()));
-    redo_.pop_back();
-    setStatus("다시 실행");
-}
-
-// ---- prefab stamps (multi-tile / multi-layer building blocks) ----
-void Editor::stampPrefab(int ox, int oy) {
-    auto m = activeMap();
-    if (!m) return;
-    const auto& list = prefabs();
-    if (prefabSel_ < 0 || prefabSel_ >= (int)list.size()) return;
-    pushUndo();
-    for (const auto& c : list[prefabSel_].cells) {
-        int x = ox + c.dx, y = oy + c.dy;
-        if (!m->tilemap.inBounds(x, y)) continue;
-        if (c.tile >= 0) m->tilemap.setTile(c.layer, x, y, c.tile);
-        if (c.blocked)   m->tilemap.setBlocked(x, y, true);
-    }
-}
-
-void Editor::drawPrefabPalette(Rectangle area) {
-    ui::panel(area, ui::kPanel);
-    ui::label("스탬프", (int)area.x + 10, (int)area.y + 8, 16, ui::kAccent);
-    const auto& list = prefabs();
-    float y = area.y + 32;
-    for (int i = 0; i < (int)list.size(); ++i) {
-        if (ui::button({ area.x + 10, y, area.width - 20, 24 }, list[i].name, prefabSel_ == i))
-            prefabSel_ = i;
-        y += 27;
-    }
-    ui::label("맵을 클릭해 배치하세요.", (int)area.x + 10, (int)(y + 6), 13, ui::kTextDim);
-    ui::label("(나무/집/연못 등의", (int)area.x + 10, (int)(y + 24), 12, ui::kTextDim);
-    ui::label(" 타일+충돌 묶음)", (int)area.x + 10, (int)(y + 40), 12, ui::kTextDim);
-}
-
-// ============================ update ============================
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
 
@@ -141,75 +83,6 @@ void Editor::update(float dt) {
 
     if (tab_ == Tab::Assets) handleAssetDrop();
 }
-
-// raylib-supported image / audio extensions (broadened so any common image —
-// and animated GIFs — can be registered and used on the map).
-static bool isImageExt(const std::string& e) {
-    static const char* k[] = { ".png",".bmp",".tga",".jpg",".jpeg",".gif",".qoi",
-        ".psd",".hdr",".dds",".ktx",".astc",".pkm",".pvr",".pic",".ppm",".pgm" };
-    for (auto* s : k) if (e == s) return true;
-    return false;
-}
-static bool isAudioExt(const std::string& e) {
-    static const char* k[] = { ".wav",".ogg",".mp3",".flac",".qoa",".xm",".mod" };
-    for (auto* s : k) if (e == s) return true;
-    return false;
-}
-
-void Editor::handleAssetDrop() {
-    if (!IsFileDropped()) return;
-    FilePathList dropped = LoadDroppedFiles();
-    Project& p = engine_.project();
-    for (unsigned i = 0; i < dropped.count; ++i) {
-        std::string path = dropped.paths[i];
-        std::string ext = GetFileExtension(path.c_str() ? path.c_str() : "");
-        for (auto& c : ext) c = (char)tolower(c);
-
-        if (ext == ".gif") {                       // animated GIF -> sprite-sheet
-            int frames = 1;
-            Image anim = LoadImageAnim(path.c_str(), &frames);
-            if (anim.data && frames > 1) {
-                // raylib stores the `frames` consecutively in anim.data (the
-                // Image height is one frame). Repack into a horizontal strip.
-                int fw = anim.width, fh = anim.height;     // single-frame size
-                int frameBytes = GetPixelDataSize(fw, fh, anim.format);
-                Image strip = GenImageColor(fw * frames, fh, BLANK);
-                ImageFormat(&strip, anim.format);
-                for (int f = 0; f < frames; ++f) {
-                    Image one = anim;                       // shallow view of frame f
-                    one.data = (unsigned char*)anim.data + (size_t)f * frameBytes;
-                    Rectangle src = { 0, 0, (float)fw, (float)fh };
-                    Rectangle dst = { (float)(f*fw), 0, (float)fw, (float)fh };
-                    ImageDraw(&strip, one, src, dst, WHITE);
-                }
-                fs::create_directories(fs::path(p.dir) / "assets");
-                fs::path base = fs::path(path).stem();
-                int n = 1; fs::path dest;
-                do { dest = fs::path(p.dir)/"assets"/(base.string()+(n>1?("_"+std::to_string(n)):std::string())+".png"); n++; }
-                while (fs::exists(dest));
-                ExportImage(strip, dest.string().c_str());
-                UnloadImage(strip); UnloadImage(anim);
-                std::string rel = (fs::path("assets")/dest.filename()).generic_string();
-                int id = p.assets.addExisting(AssetType::Image, base.string(), rel);
-                p.assets.setAnim(id, frames, 12);
-                setStatus(TextFormat("움짤 등록됨: %s (%d프레임)", base.string().c_str(), frames));
-                continue;
-            }
-            if (anim.data) UnloadImage(anim);       // static gif -> fall through
-        }
-
-        AssetType type;
-        if (isImageExt(ext))      type = AssetType::Image;
-        else if (isAudioExt(ext)) type = AssetType::Audio;
-        else continue;
-        int id = p.assets.registerAsset(p.dir, path, type);
-        if (id >= 0) setStatus("등록됨: " + std::string(GetFileName(path.c_str())));
-    }
-    UnloadDroppedFiles(dropped);
-    p.save();
-}
-
-// ============================ draw ============================
 void Editor::draw() {
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
@@ -261,7 +134,5 @@ void Editor::drawToolbar() {
         if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) collisionMode_ = !collisionMode_;
     }
 }
-
-// ----------------------------- MAP -----------------------------
 
 } // namespace tsukuru

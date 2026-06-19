@@ -85,8 +85,12 @@ if(BUILD_ENGINE)
         ${CMAKE_SOURCE_DIR}/src/core/*.cpp
         ${CMAKE_SOURCE_DIR}/src/editor/*.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlay.cpp
-        ${CMAKE_SOURCE_DIR}/src/game/GamePlayCombat.cpp
-        ${CMAKE_SOURCE_DIR}/src/game/GamePlayWorld.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayMovement.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayEvents.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayMonsters.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlaySkills.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayNpc.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayRender.cpp
         ${CMAKE_SOURCE_DIR}/src/game/TitleScreen.cpp
         ${CMAKE_SOURCE_DIR}/src/game/Menu.cpp
         ${CMAKE_SOURCE_DIR}/src/render/*.cpp

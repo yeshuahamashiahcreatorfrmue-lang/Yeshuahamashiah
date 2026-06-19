@@ -160,12 +160,15 @@
 - [x] 빈 조우 목록 시 스폰 생략 (보스 누출 버그 수정)
 
 ## 16b. 코드 구조 — 기능별 모듈화 (리팩토링)
-- [x] 거대 단일 파일을 기능별 번역 단위로 분리 (동작 100% 동일, 빌드 검증)
-  - GamePlay → `GamePlay.cpp`(루프/이벤트) + `GamePlayCombat.cpp`(전투/스킬)
-    + `GamePlayWorld.cpp`(NPC/연출/렌더)
-  - Editor → `Editor.cpp`(코어) + 탭별 `EditorMap/Events/Assets/Database/World/
-    Chars/Skills.cpp` + 공용 `EditorInternal.h`
-- [x] 분리 후 컴파일 병렬화 향상, 경고 0, 셀프테스트 통과로 무변경 확인
+- [x] 거대 단일 파일을 세부 기능 단위 번역 단위로 분리 (동작 100% 동일, 빌드 검증)
+  - GamePlay → 7개: `GamePlay`(수명주기/디스패치) · `GamePlayMovement`(이동/필드루프)
+    · `GamePlayEvents`(이벤트/대화) · `GamePlayMonsters`(몬스터/AI) · `GamePlaySkills`
+    (스킬/투사체/이펙트/HUD) · `GamePlayNpc`(NPC/자동실행) · `GamePlayRender`(연출/렌더)
+  - Editor → 11개: `Editor`(코어) · `EditorHistory`(되돌리기) · `EditorStamps`(스탬프)
+    · `EditorAssetIO`(드롭 등록/GIF) · 탭별 `EditorMap/Events/Assets/Database/World/
+    Chars/Skills` + 공용 `EditorInternal.h`
+- [x] 파일당 최대 ~266줄로 축소, 컴파일 병렬화 향상, 경고 0
+- [x] 분리 후 셀프테스트 통과 + 전 탭/게임플레이 스크린샷으로 무변경 확인
 
 ## 17. 빌드 / 패키징 / 검증
 - [x] CMake + FetchContent (raylib 5.5, nlohmann/json 3.11.3)
