@@ -2,6 +2,7 @@
 #include "core/Engine.h"
 #include "game/Menu.h"
 #include "render/UI.h"
+#include "core/Text.h"
 #include "database/Database.h"
 #include <set>
 #include <cmath>
@@ -294,12 +295,12 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
             if (&o != &m && o.alive() && o.defeatSwitch == m.defeatSwitch) { anyLeft = true; break; }
         if (!anyLeft) {
             gs.setSwitch(m.defeatSwitch, true);
-            toast_ = "The path ahead is clear!"; toastTimer_ = 2.5f;
+            toast_ = "앞길이 열렸다!"; toastTimer_ = 2.5f;
             engine_.audio().playSfx("levelup");
             return;
         }
     }
-    toast_ = m.name + " defeated!  +" + std::to_string(m.expReward) + " EXP  +" +
+    toast_ = m.name + " 처치!  +" + std::to_string(m.expReward) + " EXP  +" +
              std::to_string(m.goldReward) + " G";
     toastTimer_ = 1.8f;
     TraceLog(LOG_INFO, "KILL: %s  party gold=%d exp=%d lv=%d", m.name.c_str(),
@@ -554,7 +555,7 @@ void GamePlay::runEvent(Event& e) {
             gs.inventory.addItem(e.itemId, e.amount);
             if (e.switchId >= 0) gs.setSwitch(e.switchId, true);   // mark quest progress
             engine_.audio().playSfx("coin");
-            showMessage(e.text.empty() ? "Got an item!" : e.text);
+            showMessage(e.text.empty() ? "아이템을 얻었다!" : e.text);
             break;
         case EventType::SetSwitch:
             gs.setSwitch(e.switchId, e.switchValue);
@@ -587,9 +588,9 @@ void GamePlay::runEvent(Event& e) {
                     gs.inventory.gold -= it->price;
                     gs.inventory.addItem(it->id, 1);
                     engine_.audio().playSfx("coin");
-                    showMessage("Bought " + it->name + "!");
-                } else showMessage("Not enough gold...");
-            } else showMessage(e.text.empty() ? "Welcome!" : e.text);
+                    showMessage(it->name + "을(를) 구입했다!");
+                } else showMessage("골드가 부족합니다...");
+            } else showMessage(e.text.empty() ? "어서 오세요!" : e.text);
             break;
         }
         case EventType::Quest:
@@ -740,21 +741,21 @@ void GamePlay::drawField() {
     DrawRectangle(0, 0, GetScreenWidth(), 32, Fade(BLACK, 0.55f));
     if (!gs.party.empty()) {
         PartyMember& m = gs.party[0];
-        DrawText(TextFormat("Lv %d   HP %d/%d   MP %d/%d   EXP %d   Gold %d",
+        DrawTextU(TextFormat("Lv %d   HP %d/%d   MP %d/%d   EXP %d   Gold %d",
                  m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold),
                  12, 8, 16, ui::kText);
     }
     if (!gs.objective.empty()) {
-        DrawRectangle(0, 32, MeasureText(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
-        DrawText(TextFormat("Objective: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
+        DrawRectangle(0, 32, MeasureTextU(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
+        DrawTextU(TextFormat("목표: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
     }
-    DrawText("Space:Attack  Arrows/WASD:Move  Enter:Talk  ESC:Menu  F2:Editor",
+    DrawTextU("Space:공격  방향키/WASD:이동  Enter:대화  ESC:메뉴  F2:에디터",
              12, GetScreenHeight() - 24, 15, Fade(ui::kText, 0.7f));
 
     if (toastTimer_ > 0) {
-        int tw = MeasureText(toast_.c_str(), 18);
+        int tw = MeasureTextU(toast_.c_str(), 18);
         DrawRectangle(GetScreenWidth()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
-        DrawText(toast_.c_str(), GetScreenWidth()/2 - tw/2, 46, 18, BLACK);
+        DrawTextU(toast_.c_str(), GetScreenWidth()/2 - tw/2, 46, 18, BLACK);
     }
 }
 
@@ -763,8 +764,8 @@ void GamePlay::drawMessage() {
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };
     DrawRectangleRec(box, Fade(Color{ 20, 24, 36, 255 }, 0.95f));
     DrawRectangleLinesEx(box, 2, ui::kAccent);
-    DrawText(message_.c_str(), (int)box.x + 20, (int)box.y + 20, 22, ui::kText);
-    DrawText("[Enter]", (int)(box.x + box.width - 90), (int)(box.y + box.height - 28), 16, ui::kTextDim);
+    DrawTextU(message_.c_str(), (int)box.x + 20, (int)box.y + 20, 22, ui::kText);
+    DrawTextU("[Enter]", (int)(box.x + box.width - 96), (int)(box.y + box.height - 28), 16, ui::kTextDim);
 }
 
 void GamePlay::draw() {
@@ -772,23 +773,23 @@ void GamePlay::draw() {
         int sw = GetScreenWidth(), sh = GetScreenHeight();
         DrawRectangleGradientV(0, 0, sw, sh, Color{ 30, 30, 60, 255 }, Color{ 10, 10, 24, 255 });
         const char* a = "THE END";
-        int aw = MeasureText(a, 72);
-        DrawText(a, sw/2 - aw/2, sh/3, 72, Color{ 255, 220, 120, 255 });
-        const char* b = "Willowbrook is saved. Thank you for playing!";
-        int bw = MeasureText(b, 22);
-        DrawText(b, sw/2 - bw/2, sh/3 + 96, 22, ui::kText);
-        const char* c = "Press Enter";
-        DrawText(c, sw/2 - MeasureText(c,18)/2, sh/3 + 150, 18, ui::kTextDim);
+        int aw = MeasureTextU(a, 72);
+        DrawTextU(a, sw/2 - aw/2, sh/3, 72, Color{ 255, 220, 120, 255 });
+        const char* b = "윌로우브룩에 평화가 찾아왔습니다. 플레이해 주셔서 감사합니다!";
+        int bw = MeasureTextU(b, 22);
+        DrawTextU(b, sw/2 - bw/2, sh/3 + 96, 22, ui::kText);
+        const char* c = "Enter를 누르세요";
+        DrawTextU(c, sw/2 - MeasureTextU(c,18)/2, sh/3 + 150, 18, ui::kTextDim);
         return;
     }
     if (phase_ == Phase::GameOver) {
         DrawRectangle(0,0,GetScreenWidth(),GetScreenHeight(), Color{0,0,0,255});
         const char* go = "GAME OVER";
-        int w = MeasureText(go, 64);
-        DrawText(go, GetScreenWidth()/2 - w/2, GetScreenHeight()/2 - 60, 64, ui::kDanger);
-        const char* sub = "Press Enter";
-        int sw2 = MeasureText(sub, 22);
-        DrawText(sub, GetScreenWidth()/2 - sw2/2, GetScreenHeight()/2 + 20, 22, ui::kTextDim);
+        int w = MeasureTextU(go, 64);
+        DrawTextU(go, GetScreenWidth()/2 - w/2, GetScreenHeight()/2 - 60, 64, ui::kDanger);
+        const char* sub = "Enter를 누르세요";
+        int sw2 = MeasureTextU(sub, 22);
+        DrawTextU(sub, GetScreenWidth()/2 - sw2/2, GetScreenHeight()/2 + 20, 22, ui::kTextDim);
         return;
     }
     drawField();

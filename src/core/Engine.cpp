@@ -1,4 +1,6 @@
 #include "core/Engine.h"
+#include "core/Text.h"
+#include "core/GlyphSet.h"
 #include "editor/Editor.h"
 #include "game/GamePlay.h"
 #include "game/TitleScreen.h"
@@ -29,9 +31,12 @@ void Engine::startPlaytest() {
 
 int Engine::run(const std::string& projectDir, int maxFrames) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-    InitWindow(1280, 720, "Tsukuru Engine — RPG Maker");
+    InitWindow(1280, 720, "쯔꾸르 엔진 — RPG 메이커");
     SetExitKey(KEY_NULL); // we handle ESC ourselves
     SetTargetFPS(60);
+
+    // Load the Korean-capable UI font (baked with just the glyphs we use).
+    LoadUIFont("assets/korean.ttf", std::string(kUiGlyphs));
 
     // Load project, or create a fresh one if none exists.
     project_ = std::make_shared<Project>();
@@ -71,6 +76,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
 
     audio_.shutdown();
     textures_.clear();
+    UnloadUIFont();
     CloseWindow();
     return 0;
 }

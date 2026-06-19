@@ -2,6 +2,7 @@
 #include "editor/Prefabs.h"
 #include "core/Engine.h"
 #include "render/UI.h"
+#include "core/Text.h"
 #include "render/AssetGen.h"
 #include <algorithm>
 #include <cmath>
@@ -51,7 +52,7 @@ void Editor::doUndo() {
     redo_.push_back(m->tilemap.toJson().dump());
     m->tilemap.fromJson(nlohmann::json::parse(undo_.back()));
     undo_.pop_back();
-    setStatus("Undo");
+    setStatus("실행 취소");
 }
 void Editor::doRedo() {
     auto m = activeMap();
@@ -59,7 +60,7 @@ void Editor::doRedo() {
     undo_.push_back(m->tilemap.toJson().dump());
     m->tilemap.fromJson(nlohmann::json::parse(redo_.back()));
     redo_.pop_back();
-    setStatus("Redo");
+    setStatus("다시 실행");
 }
 
 // ---- prefab stamps (multi-tile / multi-layer building blocks) ----
@@ -79,7 +80,7 @@ void Editor::stampPrefab(int ox, int oy) {
 
 void Editor::drawPrefabPalette(Rectangle area) {
     ui::panel(area, ui::kPanel);
-    ui::label("Stamps", (int)area.x + 10, (int)area.y + 8, 16, ui::kAccent);
+    ui::label("스탬프", (int)area.x + 10, (int)area.y + 8, 16, ui::kAccent);
     const auto& list = prefabs();
     float y = area.y + 32;
     for (int i = 0; i < (int)list.size(); ++i) {
@@ -87,9 +88,9 @@ void Editor::drawPrefabPalette(Rectangle area) {
             prefabSel_ = i;
         y += 27;
     }
-    ui::label("Click map to place.", (int)area.x + 10, (int)(y + 6), 13, ui::kTextDim);
-    ui::label("(Tree/House/Pond set", (int)area.x + 10, (int)(y + 24), 12, ui::kTextDim);
-    ui::label(" tiles + collision)", (int)area.x + 10, (int)(y + 40), 12, ui::kTextDim);
+    ui::label("맵을 클릭해 배치하세요.", (int)area.x + 10, (int)(y + 6), 13, ui::kTextDim);
+    ui::label("(나무/집/연못 등의", (int)area.x + 10, (int)(y + 24), 12, ui::kTextDim);
+    ui::label(" 타일+충돌 묶음)", (int)area.x + 10, (int)(y + 40), 12, ui::kTextDim);
 }
 
 // ============================ update ============================
@@ -100,7 +101,7 @@ void Editor::update(float dt) {
     bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_;
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_S)) {
         engine_.project().save();
-        setStatus("Project saved.");
+        setStatus("프로젝트 저장됨.");
     }
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) {
         if (IsKeyDown(KEY_LEFT_SHIFT)) doRedo(); else doUndo();
@@ -157,7 +158,7 @@ void Editor::handleAssetDrop() {
             type = AssetType::Audio;
         else continue;
         int id = p.assets.registerAsset(p.dir, path, type);
-        if (id >= 0) setStatus("Registered: " + std::string(GetFileName(path.c_str())));
+        if (id >= 0) setStatus("등록됨: " + std::string(GetFileName(path.c_str())));
     }
     UnloadDroppedFiles(dropped);
     p.save();
@@ -176,9 +177,9 @@ void Editor::draw() {
     drawToolbar();
 
     if (statusTimer_ > 0) {
-        int w = MeasureText(status_.c_str(), 16);
+        int w = MeasureTextU(status_.c_str(), 16);
         DrawRectangle(GetScreenWidth() - w - 28, GetScreenHeight() - 34, w + 20, 26, ui::kAccent);
-        DrawText(status_.c_str(), GetScreenWidth() - w - 18, GetScreenHeight() - 30, 16, BLACK);
+        DrawTextU(status_.c_str(), GetScreenWidth() - w - 18, GetScreenHeight() - 30, 16, BLACK);
     }
 }
 
@@ -191,26 +192,26 @@ void Editor::drawToolbar() {
         if (ui::button({ x, 6, 78, 28 }, name, tab_ == t)) tab_ = t;
         x += 80;
     };
-    tabBtn("World", Tab::World);
-    tabBtn("Map", Tab::Map);
-    tabBtn("Events", Tab::Events);
-    tabBtn("Chars", Tab::Chars);
-    tabBtn("Assets", Tab::Assets);
-    tabBtn("Database", Tab::Database);
+    tabBtn("월드", Tab::World);
+    tabBtn("맵", Tab::Map);
+    tabBtn("이벤트", Tab::Events);
+    tabBtn("캐릭터", Tab::Chars);
+    tabBtn("에셋", Tab::Assets);
+    tabBtn("DB", Tab::Database);
 
     x += 12;
-    if (ui::button({ x, 6, 90, 28 }, "Save")) { engine_.project().save(); setStatus("Saved."); }
+    if (ui::button({ x, 6, 90, 28 }, "저장")) { engine_.project().save(); setStatus("저장됨."); }
     x += 94;
-    if (ui::button({ x, 6, 110, 28 }, "Play (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
+    if (ui::button({ x, 6, 110, 28 }, "플레이 (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {
         float bw = 54, gap = 56;
         float rx = sw - 8 - 6*gap;
         auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_)){tool_=t;collisionMode_=false;} rx+=gap; };
-        tbtn("Pencil",Tool::Pencil); tbtn("Erase",Tool::Erase); tbtn("Fill",Tool::Fill);
-        tbtn("Rect",Tool::Rect); tbtn("Stamp",Tool::Stamp);
-        if (ui::button({ rx, 6, bw, 28 }, "Collide", collisionMode_)) collisionMode_ = !collisionMode_;
+        tbtn("펜",Tool::Pencil); tbtn("지우개",Tool::Erase); tbtn("채우기",Tool::Fill);
+        tbtn("사각형",Tool::Rect); tbtn("스탬프",Tool::Stamp);
+        if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) collisionMode_ = !collisionMode_;
     }
 }
 
@@ -232,7 +233,7 @@ void Editor::drawTilePalette(Rectangle area) {
 
     // Layer selector
     float ly = area.y + 8;
-    ui::label("Layer", (int)area.x + 10, (int)ly, 16, ui::kTextDim);
+    ui::label("레이어", (int)area.x + 10, (int)ly, 16, ui::kTextDim);
     for (int i = 0; i < kLayerCount; ++i) {
         if (ui::button({ area.x + 10 + i*64, ly + 22, 60, 26 },
                        TextFormat("L%d", i+1), activeLayer_ == i))
@@ -241,10 +242,10 @@ void Editor::drawTilePalette(Rectangle area) {
     float ty = ly + 60;
 
     // Tileset image asset selector
-    ui::label("Tileset", (int)area.x + 10, (int)ty, 16, ui::kTextDim);
+    ui::label("타일셋", (int)area.x + 10, (int)ty, 16, ui::kTextDim);
     auto imgs = engine_.project().assets.byType(AssetType::Image);
     if (ui::button({ area.x + 10, ty + 22, area.width - 20, 26 },
-                   set.assetId >= 0 ? "Change tileset image" : "Pick tileset image")) {
+                   set.assetId >= 0 ? "타일셋 이미지 변경" : "타일셋 이미지 선택")) {
         // cycle to next image asset
         if (!imgs.empty()) {
             int idx = -1;
@@ -253,13 +254,13 @@ void Editor::drawTilePalette(Rectangle area) {
         }
     }
     ty += 54;
-    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "Cols", m->tileset.columns, 1, 1, 64); ty += 28;
-    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "Rows", m->tileset.rows, 1, 1, 64); ty += 30;
+    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "열", m->tileset.columns, 1, 1, 64); ty += 28;
+    ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "행", m->tileset.rows, 1, 1, 64); ty += 30;
 
     // mark the selected tile as animated (cycles tile <-> tile+1 in play)
     bool isAnim = std::find(m->animTiles.begin(), m->animTiles.end(), selectedTile_) != m->animTiles.end();
     if (ui::button({ area.x + 10, ty, area.width - 20, 24 },
-                   isAnim ? "Animated: ON" : "Animated: OFF", isAnim)) {
+                   isAnim ? "애니메이션: 켜짐" : "애니메이션: 꺼짐", isAnim)) {
         if (isAnim) m->animTiles.erase(std::remove(m->animTiles.begin(), m->animTiles.end(), selectedTile_), m->animTiles.end());
         else m->animTiles.push_back(selectedTile_);
     }
@@ -267,8 +268,8 @@ void Editor::drawTilePalette(Rectangle area) {
 
     // Tile grid
     if (set.assetId < 0) {
-        ui::label("Drop an image in", (int)area.x + 10, (int)ty, 14, ui::kTextDim);
-        ui::label("the Assets tab.", (int)area.x + 10, (int)ty + 18, 14, ui::kTextDim);
+        ui::label("에셋 탭에 이미지를", (int)area.x + 10, (int)ty, 14, ui::kTextDim);
+        ui::label("끌어다 놓으세요.", (int)area.x + 10, (int)ty + 18, 14, ui::kTextDim);
         return;
     }
     const Texture2D& tex = engine_.assetTexture(set.assetId);
@@ -373,12 +374,12 @@ void Editor::drawMapCanvas(Rectangle area) {
             if (eyedrop) {                                  // eyedropper: pick a tile
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     int t = m->tilemap.tile(activeLayer_, tx, ty);
-                    if (t >= 0) { selectedTile_ = t; setStatus("Picked tile " + std::to_string(t)); }
+                    if (t >= 0) { selectedTile_ = t; setStatus("타일 선택: " + std::to_string(t)); }
                 }
             } else if (tool_ == Tool::Stamp) {              // prefab stamp
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     stampPrefab(tx, ty);
-                    setStatus("Stamped " + prefabs()[prefabSel_].name);
+                    setStatus(prefabs()[prefabSel_].name + " 스탬프됨");
                 }
             } else if (tool_ == Tool::Rect) {               // rectangle fill (drag)
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { rectDragging_ = true; rectStartX_ = tx; rectStartY_ = ty; }
@@ -392,7 +393,7 @@ void Editor::drawMapCanvas(Rectangle area) {
                             if (collisionMode_) m->tilemap.setBlocked(xx, yy, true);
                             else m->tilemap.setTile(activeLayer_, xx, yy, selectedTile_);
                         }
-                    setStatus("Rect filled");
+                    setStatus("사각형 채움");
                 }
             } else if (collisionMode_) {                    // collision paint
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) pushUndo();
@@ -443,7 +444,7 @@ void Editor::drawEventsTab() {
             DrawRectangle(e.x*TS, e.y*TS, TS, TS, Fade(ui::kAccent, 0.5f));
             DrawRectangleLinesEx({ (float)e.x*TS,(float)e.y*TS,(float)TS,(float)TS }, 2,
                                  e.id == editingEventId_ ? ui::kAccentHi : ui::kAccent);
-            DrawText(TextFormat("%d", e.id), e.x*TS+3, e.y*TS+2, 12, WHITE);
+            DrawTextU(TextFormat("%d", e.id), e.x*TS+3, e.y*TS+2, 14, WHITE);
         }
         EndMode2D();
 
@@ -457,7 +458,7 @@ void Editor::drawEventsTab() {
                 if (existing) editingEventId_ = existing->id;
                 else {
                     Event ne; ne.id = m->nextEventId(); ne.x = tx; ne.y = ty;
-                    ne.text = "Hello!";
+                    ne.text = "안녕하세요!";
                     m->events.push_back(ne);
                     editingEventId_ = ne.id;
                 }
@@ -470,27 +471,27 @@ void Editor::drawEventsTab() {
     // ---- event inspector panel ----
     Rectangle panel = { (float)GetScreenWidth() - 320, kToolbarH, 320, (float)GetScreenHeight() - kToolbarH };
     ui::panel(panel, ui::kPanel);
-    ui::label("EVENT", (int)panel.x + 12, (int)panel.y + 10, 22, ui::kAccent);
+    ui::label("이벤트", (int)panel.x + 12, (int)panel.y + 10, 22, ui::kAccent);
     Event* ev = nullptr;
     if (m) for (auto& e : m->events) if (e.id == editingEventId_) ev = &e;
-    if (!ev) { ui::label("Click a tile to add", (int)panel.x + 12, (int)panel.y + 48, 16, ui::kTextDim);
-               ui::label("or edit an event.", (int)panel.x + 12, (int)panel.y + 68, 16, ui::kTextDim);
+    if (!ev) { ui::label("타일을 클릭해 추가하거나", (int)panel.x + 12, (int)panel.y + 48, 16, ui::kTextDim);
+               ui::label("이벤트를 선택하세요.", (int)panel.x + 12, (int)panel.y + 68, 16, ui::kTextDim);
                return; }
 
     float y = panel.y + 44;
-    const char* typeNames[] = { "Message", "Teleport", "GiveItem", "SetSwitch", "Battle", "Shop", "Quest", "Ending" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("Type: %s", typeNames[(int)ev->type]))) {
+    const char* typeNames[] = { "메시지", "이동", "아이템지급", "스위치설정", "전투", "상점", "퀘스트", "엔딩" };
+    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("종류: %s", typeNames[(int)ev->type]))) {
         ev->type = (EventType)(((int)ev->type + 1) % 8);
     }
     y += 32;
-    const char* trigNames[] = { "Action", "Touch", "Autorun" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("Trigger: %s", trigNames[(int)ev->trigger]))) {
+    const char* trigNames[] = { "말걸기", "접촉", "자동실행" };
+    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("트리거: %s", trigNames[(int)ev->trigger]))) {
         ev->trigger = (TriggerType)(((int)ev->trigger + 1) % 3);
     }
     y += 36;
 
     // text field (used by Message/GiveItem/SetSwitch/Shop)
-    ui::label("Text:", (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
+    ui::label("텍스트:", (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
     Rectangle tf = { panel.x + 12, y, 296, 26 };
     if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
     else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
@@ -500,44 +501,44 @@ void Editor::drawEventsTab() {
     // type-specific params
     switch (ev->type) {
         case EventType::Teleport:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "ToMap", ev->targetMap, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "X", ev->targetX, 1, 0, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "Y", ev->targetY, 1, 0, 999); y += 28;
             break;
         case EventType::GiveItem:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "ItemId", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "Amount", ev->amount, 1, 1, 99); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "SetSwitch", ev->switchId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수량", ev->amount, 1, 1, 99); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
             break;
         case EventType::SetSwitch:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "SwitchId", ev->switchId, 1, 0, 999); y += 28;
-            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "Value: ON" : "Value: OFF"))
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치ID", ev->switchId, 1, 0, 999); y += 28;
+            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "값: 켜짐" : "값: 꺼짐"))
                 ev->switchValue = !ev->switchValue;
             y += 28;
             break;
         case EventType::StartBattle:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "EnemyId", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "Count", ev->amount, 1, 1, 6); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "DefeatSw", ev->switchId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "적ID", ev->itemId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수", ev->amount, 1, 1, 6); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "처치스위치", ev->switchId, 1, -1, 999); y += 28;
             break;
         case EventType::Shop:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "ItemId", ev->itemId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
             break;
         case EventType::Quest:
-            DrawText("Text = objective shown on HUD.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "SetSwitch", ev->switchId, 1, -1, 999); y += 28;
+            DrawTextU("텍스트 = HUD에 표시되는 목표.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
             break;
         case EventType::Ending:
-            DrawText("Shows the game-clear screen.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
+            DrawTextU("게임 클리어 화면을 표시합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
             break;
         default: break;
     }
     y += 6;
     // condition switch
-    ui::intStepper({ panel.x + 12, y, 296, 24 }, "CondSwitch", ev->conditionSwitch, 1, -1, 999); y += 28;
-    if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "Once: YES" : "Once: NO")) ev->once = !ev->once;
+    ui::intStepper({ panel.x + 12, y, 296, 24 }, "조건스위치", ev->conditionSwitch, 1, -1, 999); y += 28;
+    if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
     // graphic asset cycle
-    if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "Graphic: set" : "Graphic: none")) {
+    if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
         auto imgs = engine_.project().assets.byType(AssetType::Image);
         if (imgs.empty()) ev->graphicAsset = -1;
         else {
@@ -549,12 +550,12 @@ void Editor::drawEventsTab() {
     }
     y += 32;
     // NPC wander toggle (only meaningful when the event has a sprite)
-    if (ui::button({ panel.x + 12, y, 296, 24 }, ev->wander ? "NPC Wander: ON" : "NPC Wander: OFF", ev->wander))
+    if (ui::button({ panel.x + 12, y, 296, 24 }, ev->wander ? "NPC 배회: 켜짐" : "NPC 배회: 꺼짐", ev->wander))
         ev->wander = !ev->wander;
     y += 30;
-    DrawText("Trigger 'Autorun' = plays once on map enter.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
+    DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
     y += 22;
-    if (ui::button({ panel.x + 12, y, 296, 28 }, "Delete Event", false)) {
+    if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트 삭제", false)) {
         auto& evs = m->events;
         evs.erase(std::remove_if(evs.begin(), evs.end(),
                   [&](const Event& e){ return e.id == editingEventId_; }), evs.end());
@@ -566,7 +567,7 @@ void Editor::drawEventsTab() {
 void Editor::drawAssetsTab() {
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
-    ui::label("Drag & drop .png / .wav / .ogg files anywhere to register them.",
+    ui::label(".png / .wav / .ogg 파일을 창에 끌어다 놓으면 등록됩니다.",
               20, (int)kToolbarH + 16, 20, ui::kText);
 
     Project& p = engine_.project();
@@ -582,18 +583,18 @@ void Editor::drawAssetsTab() {
             float s = std::min(thumb / std::max(1, tex.width), thumb / std::max(1, tex.height));
             DrawTextureEx(tex, { x + 8, y + 8 }, 0, s, WHITE);
         } else {
-            DrawText("♪ AUDIO", (int)x + 10, (int)y + 40, 18, ui::kAccent);
+            DrawTextU("♪ AUDIO", (int)x + 10, (int)y + 40, 18, ui::kAccent);
         }
-        DrawText(a.name.c_str(), (int)x + 8, (int)(y + thumb + 12), 14, ui::kText);
-        DrawText(TextFormat("id %d", a.id), (int)x + 8, (int)(y + thumb + 30), 12, ui::kTextDim);
+        DrawTextU(a.name.c_str(), (int)x + 8, (int)(y + thumb + 12), 14, ui::kText);
+        DrawTextU(TextFormat("id %d", a.id), (int)x + 8, (int)(y + thumb + 30), 12, ui::kTextDim);
 
         // image action buttons
         if (a.type == AssetType::Image) {
-            if (ui::button({ x + thumb + 12, y + 8, 100, 24 }, "Tileset", false)) {
-                if (auto m = activeMap()) { m->tileset.assetId = a.id; setStatus("Set tileset."); }
+            if (ui::button({ x + thumb + 12, y + 8, 100, 24 }, "타일셋", false)) {
+                if (auto m = activeMap()) { m->tileset.assetId = a.id; setStatus("타일셋 설정됨."); }
             }
-            if (ui::button({ x + thumb + 12, y + 36, 100, 24 }, "Player", false)) {
-                p.playerSprite = a.id; setStatus("Set player sprite.");
+            if (ui::button({ x + thumb + 12, y + 36, 100, 24 }, "플레이어", false)) {
+                p.playerSprite = a.id; setStatus("플레이어 스프라이트 설정됨.");
             }
         }
         x += cellW + pad;
@@ -601,7 +602,7 @@ void Editor::drawAssetsTab() {
     }
 
     if (assets.empty())
-        ui::label("(no assets yet)", 20, (int)kToolbarH + 56, 18, ui::kTextDim);
+        ui::label("(아직 에셋이 없습니다)", 20, (int)kToolbarH + 56, 18, ui::kTextDim);
 }
 
 // --------------------------- DATABASE ---------------------------
@@ -611,7 +612,7 @@ void Editor::drawDatabaseTab() {
     Database& db = engine_.project().database;
 
     // category tabs
-    const char* cats[] = { "Items", "Equipment", "Skills", "Actors", "Enemies" };
+    const char* cats[] = { "아이템", "장비", "스킬", "액터", "적" };
     for (int i = 0; i < 5; ++i)
         if (ui::button({ 12.0f + i*120, kToolbarH + 10, 112, 28 }, cats[i], dbCategory_ == i)) {
             dbCategory_ = i; dbSelected_ = -1; dbNameFocus_ = -1;
@@ -621,7 +622,7 @@ void Editor::drawDatabaseTab() {
     ui::panel({ listX, listY, listW, area.height - 60 }, ui::kPanel);
 
     // "Add" button
-    if (ui::button({ listX + 8, listY + 8, listW - 16, 28 }, "+ Add New")) {
+    if (ui::button({ listX + 8, listY + 8, listW - 16, 28 }, "+ 새로 추가")) {
         switch (dbCategory_) {
             case 0: { Item it; it.id = (int)db.items.size()+1; db.items.push_back(it); dbSelected_=(int)db.items.size()-1; } break;
             case 1: { Equipment e; e.id = (int)db.equipment.size()+1; db.equipment.push_back(e); dbSelected_=(int)db.equipment.size()-1; } break;
@@ -654,7 +655,7 @@ void Editor::drawDatabaseTab() {
     ui::panel({ dx - 8, listY, dw + 16, area.height - 60 }, ui::kPanel);
 
     auto nameField = [&](std::string& name) {
-        ui::label("Name:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
+        ui::label("이름:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
         Rectangle tf = { dx, dy, std::min(360.0f, dw), 28 };
         bool focus = (dbNameFocus_ == dbSelected_);
         if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) dbNameFocus_ = dbSelected_;
@@ -668,45 +669,45 @@ void Editor::drawDatabaseTab() {
 
     switch (dbCategory_) {
         case 0: { Item& it = db.items[dbSelected_]; nameField(it.name);
-            step("Price", it.price, 10, 0, 99999);
-            step("Power", it.power, 5, 0, 9999);
-            const char* effs[] = {"None","HealHP","HealMP","Damage"};
-            if (ui::button({dx,dy,200,26}, TextFormat("Effect: %s", effs[(int)it.effect]))) it.effect=(ItemEffect)(((int)it.effect+1)%4);
+            step("가격", it.price, 10, 0, 99999);
+            step("효과량", it.power, 5, 0, 9999);
+            const char* effs[] = {"없음","HP회복","MP회복","데미지"};
+            if (ui::button({dx,dy,200,26}, TextFormat("효과: %s", effs[(int)it.effect]))) it.effect=(ItemEffect)(((int)it.effect+1)%4);
             dy+=32;
-            if (ui::button({dx,dy,200,26}, it.consumable?"Consumable: YES":"Consumable: NO")) it.consumable=!it.consumable;
+            if (ui::button({dx,dy,200,26}, it.consumable?"소모성: 예":"소모성: 아니오")) it.consumable=!it.consumable;
             dy+=36;
             break; }
         case 1: { Equipment& e = db.equipment[dbSelected_]; nameField(e.name);
-            if (ui::button({dx,dy,200,26}, e.slot==EquipSlot::Weapon?"Slot: Weapon":"Slot: Armor"))
+            if (ui::button({dx,dy,200,26}, e.slot==EquipSlot::Weapon?"슬롯: 무기":"슬롯: 방어구"))
                 e.slot = e.slot==EquipSlot::Weapon?EquipSlot::Armor:EquipSlot::Weapon;
             dy+=32;
-            step("Price", e.price, 10, 0, 99999);
-            step("ATK+", e.atk, 1, 0, 999);
-            step("DEF+", e.def, 1, 0, 999);
+            step("가격", e.price, 10, 0, 99999);
+            step("공격+", e.atk, 1, 0, 999);
+            step("방어+", e.def, 1, 0, 999);
             break; }
         case 2: { Skill& s = db.skills[dbSelected_]; nameField(s.name);
-            step("MP Cost", s.mpCost, 1, 0, 999);
-            step("Power", s.power, 5, 0, 9999);
-            if (ui::button({dx,dy,200,26}, s.healing?"Type: Heal":"Type: Damage")) s.healing=!s.healing;
+            step("MP 소모", s.mpCost, 1, 0, 999);
+            step("위력", s.power, 5, 0, 9999);
+            if (ui::button({dx,dy,200,26}, s.healing?"종류: 회복":"종류: 데미지")) s.healing=!s.healing;
             dy+=36;
             break; }
         case 3: { ActorDef& a = db.actors[dbSelected_]; nameField(a.name);
-            step("Max HP", a.maxHp, 10, 1, 9999);
-            step("Max MP", a.maxMp, 5, 0, 9999);
-            step("ATK", a.atk, 1, 0, 999);
-            step("DEF", a.def, 1, 0, 999);
-            step("SPD", a.spd, 1, 0, 999);
+            step("최대 HP", a.maxHp, 10, 1, 9999);
+            step("최대 MP", a.maxMp, 5, 0, 9999);
+            step("공격", a.atk, 1, 0, 999);
+            step("방어", a.def, 1, 0, 999);
+            step("속도", a.spd, 1, 0, 999);
             break; }
         case 4: { EnemyDef& e = db.enemies[dbSelected_]; nameField(e.name);
-            step("Max HP", e.maxHp, 10, 1, 9999);
-            step("ATK", e.atk, 1, 0, 999);
-            step("DEF", e.def, 1, 0, 999);
-            step("SPD", e.spd, 1, 0, 999);
-            step("EXP", e.expReward, 5, 0, 99999);
-            step("Gold", e.goldReward, 5, 0, 99999);
+            step("최대 HP", e.maxHp, 10, 1, 9999);
+            step("공격", e.atk, 1, 0, 999);
+            step("방어", e.def, 1, 0, 999);
+            step("속도", e.spd, 1, 0, 999);
+            step("경험치", e.expReward, 5, 0, 99999);
+            step("골드", e.goldReward, 5, 0, 99999);
             break; }
     }
-    DrawText(TextFormat("id: %d   (Ctrl+S to save project)",
+    DrawTextU(TextFormat("id: %d   (Ctrl+S로 프로젝트 저장)",
              dbCategory_==0?db.items[dbSelected_].id:
              dbCategory_==1?db.equipment[dbSelected_].id:
              dbCategory_==2?db.skills[dbSelected_].id:
@@ -723,8 +724,8 @@ void Editor::drawWorldTab() {
     // ---- left: map list ----
     float lx = 12, ly = kToolbarH + 12, lw = 300;
     ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
-    ui::label("MAPS", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
-    DrawText(TextFormat("%d maps", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
+    ui::label("맵 목록", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
+    DrawTextU(TextFormat("%d개", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
 
     float y = ly + 46;
     for (int i = 0; i < (int)p.maps.size(); ++i) {
@@ -741,17 +742,17 @@ void Editor::drawWorldTab() {
 
     // new map controls
     y += 8;
-    ui::intStepper({ lx + 10, y, (lw-30)/2, 26 }, "W", newMapW_, 5, 5, 200);
-    ui::intStepper({ lx + 10 + (lw-30)/2 + 10, y, (lw-30)/2, 26 }, "H", newMapH_, 5, 5, 200);
+    ui::intStepper({ lx + 10, y, (lw-30)/2, 26 }, "너비", newMapW_, 5, 5, 200);
+    ui::intStepper({ lx + 10 + (lw-30)/2 + 10, y, (lw-30)/2, 26 }, "높이", newMapH_, 5, 5, 200);
     y += 34;
-    if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ New Map")) {
+    if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ 새 맵")) {
         auto nm = p.addMap("Map" + std::to_string(p.nextMapId()), newMapW_, newMapH_);
         // copy tileset from current map so it is paintable immediately
         if (auto cur = activeMap()) nm->tileset = cur->tileset;
         activeMapId_ = nm->id;
         worldSelected_ = (int)p.maps.size() - 1;
         p.save();
-        setStatus("Created " + nm->name);
+        setStatus(nm->name + " 생성됨");
         tab_ = Tab::Map;
     }
 
@@ -763,10 +764,10 @@ void Editor::drawWorldTab() {
 
     float dx = lx + lw + 24, dy = ly;
     ui::panel({ dx - 8, ly, area.width - dx - 4, area.height - 24 }, ui::kPanel);
-    ui::label("MAP SETTINGS", (int)dx + 4, (int)dy + 10, 22, ui::kAccent);
+    ui::label("맵 설정", (int)dx + 4, (int)dy + 10, 22, ui::kAccent);
     dy += 46;
 
-    ui::label("Name:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
+    ui::label("이름:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
     Rectangle tf = { dx, dy, 360, 28 };
     if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) mapNameFocus_ = true;
     else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) mapNameFocus_ = false;
@@ -774,29 +775,29 @@ void Editor::drawWorldTab() {
     dy += 40;
 
     int w = m->tilemap.width(), h = m->tilemap.height();
-    DrawText(TextFormat("Size: %d x %d tiles", w, h), (int)dx, (int)dy, 16, ui::kText); dy += 28;
+    DrawTextU(TextFormat("크기: %d x %d 타일", w, h), (int)dx, (int)dy, 16, ui::kText); dy += 28;
     int nw = w, nh = h;
-    ui::intStepper({ dx, dy, 220, 26 }, "Width", nw, 5, 5, 200); dy += 30;
-    ui::intStepper({ dx, dy, 220, 26 }, "Height", nh, 5, 5, 200); dy += 32;
+    ui::intStepper({ dx, dy, 220, 26 }, "너비", nw, 5, 5, 200); dy += 30;
+    ui::intStepper({ dx, dy, 220, 26 }, "높이", nh, 5, 5, 200); dy += 32;
     if ((nw != w || nh != h)) m->tilemap.resizePreserve(nw, nh);
 
-    ui::intStepper({ dx, dy, 260, 26 }, "Encounter%", m->encounterRate, 5, 0, 100); dy += 34;
+    ui::intStepper({ dx, dy, 260, 26 }, "조우율%", m->encounterRate, 5, 0, 100); dy += 34;
 
     // ---- second column: atmosphere / audio / field monsters ----
     float cx = dx + 300, cy = ly + 92;
-    ui::label("Atmosphere", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
-    ui::intStepper({ cx, cy, 250, 26 }, "Darkness", m->darkness, 15, 0, 255); cy += 32;
-    const char* wx[3] = { "Weather: None", "Weather: Rain", "Weather: Snow" };
+    ui::label("분위기", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    ui::intStepper({ cx, cy, 250, 26 }, "어둠", m->darkness, 15, 0, 255); cy += 32;
+    const char* wx[3] = { "날씨: 없음", "날씨: 비", "날씨: 눈" };
     if (ui::button({ cx, cy, 250, 26 }, wx[m->weather % 3])) m->weather = (m->weather + 1) % 3;
     cy += 32;
-    if (ui::button({ cx, cy, 250, 26 }, m->dayNight ? "Day/Night: ON" : "Day/Night: OFF", m->dayNight))
+    if (ui::button({ cx, cy, 250, 26 }, m->dayNight ? "낮/밤: 켜짐" : "낮/밤: 꺼짐", m->dayNight))
         m->dayNight = !m->dayNight;
     cy += 38;
 
-    ui::label("Music (BGM)", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    ui::label("배경음악 (BGM)", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
     auto auds = p.assets.byType(AssetType::Audio);
     const AssetEntry* curB = p.assets.find(m->bgmAsset);
-    if (ui::button({ cx, cy, 250, 26 }, std::string("BGM: ") + (curB ? curB->name : "None"))) {
+    if (ui::button({ cx, cy, 250, 26 }, std::string("BGM: ") + (curB ? curB->name : "없음"))) {
         int idx = -1;
         for (int i = 0; i < (int)auds.size(); ++i) if (auds[i]->id == m->bgmAsset) idx = i;
         idx++;
@@ -804,7 +805,7 @@ void Editor::drawWorldTab() {
     }
     cy += 40;
 
-    ui::label("Field Monsters", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
+    ui::label("필드 몬스터", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
     for (auto& en : p.database.enemies) {
         bool on = std::find(m->encounterEnemies.begin(), m->encounterEnemies.end(), en.id) != m->encounterEnemies.end();
         if (ui::button({ cx, cy, 250, 24 }, (on ? "[x] " : "[  ] ") + en.name, on)) {
@@ -814,15 +815,15 @@ void Editor::drawWorldTab() {
         cy += 27;
     }
 
-    if (ui::button({ dx, dy, 220, 30 }, p.startMap == m->id ? "Start Map (current)" : "Set as Start Map",
+    if (ui::button({ dx, dy, 220, 30 }, p.startMap == m->id ? "시작 맵 (현재)" : "시작 맵으로 설정",
                    p.startMap == m->id)) {
-        p.startMap = m->id; p.startX = w/2; p.startY = h/2; setStatus("Start map set.");
+        p.startMap = m->id; p.startX = w/2; p.startY = h/2; setStatus("시작 맵 설정됨.");
     }
     dy += 38;
-    if (ui::button({ dx, dy, 220, 30 }, "Edit this Map")) { activeMapId_ = m->id; tab_ = Tab::Map; }
+    if (ui::button({ dx, dy, 220, 30 }, "이 맵 편집")) { activeMapId_ = m->id; tab_ = Tab::Map; }
     dy += 38;
     if ((int)p.maps.size() > 1) {
-        if (ui::button({ dx, dy, 220, 30 }, "Delete Map", false)) {
+        if (ui::button({ dx, dy, 220, 30 }, "맵 삭제", false)) {
             int delId = m->id;
             p.maps.erase(p.maps.begin() + worldSelected_);
             std::error_code ec;
@@ -831,11 +832,11 @@ void Editor::drawWorldTab() {
             if (activeMapId_ == delId) activeMapId_ = p.maps.front()->id;
             worldSelected_ = 0;
             p.save();
-            setStatus("Map deleted.");
+            setStatus("맵 삭제됨.");
             return;
         }
     }
-    DrawText("Tip: connect maps with Teleport events (Events tab).",
+    DrawTextU("팁: 이동 이벤트로 맵을 연결하세요 (이벤트 탭).",
              (int)dx, (int)(ly + area.height - 60), 14, ui::kTextDim);
 }
 
@@ -864,7 +865,7 @@ int Editor::generateCharacter() {
     std::string rel = (fs::path("assets") / dest.filename()).generic_string();
     int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
     p.save();
-    setStatus("Character created: " + dest.stem().string());
+    setStatus("캐릭터 생성됨: " + dest.stem().string());
     return id;
 }
 
@@ -873,10 +874,10 @@ void Editor::drawCharsTab() {
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
 
-    ui::label("CHARACTERS", 20, (int)kToolbarH + 14, 24, ui::kAccent);
-    DrawText("Generate new characters in-engine, or drag a PNG sprite-sheet (4 frames x 4 dirs) onto the window.",
+    ui::label("캐릭터", 20, (int)kToolbarH + 14, 24, ui::kAccent);
+    DrawTextU("엔진에서 새 캐릭터를 생성하거나, PNG 스프라이트시트(4프레임 x 4방향)를 창에 끌어다 놓으세요.",
              20, (int)kToolbarH + 44, 16, ui::kTextDim);
-    if (ui::button({ 20, kToolbarH + 70, 240, 32 }, "+ Generate New Character"))
+    if (ui::button({ 20, kToolbarH + 70, 240, 32 }, "+ 새 캐릭터 생성"))
         generateCharacter();
     handleAssetDrop(); // allow dropping character sheets here too
 
@@ -894,16 +895,16 @@ void Editor::drawCharsTab() {
         Rectangle src = { 0, 0, fw, fh };
         Rectangle dst = { x + (cell - fw*sc)/2, y + 8, fw*sc, fh*sc };
         DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
-        DrawText(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
+        DrawTextU(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
         if (ui::button({ x + 8, y + cell - 16, cell - 16, 26 },
-                       isPlayer ? "PLAYER" : "Set Player", isPlayer)) {
-            p.playerSprite = a->id; p.save(); setStatus("Player character set.");
+                       isPlayer ? "플레이어" : "플레이어로 설정", isPlayer)) {
+            p.playerSprite = a->id; p.save(); setStatus("플레이어 캐릭터 설정됨.");
         }
         x += cell + 14;
         if (x + cell > area.width - 20) { x = 20; y += cell + 70; }
     }
     if (imgs.empty())
-        ui::label("(no characters yet - click Generate)", 20, (int)kToolbarH + 120, 18, ui::kTextDim);
+        ui::label("(아직 캐릭터가 없습니다 - 생성을 클릭하세요)", 20, (int)kToolbarH + 120, 18, ui::kTextDim);
 }
 
 } // namespace tsukuru

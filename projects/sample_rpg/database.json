@@ -6,7 +6,7 @@
       "id": 1,
       "maxHp": 140,
       "maxMp": 30,
-      "name": "Hero",
+      "name": "용사",
       "skills": [
         1,
         2
@@ -24,7 +24,7 @@
       "id": 1,
       "maxHp": 34,
       "maxMp": 0,
-      "name": "Slime",
+      "name": "슬라임",
       "spd": 4,
       "spriteAsset": 7
     },
@@ -36,7 +36,7 @@
       "id": 2,
       "maxHp": 26,
       "maxMp": 0,
-      "name": "Bat",
+      "name": "박쥐",
       "spd": 7,
       "spriteAsset": 8
     },
@@ -48,7 +48,7 @@
       "id": 3,
       "maxHp": 60,
       "maxMp": 0,
-      "name": "Boar",
+      "name": "멧돼지",
       "spd": 5,
       "spriteAsset": 9
     },
@@ -60,7 +60,7 @@
       "id": 4,
       "maxHp": 220,
       "maxMp": 0,
-      "name": "Cave Guardian",
+      "name": "동굴 수호자",
       "spd": 4,
       "spriteAsset": 10
     }
@@ -71,7 +71,7 @@
       "def": 0,
       "iconAsset": -1,
       "id": 1,
-      "name": "Iron Sword",
+      "name": "철검",
       "price": 140,
       "slot": "weapon"
     },
@@ -80,7 +80,7 @@
       "def": 8,
       "iconAsset": -1,
       "id": 2,
-      "name": "Leather Armor",
+      "name": "가죽 갑옷",
       "price": 120,
       "slot": "armor"
     }
@@ -88,41 +88,41 @@
   "items": [
     {
       "consumable": true,
-      "description": "Restores 60 HP.",
+      "description": "HP를 60 회복합니다.",
       "effect": "healHP",
       "iconAsset": -1,
       "id": 1,
-      "name": "Potion",
+      "name": "포션",
       "power": 60,
       "price": 30
     },
     {
       "consumable": true,
-      "description": "Restores 200 HP.",
+      "description": "HP를 200 회복합니다.",
       "effect": "healHP",
       "iconAsset": -1,
       "id": 2,
-      "name": "Hi-Potion",
+      "name": "하이포션",
       "power": 200,
       "price": 120
     },
     {
       "consumable": true,
-      "description": "Restores 40 MP.",
+      "description": "MP를 40 회복합니다.",
       "effect": "healMP",
       "iconAsset": -1,
       "id": 3,
-      "name": "Ether",
+      "name": "에테르",
       "power": 40,
       "price": 80
     },
     {
       "consumable": false,
-      "description": "The village's sacred Crystal.",
+      "description": "마을의 신성한 크리스탈.",
       "effect": "none",
       "iconAsset": -1,
       "id": 4,
-      "name": "Crystal",
+      "name": "크리스탈",
       "power": 0,
       "price": 0
     }
@@ -132,14 +132,14 @@
       "healing": false,
       "id": 1,
       "mpCost": 4,
-      "name": "Slash",
+      "name": "베기",
       "power": 18
     },
     {
       "healing": true,
       "id": 2,
       "mpCost": 6,
-      "name": "Heal",
+      "name": "치유",
       "power": 40
     }
   ]

@@ -186,7 +186,7 @@ int main(int argc,char**argv){
     printf("art + audio generated\n");
 
     auto p = std::make_shared<Project>();
-    p->dir = out; p->name = "Willowbrook";
+    p->dir = out; p->name = "윌로우브룩";
     int A_ts   = p->assets.addExisting(AssetType::Image,"tileset","assets/tileset.png");
     int A_hero = p->assets.addExisting(AssetType::Image,"hero","assets/hero.png");
     int A_v1   = p->assets.addExisting(AssetType::Image,"villager1","assets/villager1.png");
@@ -202,21 +202,21 @@ int main(int argc,char**argv){
 
     // database
     Database& db = p->database;
-    db.items.push_back({1,"Potion","Restores 60 HP.",30,-1,ItemEffect::HealHP,60,true});
-    db.items.push_back({2,"Hi-Potion","Restores 200 HP.",120,-1,ItemEffect::HealHP,200,true});
-    db.items.push_back({3,"Ether","Restores 40 MP.",80,-1,ItemEffect::HealMP,40,true});
-    db.items.push_back({4,"Crystal","The village's sacred Crystal.",0,-1,ItemEffect::None,0,false});
-    db.equipment.push_back({1,"Iron Sword",EquipSlot::Weapon,140,-1,12,0});
-    db.equipment.push_back({2,"Leather Armor",EquipSlot::Armor,120,-1,0,8});
-    db.skills.push_back({1,"Slash",4,18,false});
-    db.skills.push_back({2,"Heal",6,40,true});
-    db.actors.push_back({1,"Hero",A_hero,140,30,15,8,7,{1,2}});
-    db.enemies.push_back({1,"Slime",A_sl,34,0,9,4,4,9,7});
-    db.enemies.push_back({2,"Bat",A_bat,26,0,12,3,7,11,9});
-    db.enemies.push_back({3,"Boar",A_boar,60,0,15,6,5,22,18});
-    db.enemies.push_back({4,"Cave Guardian",A_guard,220,0,18,9,4,150,120});
+    db.items.push_back({1,"포션","HP를 60 회복합니다.",30,-1,ItemEffect::HealHP,60,true});
+    db.items.push_back({2,"하이포션","HP를 200 회복합니다.",120,-1,ItemEffect::HealHP,200,true});
+    db.items.push_back({3,"에테르","MP를 40 회복합니다.",80,-1,ItemEffect::HealMP,40,true});
+    db.items.push_back({4,"크리스탈","마을의 신성한 크리스탈.",0,-1,ItemEffect::None,0,false});
+    db.equipment.push_back({1,"철검",EquipSlot::Weapon,140,-1,12,0});
+    db.equipment.push_back({2,"가죽 갑옷",EquipSlot::Armor,120,-1,0,8});
+    db.skills.push_back({1,"베기",4,18,false});
+    db.skills.push_back({2,"치유",6,40,true});
+    db.actors.push_back({1,"용사",A_hero,140,30,15,8,7,{1,2}});
+    db.enemies.push_back({1,"슬라임",A_sl,34,0,9,4,4,9,7});
+    db.enemies.push_back({2,"박쥐",A_bat,26,0,12,3,7,11,9});
+    db.enemies.push_back({3,"멧돼지",A_boar,60,0,15,6,5,22,18});
+    db.enemies.push_back({4,"동굴 수호자",A_guard,220,0,18,9,4,150,120});
 
-    auto m = p->addMap("Willowbrook Village", 44, 34);
+    auto m = p->addMap("윌로우브룩 마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;
     m->animTiles = { WATER, SHALLOW };
     Tilemap& tm = m->tilemap;
@@ -287,32 +287,32 @@ int main(int argc,char**argv){
     auto sign=[&](int x,int y,const std::string&txt){ setT(1,x,y,SIGN);blk(x,y); Event e;e.x=x;e.y=y;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
     auto door=[&](std::pair<int,int> pos,const std::string&txt){ Event e;e.x=pos.first;e.y=pos.second;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
 
-    npc(23,16,A_eld,"Elder: Welcome to Willowbrook, young hero!|Wild beasts roam the eastern fields,|and something stirs in the northern cave...");
-    npc(19,15,A_v1,"Villager: The well water is cold and sweet.|Try the shop to the east!",true);
-    npc(28,20,A_v2,"Farmer: My flowers bloom nicely|even in this gentle rain.",true);
-    npc(8,16,A_girl,"Girl: I saw a shiny box near the trees!|Hee hee.",true);
+    npc(23,16,A_eld,"촌장: 윌로우브룩에 온 걸 환영하네, 젊은 용사여!|동쪽 들판엔 야수들이 떠돌고,|북쪽 동굴에선 무언가 꿈틀대고 있다네...");
+    npc(19,15,A_v1,"마을 사람: 우물물이 차갑고 달아요.|동쪽 상점에 들러보세요!",true);
+    npc(28,20,A_v2,"농부: 이 부드러운 비에도|내 꽃들이 잘 피어난다오.",true);
+    npc(8,16,A_girl,"소녀: 나무 근처에서 반짝이는 상자를 봤어요!|히히.",true);
 
     // autorun intro (cutscene + quest objective, plays once on arrival)
     { Event e; e.x=22;e.y=20;e.type=EventType::Quest;e.trigger=TriggerType::Autorun;
-      e.text="The village Crystal was stolen by a cave beast! Recover it from the northern cave."; ev(e); }
+      e.text="마을의 크리스탈을 동굴 괴수가 훔쳐갔다! 북쪽 동굴에서 되찾아라."; ev(e); }
     // autorun ending: fires when you return with the Crystal (switch 3)
     { Event e; e.x=22;e.y=20;e.type=EventType::Ending;e.trigger=TriggerType::Autorun;
       e.conditionSwitch=3;e.conditionValue=true; ev(e); }
 
     // shopkeeper (sells a potion via Shop event)
-    { Event e; e.x=30;e.y=18;e.type=EventType::Shop;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v1;e.itemId=1;e.text="Shop: Buy a Potion?"; ev(e); }
+    { Event e; e.x=30;e.y=18;e.type=EventType::Shop;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v1;e.itemId=1;e.text="상점: 포션을 사시겠어요?"; ev(e); }
 
     // treasure chest (gives Hi-Potion once)
     setT(1,3,2,CHEST);
-    { Event e; e.x=3;e.y=2;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=1;e.once=true;e.text="You found a Hi-Potion!"; ev(e); }
+    { Event e; e.x=3;e.y=2;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=1;e.once=true;e.text="하이포션을 발견했다!"; ev(e); }
 
-    sign(21,18,"Willowbrook Village  -  Plaza");
-    sign(40,17,"East Field: Monsters ahead! Press Space to attack.");
+    sign(21,18,"윌로우브룩 마을  -  광장");
+    sign(40,17,"동쪽 들판: 몬스터 출현! Space로 공격하세요.");
 
-    door(h1,"A cozy cottage. The door is locked.");
-    door(h2,"The carpenter is out today.");
-    door(h3,"Someone is napping inside...");
-    door(h4,"Home sweet home.");
+    door(h1,"아늑한 오두막. 문이 잠겨 있다.");
+    door(h2,"목수는 오늘 외출 중이다.");
+    door(h3,"안에서 누군가 낮잠을 자고 있다...");
+    door(h4,"우리 집, 즐거운 나의 집.");
 
     // field monsters in the open east area
     m->encounterEnemies = {1,2};
@@ -321,7 +321,7 @@ int main(int argc,char**argv){
     m->weather = 1;           // gentle rain
 
     // ===== Map 2: Whispering Cave (dark, torch-lit, tougher) =====
-    auto cave = p->addMap("Whispering Cave", 32, 26);
+    auto cave = p->addMap("속삭이는 동굴", 32, 26);
     cave->tileset.assetId=A_ts; cave->tileset.tileWidth=32; cave->tileset.tileHeight=32;
     cave->tileset.columns=8; cave->tileset.rows=6;
     cave->animTiles={WATER,SHALLOW}; cave->bgmAsset=A_bgmC; cave->darkness=185;
@@ -344,7 +344,7 @@ int main(int argc,char**argv){
     cset(1,5,4,CHEST);       // crystal chest (revealed after the boss)
     int ceid=1; auto cev=[&](Event e){e.id=ceid++;cave->events.push_back(e);};
     // potion chest near entrance (once)
-    { Event e;e.x=5;e.y=5;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=2;e.once=true;e.text="A glint in the dark...|You found 2 Hi-Potions!"; cev(e); }
+    { Event e;e.x=5;e.y=5;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=2;e.once=true;e.text="어둠 속의 반짝임...|하이포션 2개를 발견했다!"; cev(e); }
     // BOSS: stepping into the inner cavern summons the Cave Guardian (once).
     //       Defeating it sets switch 2 (clears the way + reveals the Crystal).
     { Event e;e.x=16;e.y=16;e.type=EventType::StartBattle;e.trigger=TriggerType::PlayerTouch;e.once=true;
@@ -352,20 +352,20 @@ int main(int argc,char**argv){
     // Crystal: only obtainable after the Guardian falls (switch 2). Sets switch 3.
     { Event e;e.x=5;e.y=4;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.once=true;
       e.itemId=4;e.amount=1;e.switchId=3;e.conditionSwitch=2;e.conditionValue=true;
-      e.text="The stolen Crystal!|You reclaim it.|Carry it back through the gate to the village."; cev(e); }
+      e.text="도난당한 크리스탈!|되찾았다.|문을 통해 마을로 가지고 돌아가자."; cev(e); }
     // Guardian still alive -> the Crystal pedestal won't budge (event page on same tile)
     { Event e;e.x=5;e.y=4;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;
-      e.text="A crystal pedestal, sealed by the Guardian's magic."; cev(e); }
+      e.text="수호자의 마법으로 봉인된 크리스탈 받침대."; cev(e); }
     // return gate: opens once the Guardian is defeated (switch 2)
     { Event e;e.x=16;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=m->id;e.targetX=22;e.targetY=3;e.conditionSwitch=2;e.conditionValue=true; cev(e); }
-    { cset(1,14,2,SIGN);cblk(14,2); Event e;e.x=14;e.y=2;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text="A sealed gate.|It will open when the cave's guardian is slain."; cev(e); }
+    { cset(1,14,2,SIGN);cblk(14,2); Event e;e.x=14;e.y=2;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text="봉인된 문.|동굴의 수호자를 쓰러뜨리면 열린다."; cev(e); }
     // lost miner npc (wanders)
-    { Event e;e.x=9;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v2;e.wander=true;e.text="Miner: A Guardian hoards the Crystal deeper in!|Strike it down to pass."; cev(e); }
+    { Event e;e.x=9;e.y=20;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.graphicAsset=A_v2;e.wander=true;e.text="광부: 더 깊은 곳에서 수호자가 크리스탈을 지키고 있소!|쓰러뜨려야 지나갈 수 있다오."; cev(e); }
 
     // village -> cave entrance (top of the road)
     setT(1,22,2,STAIRS);
     { Event e;e.id=eid++;e.x=22;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=cave->id;e.targetX=16;e.targetY=23; m->events.push_back(e); }
-    sign(20,3,"Cave entrance ->|Beware what whispers within.");
+    sign(20,3,"동굴 입구 ->|안에서 속삭이는 것을 조심하라.");
 
     p->startMap=m->id; p->startX=22; p->startY=20; p->startActor=1; p->playerSprite=A_hero;
     p->save();

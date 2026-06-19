@@ -1,6 +1,7 @@
 #include "game/Menu.h"
 #include "core/Engine.h"
 #include "render/UI.h"
+#include "core/Text.h"
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
@@ -38,7 +39,7 @@ bool Menu::update(float dt) {
                 case 0: page_ = Page::Items;  selection_ = 0; break;
                 case 1: page_ = Page::Equip;  selection_ = 0; break;
                 case 2: page_ = Page::Status; selection_ = 0; break;
-                case 3: saveGame(engine_); toast_ = "Game Saved!"; toastTimer_ = 2.0f; break;
+                case 3: saveGame(engine_); toast_ = "게임이 저장되었습니다!"; toastTimer_ = 2.0f; break;
                 case 4: return false;
             }
         }
@@ -55,7 +56,7 @@ bool Menu::update(float dt) {
                 if (it->effect == ItemEffect::HealHP) m.hp = std::min(m.maxHp, m.hp + it->power);
                 else if (it->effect == ItemEffect::HealMP) m.mp = std::min(m.maxMp, m.mp + it->power);
                 if (it->consumable) gs.inventory.removeItem(itemId);
-                toast_ = "Used " + it->name; toastTimer_ = 1.5f;
+                toast_ = it->name + " 사용"; toastTimer_ = 1.5f;
             }
         }
     } else if (page_ == Page::Equip) {
@@ -81,38 +82,38 @@ bool Menu::update(float dt) {
 void Menu::drawRoot() {
     Rectangle r = { 40, 40, 220, 280 };
     ui::panel(r);
-    ui::label("MENU", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
-    const char* opts[5] = { "Items", "Equipment", "Status", "Save", "Close" };
+    ui::label("메뉴", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    const char* opts[5] = { "아이템", "장비", "상태", "저장", "닫기" };
     for (int i = 0; i < 5; ++i) {
         Color c = i == selection_ ? ui::kAccentHi : ui::kText;
         std::string t = (i == selection_ ? "> " : "  ") + std::string(opts[i]);
-        DrawText(t.c_str(), (int)r.x + 16, (int)r.y + 56 + i * 40, 22, c);
+        DrawTextU(t.c_str(), (int)r.x + 16, (int)r.y + 56 + i * 40, 22, c);
     }
 }
 
 void Menu::drawItems() {
     Rectangle r = { 40, 40, 420, 400 };
     ui::panel(r);
-    ui::label("ITEMS", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    ui::label("아이템", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
     GameState& gs = engine_.state();
     Database&  db = engine_.project().database;
-    DrawText(TextFormat("Gold: %d", gs.inventory.gold), (int)r.x + 260, (int)r.y + 16, 18, ui::kGood);
+    DrawTextU(TextFormat("골드: %d", gs.inventory.gold), (int)r.x + 260, (int)r.y + 16, 18, ui::kGood);
     auto items = gs.inventory.list();
-    if (items.empty()) ui::label("(empty)", (int)r.x + 16, (int)r.y + 56, 18, ui::kTextDim);
+    if (items.empty()) ui::label("(비어 있음)", (int)r.x + 16, (int)r.y + 56, 18, ui::kTextDim);
     for (int i = 0; i < (int)items.size(); ++i) {
         const Item* it = db.item(items[i].first);
         std::string name = it ? it->name : "?";
         Color c = i == selection_ ? ui::kAccentHi : ui::kText;
         std::string line = (i == selection_ ? "> " : "  ") + name + "  x" + std::to_string(items[i].second);
-        DrawText(line.c_str(), (int)r.x + 16, (int)r.y + 56 + i * 28, 18, c);
+        DrawTextU(line.c_str(), (int)r.x + 16, (int)r.y + 56 + i * 28, 18, c);
     }
-    DrawText("Enter: use   ESC: back", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
+    DrawTextU("Enter: 사용   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
 }
 
 void Menu::drawEquip() {
     Rectangle r = { 40, 40, 460, 320 };
     ui::panel(r);
-    ui::label("EQUIPMENT", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    ui::label("장비", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
     GameState& gs = engine_.state();
     Database&  db = engine_.project().database;
     if (gs.party.empty()) return;
@@ -121,32 +122,32 @@ void Menu::drawEquip() {
     const Equipment* a = db.equip(m.armorId);
     Color wc = selection_ == 0 ? ui::kAccentHi : ui::kText;
     Color ac = selection_ == 1 ? ui::kAccentHi : ui::kText;
-    DrawText(TextFormat("Weapon: %s", w ? w->name.c_str() : "(none)"), (int)r.x + 16, (int)r.y + 70, 20, wc);
-    DrawText(TextFormat("Armor : %s", a ? a->name.c_str() : "(none)"), (int)r.x + 16, (int)r.y + 110, 20, ac);
-    DrawText(TextFormat("ATK %d   DEF %d", m.totalAtk(db), m.totalDef(db)),
+    DrawTextU(TextFormat("무기: %s", w ? w->name.c_str() : "(없음)"), (int)r.x + 16, (int)r.y + 70, 20, wc);
+    DrawTextU(TextFormat("방어구: %s", a ? a->name.c_str() : "(없음)"), (int)r.x + 16, (int)r.y + 110, 20, ac);
+    DrawTextU(TextFormat("공격 %d   방어 %d", m.totalAtk(db), m.totalDef(db)),
              (int)r.x + 16, (int)r.y + 170, 18, ui::kGood);
-    DrawText("Up/Down: slot   Left/Right: change   ESC: back",
+    DrawTextU("위/아래: 슬롯   좌/우: 변경   ESC: 뒤로",
              (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
 }
 
 void Menu::drawStatus() {
     Rectangle r = { 40, 40, 460, 360 };
     ui::panel(r);
-    ui::label("STATUS", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    ui::label("상태", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
     GameState& gs = engine_.state();
     Database&  db = engine_.project().database;
     int y = (int)r.y + 56;
     for (auto& m : gs.party) {
         const ActorDef* def = db.actor(m.actorId);
-        DrawText(def ? def->name.c_str() : "Hero", (int)r.x + 16, y, 22, ui::kText);
-        DrawText(TextFormat("Lv %d   EXP %d", m.level, m.exp), (int)r.x + 220, y, 18, ui::kTextDim);
+        DrawTextU(def ? def->name.c_str() : "용사", (int)r.x + 16, y, 22, ui::kText);
+        DrawTextU(TextFormat("Lv %d   EXP %d", m.level, m.exp), (int)r.x + 220, y, 18, ui::kTextDim);
         y += 30;
-        DrawText(TextFormat("HP %d/%d   MP %d/%d", m.hp, m.maxHp, m.mp, m.maxMp),
+        DrawTextU(TextFormat("HP %d/%d   MP %d/%d", m.hp, m.maxHp, m.mp, m.maxMp),
                  (int)r.x + 24, y, 18, ui::kGood); y += 26;
-        DrawText(TextFormat("ATK %d   DEF %d   SPD %d", m.totalAtk(db), m.totalDef(db), m.spd),
+        DrawTextU(TextFormat("공격 %d   방어 %d   속도 %d", m.totalAtk(db), m.totalDef(db), m.spd),
                  (int)r.x + 24, y, 18, ui::kText); y += 40;
     }
-    DrawText("ESC: back", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
+    DrawTextU("ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
 }
 
 void Menu::draw() {
@@ -157,9 +158,9 @@ void Menu::draw() {
         case Page::Status: drawStatus(); break;
     }
     if (toastTimer_ > 0) {
-        int w = MeasureText(toast_.c_str(), 20);
+        int w = MeasureTextU(toast_.c_str(), 20);
         DrawRectangle(GetScreenWidth()/2 - w/2 - 12, 20, w + 24, 36, ui::kAccent);
-        DrawText(toast_.c_str(), GetScreenWidth()/2 - w/2, 28, 20, BLACK);
+        DrawTextU(toast_.c_str(), GetScreenWidth()/2 - w/2, 28, 20, BLACK);
     }
 }
 

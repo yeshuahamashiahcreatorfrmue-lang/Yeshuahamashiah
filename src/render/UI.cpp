@@ -1,4 +1,5 @@
 #include "render/UI.h"
+#include "core/Text.h"
 #include <cstring>
 
 namespace tsukuru {
@@ -14,12 +15,12 @@ void panel(Rectangle r, Color c) {
 }
 
 void label(const std::string& text, int x, int y, int size, Color c) {
-    DrawText(text.c_str(), x, y, size, c);
+    DrawTextU(text.c_str(), x, y, size, c);
 }
 
 void labelCentered(const std::string& text, Rectangle r, int size, Color c) {
-    int w = MeasureText(text.c_str(), size);
-    DrawText(text.c_str(), (int)(r.x + (r.width - w) / 2),
+    int w = MeasureTextU(text.c_str(), size);
+    DrawTextU(text.c_str(), (int)(r.x + (r.width - w) / 2),
              (int)(r.y + (r.height - size) / 2), size, c);
 }
 
@@ -49,7 +50,7 @@ bool textField(Rectangle r, std::string& text, bool focused, int maxLen) {
     }
     std::string shown = text;
     if (focused && ((int)(GetTime() * 2) % 2 == 0)) shown += "_";
-    DrawText(shown.c_str(), (int)r.x + 6, (int)(r.y + (r.height - 16) / 2), 16, kText);
+    DrawTextU(shown.c_str(), (int)r.x + 6, (int)(r.y + (r.height - 16) / 2), 16, kText);
     return focused;
 }
 

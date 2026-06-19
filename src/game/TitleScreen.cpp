@@ -1,6 +1,7 @@
 #include "game/TitleScreen.h"
 #include "core/Engine.h"
 #include "render/UI.h"
+#include "core/Text.h"
 #include <filesystem>
 #include <fstream>
 
@@ -57,22 +58,22 @@ void TitleScreen::draw() {
 
     const char* title = engine_.project().name.c_str();
     int ts = 64;
-    int tw = MeasureText(title, ts);
-    DrawText(title, (sw - tw) / 2, sh / 4, ts, ui::kText);
-    const char* sub = "Made with Tsukuru Engine";
-    int subw = MeasureText(sub, 18);
-    DrawText(sub, (sw - subw) / 2, sh / 4 + ts + 8, 18, ui::kTextDim);
+    int tw = MeasureTextU(title, ts);
+    DrawTextU(title, (sw - tw) / 2, sh / 4, ts, ui::kText);
+    const char* sub = "쯔꾸르 엔진으로 제작됨";
+    int subw = MeasureTextU(sub, 18);
+    DrawTextU(sub, (sw - subw) / 2, sh / 4 + ts + 8, 18, ui::kTextDim);
 
-    const char* opts[3] = { "New Game", "Continue", "Quit to Editor" };
+    const char* opts[3] = { "새 게임", "이어하기", "에디터로 나가기" };
     bool enabled[3] = { true, hasSave(), true };
     int oy = sh / 2 + 40;
     for (int i = 0; i < 3; ++i) {
         Color c = !enabled[i] ? ui::kTextDim : (i == selection_ ? ui::kAccentHi : ui::kText);
         std::string text = (i == selection_ ? "> " : "  ") + std::string(opts[i]);
-        int w = MeasureText(text.c_str(), 28);
-        DrawText(text.c_str(), (sw - w) / 2, oy + i * 44, 28, c);
+        int w = MeasureTextU(text.c_str(), 28);
+        DrawTextU(text.c_str(), (sw - w) / 2, oy + i * 44, 28, c);
     }
-    DrawText("Up/Down: select   Enter: confirm   ESC: editor",
+    DrawTextU("위/아래: 선택   Enter: 확인   ESC: 에디터",
              20, sh - 30, 16, ui::kTextDim);
 }
 
