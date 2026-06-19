@@ -132,10 +132,11 @@ static void saveImg(Image im,const std::string&p){ ExportImage(im,p.c_str()); Un
 
 // ---------- procedural audio (16-bit mono WAV) ----------
 static const int RATE = 22050;
+static const double TAU = 6.28318530717958647692;
 static void note(std::vector<short>&b,double f,double dur,double vol,int wave=0){
     int n=(int)(dur*RATE);
     for(int i=0;i<n;i++){double t=(double)i/RATE; double env=1.0-(double)i/n;
-        double ph=f*t,s; if(wave==0)s=(fmod(ph,1.0)<0.5?1:-1); else if(wave==1)s=sin(ph*2*M_PI);
+        double ph=f*t,s; if(wave==0)s=(fmod(ph,1.0)<0.5?1:-1); else if(wave==1)s=sin(ph*TAU);
         else s=((rand()%2001)-1000)/1000.0;
         int v=(int)(s*vol*env*30000); if(v>32767)v=32767; if(v<-32768)v=-32768; b.push_back((short)v);}
 }
