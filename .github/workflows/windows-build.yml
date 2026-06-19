@@ -63,11 +63,23 @@ jobs:
           Push-Location $dir
           Remove-Item tsukuru_log.txt -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $exe -ArgumentList "--frames","40","--shot","shot_softgl.png" -Wait -PassThru
-          Write-Host "Exit code (software GL): $($p.ExitCode)"
-          if (Test-Path tsukuru_log.txt) { Write-Host "----- LOG -----"; Get-Content tsukuru_log.txt }
+          Write-Host "Exit code (editor): $($p.ExitCode)"
+          if (Test-Path tsukuru_log.txt) { Write-Host "----- EDITOR LOG -----"; Get-Content tsukuru_log.txt }
           if ($p.ExitCode -ne 0) { throw "Engine did not exit cleanly on real Windows (rc=$($p.ExitCode))" }
           if (-not (Test-Path shot_softgl.png)) { throw "No screenshot produced -> did not actually render" }
-          Write-Host "SUCCESS: engine ran and rendered on real Windows (software GL)."
+
+          # PLAY MODE test: jump straight into the game and auto-walk the player.
+          Remove-Item tsukuru_log.txt -ErrorAction SilentlyContinue
+          $env:TSUKURU_AUTOWALK = "1"
+          $p2 = Start-Process -FilePath $exe -ArgumentList "--start","play","--frames","120","--shot","play_softgl.png" -Wait -PassThru
+          Write-Host "Exit code (play): $($p2.ExitCode)"
+          if (Test-Path tsukuru_log.txt) { Write-Host "----- PLAY LOG -----"; Get-Content tsukuru_log.txt }
+          if ($p2.ExitCode -ne 0) { throw "Play mode did not exit cleanly (rc=$($p2.ExitCode))" }
+          if (-not (Test-Path play_softgl.png)) { throw "No play screenshot -> play did not render" }
+          $walks = (Select-String -Path tsukuru_log.txt -Pattern "AUTOWALK arrived").Count
+          Write-Host "Player auto-walk steps: $walks"
+          if ($walks -lt 1) { throw "Player did not move in play mode" }
+          Write-Host "SUCCESS: engine ran, rendered, and the player moved on real Windows."
           Pop-Location
 
       - name: Stage release package
@@ -82,6 +94,7 @@ jobs:
           Copy-Item "$dir\assets" $out -Recurse -Force
           Copy-Item "$dir\projects" $out -Recurse -Force
           if (Test-Path "$dir\shot_softgl.png") { Copy-Item "$dir\shot_softgl.png" $out }
+          if (Test-Path "$dir\play_softgl.png") { Copy-Item "$dir\play_softgl.png" $out }
           Copy-Item "README.md" $out -ErrorAction SilentlyContinue
           Get-ChildItem $out -Recurse | Select-Object FullName
 
