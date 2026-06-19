@@ -15,43 +15,56 @@
       },
       {
         "id": 3,
-        "name": "npc",
-        "path": "assets/npc.png",
+        "name": "villager1",
+        "path": "assets/villager1.png",
         "type": "image"
       },
       {
         "id": 4,
-        "name": "oldman",
-        "path": "assets/oldman.png",
+        "name": "villager2",
+        "path": "assets/villager2.png",
         "type": "image"
       },
       {
         "id": 5,
+        "name": "elder",
+        "path": "assets/elder.png",
+        "type": "image"
+      },
+      {
+        "id": 6,
+        "name": "girl",
+        "path": "assets/girl.png",
+        "type": "image"
+      },
+      {
+        "id": 7,
         "name": "slime",
         "path": "assets/slime.png",
         "type": "image"
       },
       {
-        "id": 6,
+        "id": 8,
         "name": "bat",
         "path": "assets/bat.png",
         "type": "image"
+      },
+      {
+        "id": 9,
+        "name": "boar",
+        "path": "assets/boar.png",
+        "type": "image"
       }
     ],
-    "nextId": 7
+    "nextId": 10
   },
   "maps": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
+    1
   ],
-  "name": "Realm of Tsukuru",
+  "name": "Willowbrook",
   "playerSprite": 2,
   "startActor": 1,
   "startMap": 1,
-  "startX": 24,
+  "startX": 22,
   "startY": 20
 }

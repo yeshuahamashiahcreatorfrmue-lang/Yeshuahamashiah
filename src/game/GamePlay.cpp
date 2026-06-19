@@ -433,19 +433,32 @@ void GamePlay::drawMonsters() {
 void GamePlay::drawField() {
     if (!map_) return;
     int TS = map_->tileset.tileWidth;
-    cam_.target = { pxX_ + TS/2.0f, pxY_ + TS/2.0f };
-    cam_.offset = { GetScreenWidth()/2.0f, GetScreenHeight()/2.0f };
+    int w = map_->tilemap.width(), h = map_->tilemap.height();
+
+    // follow the player, but clamp so the view never shows past the map edges
+    float sw = (float)GetScreenWidth(), sh = (float)GetScreenHeight();
+    float halfW = sw / (2.0f * cam_.zoom), halfH = sh / (2.0f * cam_.zoom);
+    float mapW = w * (float)TS, mapH = h * (float)TS;
+    float tgx = pxX_ + TS/2.0f, tgy = pxY_ + TS/2.0f;
+    if (mapW > 2*halfW) tgx = std::min(std::max(tgx, halfW), mapW - halfW); else tgx = mapW/2;
+    if (mapH > 2*halfH) tgy = std::min(std::max(tgy, halfH), mapH - halfH); else tgy = mapH/2;
+    cam_.target = { tgx, tgy };
+    cam_.offset = { sw/2.0f, sh/2.0f };
 
     const Texture2D& ts = engine_.assetTexture(map_->tileset.assetId);
     const Tileset& set = map_->tileset;
 
+    // animated tiles: cycle base id <-> id+1
+    int phase = (int)(GetTime() * 2.5) % 2;
+
     BeginMode2D(cam_);
-    int w = map_->tilemap.width(), h = map_->tilemap.height();
     auto drawLayer = [&](int layer) {
         for (int y = 0; y < h; ++y)
             for (int x = 0; x < w; ++x) {
                 int t = map_->tilemap.tile(layer, x, y);
                 if (t < 0) continue;
+                if (phase == 1)
+                    for (int a : map_->animTiles) if (a == t) { t = t + 1; break; }
                 int sx, sy; set.srcOf(t, sx, sy);
                 Rectangle src = { (float)sx, (float)sy, (float)set.tileWidth, (float)set.tileHeight };
                 Rectangle dst = { (float)x*TS, (float)y*TS, (float)TS, (float)TS };

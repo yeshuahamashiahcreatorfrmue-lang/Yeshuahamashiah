@@ -21,6 +21,10 @@ public:
     int  encounterRate = 0;            // 0 = none; higher = more frequent (per step %)
     int  bgmAsset = -1;
 
+    // Animated tiles: each listed tile id cycles between id and id+1 over time
+    // (the tileset stores the alternate frame right after the base tile).
+    std::vector<int> animTiles;
+
     Map() : tilemap(20, 15) {}
 
     Event* eventAt(int x, int y);

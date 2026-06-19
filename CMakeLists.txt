@@ -119,4 +119,9 @@ endif()
 if(NOT CMAKE_CROSSCOMPILING)
     add_executable(gen_world ${CMAKE_SOURCE_DIR}/tools/gen_world.cpp)
     target_link_libraries(gen_world PRIVATE tsukuru_core)
+
+    # Polished single-map game generator (art via raylib + data via core).
+    add_executable(gen_game ${CMAKE_SOURCE_DIR}/tools/gen_game.cpp)
+    target_link_libraries(gen_game PRIVATE tsukuru_core raylib)
+    target_include_directories(gen_game PRIVATE ${CMAKE_SOURCE_DIR}/src)
 endif()

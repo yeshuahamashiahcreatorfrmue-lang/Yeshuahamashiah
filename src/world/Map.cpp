@@ -25,7 +25,8 @@ json Map::toJson() const {
         {"events", evs},
         {"encounterEnemies", encounterEnemies},
         {"encounterRate", encounterRate},
-        {"bgmAsset", bgmAsset}
+        {"bgmAsset", bgmAsset},
+        {"animTiles", animTiles}
     };
 }
 
@@ -40,6 +41,7 @@ void Map::fromJson(const json& j) {
     encounterEnemies = j.value("encounterEnemies", std::vector<int>{});
     encounterRate    = j.value("encounterRate", 0);
     bgmAsset         = j.value("bgmAsset", -1);
+    animTiles        = j.value("animTiles", std::vector<int>{});
 }
 
 } // namespace tsukuru

@@ -1,137 +1,107 @@
 {
   "actors": [
     {
-      "atk": 14,
-      "def": 7,
+      "atk": 15,
+      "def": 8,
       "id": 1,
-      "maxHp": 120,
+      "maxHp": 140,
       "maxMp": 30,
       "name": "Hero",
       "skills": [
         1,
         2
       ],
-      "spd": 6,
+      "spd": 7,
       "spriteAsset": 2
     }
   ],
   "enemies": [
     {
-      "atk": 8,
-      "def": 3,
-      "expReward": 8,
-      "goldReward": 6,
+      "atk": 9,
+      "def": 4,
+      "expReward": 9,
+      "goldReward": 7,
       "id": 1,
-      "maxHp": 30,
+      "maxHp": 34,
       "maxMp": 0,
       "name": "Slime",
       "spd": 4,
-      "spriteAsset": 5
+      "spriteAsset": 7
     },
     {
-      "atk": 10,
-      "def": 2,
-      "expReward": 10,
-      "goldReward": 8,
+      "atk": 12,
+      "def": 3,
+      "expReward": 11,
+      "goldReward": 9,
       "id": 2,
-      "maxHp": 22,
+      "maxHp": 26,
       "maxMp": 0,
       "name": "Bat",
-      "spd": 6,
-      "spriteAsset": 6
-    },
-    {
-      "atk": 18,
-      "def": 9,
-      "expReward": 35,
-      "goldReward": 28,
-      "id": 3,
-      "maxHp": 70,
-      "maxMp": 0,
-      "name": "Orc",
-      "spd": 5,
-      "spriteAsset": 5
-    },
-    {
-      "atk": 34,
-      "def": 16,
-      "expReward": 400,
-      "goldReward": 500,
-      "id": 4,
-      "maxHp": 240,
-      "maxMp": 0,
-      "name": "Dragon",
       "spd": 7,
-      "spriteAsset": 6
+      "spriteAsset": 8
+    },
+    {
+      "atk": 15,
+      "def": 6,
+      "expReward": 22,
+      "goldReward": 18,
+      "id": 3,
+      "maxHp": 60,
+      "maxMp": 0,
+      "name": "Boar",
+      "spd": 5,
+      "spriteAsset": 9
     }
   ],
   "equipment": [
     {
-      "atk": 8,
+      "atk": 12,
       "def": 0,
       "iconAsset": -1,
       "id": 1,
-      "name": "Bronze Sword",
-      "price": 50,
+      "name": "Iron Sword",
+      "price": 140,
       "slot": "weapon"
     },
     {
-      "atk": 18,
-      "def": 0,
+      "atk": 0,
+      "def": 8,
       "iconAsset": -1,
       "id": 2,
-      "name": "Iron Sword",
-      "price": 200,
-      "slot": "weapon"
-    },
-    {
-      "atk": 0,
-      "def": 6,
-      "iconAsset": -1,
-      "id": 3,
       "name": "Leather Armor",
-      "price": 60,
-      "slot": "armor"
-    },
-    {
-      "atk": 0,
-      "def": 14,
-      "iconAsset": -1,
-      "id": 4,
-      "name": "Chain Mail",
-      "price": 220,
+      "price": 120,
       "slot": "armor"
     }
   ],
   "items": [
     {
       "consumable": true,
-      "description": "Restores 50 HP.",
+      "description": "Restores 60 HP.",
       "effect": "healHP",
       "iconAsset": -1,
       "id": 1,
       "name": "Potion",
-      "power": 50,
+      "power": 60,
       "price": 30
     },
     {
       "consumable": true,
-      "description": "Restores 150 HP.",
+      "description": "Restores 200 HP.",
       "effect": "healHP",
       "iconAsset": -1,
       "id": 2,
       "name": "Hi-Potion",
-      "power": 150,
-      "price": 100
+      "power": 200,
+      "price": 120
     },
     {
       "consumable": true,
-      "description": "Restores 30 MP.",
+      "description": "Restores 40 MP.",
       "effect": "healMP",
       "iconAsset": -1,
       "id": 3,
       "name": "Ether",
-      "power": 30,
+      "power": 40,
       "price": 80
     }
   ],
@@ -139,14 +109,14 @@
     {
       "healing": false,
       "id": 1,
-      "mpCost": 5,
-      "name": "Fireball",
-      "power": 20
+      "mpCost": 4,
+      "name": "Slash",
+      "power": 18
     },
     {
       "healing": true,
       "id": 2,
-      "mpCost": 8,
+      "mpCost": 6,
       "name": "Heal",
       "power": 40
     }
