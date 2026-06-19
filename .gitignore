@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+.venv/
+venv/
+.DS_Store
+
+# Auto-generated game data (the sample project is recreated on first launch).
+projects/
