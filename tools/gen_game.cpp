@@ -3,8 +3,8 @@
 // then hand-builds one complete, playable village map with houses, a pond,
 // gardens, NPCs, a shop, a chest, signs, decorations and field monsters.
 #include "raylib.h"
-#include "render/AssetGen.h"
-#include "render/SfxGen.h"
+#include "gen/AssetGen.h"
+#include "gen/SfxGen.h"
 #include "project/Project.h"
 #include "database/Database.h"
 #include <string>

@@ -4,7 +4,6 @@
 #include "core/Engine.h"
 #include "render/UI.h"
 #include "core/Text.h"
-#include "render/AssetGen.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
