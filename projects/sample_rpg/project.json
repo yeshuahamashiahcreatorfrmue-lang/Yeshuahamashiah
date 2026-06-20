@@ -160,9 +160,57 @@
         "name": "snd_dash",
         "path": "assets/snd_dash.wav",
         "type": "audio"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 21,
+        "name": "hero_m0",
+        "path": "assets/hero_m0.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 22,
+        "name": "hero_m1",
+        "path": "assets/hero_m1.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 23,
+        "name": "hero_m2",
+        "path": "assets/hero_m2.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 24,
+        "name": "hero_m3",
+        "path": "assets/hero_m3.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 25,
+        "name": "hero_m4",
+        "path": "assets/hero_m4.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 26,
+        "name": "hero_m5",
+        "path": "assets/hero_m5.png",
+        "type": "image"
       }
     ],
-    "nextId": 21
+    "nextId": 27
   },
   "maps": [
     1,
@@ -170,6 +218,7 @@
   ],
   "name": "윌로우브룩",
   "playerAtkFrames": 2,
+  "playerCharId": 1,
   "playerFrames": 4,
   "playerSprite": 2,
   "startActor": 1,

@@ -69,6 +69,7 @@ bool Project::load(const std::string& projectDir) {
     playerSprite= meta.value("playerSprite", -1);
     playerFrames= meta.value("playerFrames", 4);
     playerAtkFrames = meta.value("playerAtkFrames", 0);
+    playerCharId = meta.value("playerCharId", -1);
     if (meta.contains("assets")) assets.fromJson(meta["assets"]);
 
     json db;
@@ -106,6 +107,7 @@ bool Project::save() const {
         {"startMap", startMap}, {"startX", startX}, {"startY", startY},
         {"startActor", startActor}, {"playerSprite", playerSprite},
         {"playerFrames", playerFrames}, {"playerAtkFrames", playerAtkFrames},
+        {"playerCharId", playerCharId},
         {"assets", assets.toJson()},
         {"maps", ids}
     };

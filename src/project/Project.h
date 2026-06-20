@@ -27,6 +27,7 @@ public:
     int playerSprite = -1;          // asset id for the on-map player graphic
     int playerFrames = 4;           // walk frames per direction in the sheet (4..7)
     int playerAtkFrames = 0;        // attack frames appended after the walk frames
+    int playerCharId = -1;          // custom CharacterDef driving the player (-1 = use sheet)
 
     // Loaded maps (lazy-managed; the editor keeps the active one).
     std::vector<std::shared_ptr<Map>> maps;

@@ -38,6 +38,7 @@ void GamePlay::onEnter() {
     phase_ = Phase::Field;
     attackTimer_ = playerHurt_ = 0;
     for (float& c : skillCd_) c = 0;
+    playMotion_ = MO_Walk; motionFrame_ = 0; motionAnim_ = motionTimer_ = dyingTimer_ = 0;
     projectiles_.clear(); fx_.clear();
     loadSkills();
     spawnMonsters();

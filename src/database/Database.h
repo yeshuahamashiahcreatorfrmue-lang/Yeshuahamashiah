@@ -59,6 +59,23 @@ struct FieldSkill {
     int         soundAsset  = -1;// audio asset to play (-1 = built-in "attack")
 };
 
+// A custom character built from registered images: each motion is a sequence of
+// image asset ids played back as a flipbook. Motions are fixed-order (see
+// kMotionNames). Lets users author characters without sprite-sheet layout rules.
+enum MotionId { MO_Walk=0, MO_Attack=1, MO_Skill1=2, MO_Skill2=3, MO_Ult=4, MO_Death=5, MO_COUNT=6 };
+inline const char* const kMotionNames[MO_COUNT] = { "걷기","공격","스킬1","스킬2","궁극기","죽음" };
+
+struct MotionClip {
+    std::vector<int> frames;     // image asset ids, played in order
+    int fps = 8;                 // playback speed
+};
+
+struct CharacterDef {
+    int id = -1;
+    std::string name = "캐릭터";
+    MotionClip motions[MO_COUNT]; // walk/attack/skill1/skill2/ultimate/death
+};
+
 struct ActorDef {
     int         id = -1;
     std::string name = "Hero";
@@ -86,8 +103,10 @@ public:
     std::vector<ActorDef>   actors;
     std::vector<EnemyDef>   enemies;
     std::vector<FieldSkill> fieldSkills;
+    std::vector<CharacterDef> characters;   // custom multi-motion characters
 
     const Item*      item(int id) const;
+    const CharacterDef* character(int id) const;
     const Equipment* equip(int id) const;
     const Skill*     skill(int id) const;
     const ActorDef*  actor(int id) const;

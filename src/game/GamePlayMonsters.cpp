@@ -147,7 +147,15 @@ void GamePlay::updateMonsters(float dt) {
             hero.hp = std::max(0, hero.hp - dmg);
             playerHurt_ = 0.22f;
             engine_.audio().playSfx("hurt", 0.7f);
-            if (gs.partyWiped()) { phase_ = Phase::GameOver; return; }
+            if (gs.partyWiped()) {
+                // play the custom death motion first (if any), else go straight to GameOver
+                const CharacterDef* cd = customChar();
+                if (cd && !cd->motions[MO_Death].frames.empty()) {
+                    triggerMotion(MO_Death);
+                    dyingTimer_ = motionTimer_ > 0 ? motionTimer_ : 0.8f;
+                } else phase_ = Phase::GameOver;
+                return;
+            }
         }
     }
 }

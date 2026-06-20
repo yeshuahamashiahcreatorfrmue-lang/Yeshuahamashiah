@@ -174,7 +174,13 @@ int main(int argc,char**argv){
     std::filesystem::create_directories(out+"/maps", ec);
     // generate art
     saveImg(genTileset(), ad+"/tileset.png");
-    saveImg(gen::characterSheet({80,140,220,255},{240,200,160,255}, 2), ad+"/hero.png"); // +2 attack frames
+    { Image hero = gen::characterSheet({80,140,220,255},{240,200,160,255}, 2); // 4 walk + 2 attack
+      ExportImage(hero, (ad+"/hero.png").c_str());
+      // slice the down-facing row into 6 individual frame images for the custom
+      // multi-motion character (demonstrates the image-sequence builder).
+      for (int i=0;i<6;i++){ Image f=ImageFromImage(hero,{(float)i*32,0,32,32});
+          ExportImage(f,(ad+"/hero_m"+std::to_string(i)+".png").c_str()); UnloadImage(f); }
+      UnloadImage(hero); }
     saveImg(gen::characterSheet({200,120,80,255},{240,200,160,255}),  ad+"/villager1.png");
     saveImg(gen::characterSheet({120,170,110,255},{238,202,168,255}), ad+"/villager2.png");
     saveImg(gen::characterSheet({170,170,180,255},{235,205,175,255}), ad+"/elder.png");
@@ -216,6 +222,9 @@ int main(int argc,char**argv){
     int SN_magic=p->assets.addExisting(AssetType::Audio,"snd_magic","assets/snd_magic.wav");
     int SN_boom =p->assets.addExisting(AssetType::Audio,"snd_boom","assets/snd_boom.wav");
     int SN_dash =p->assets.addExisting(AssetType::Audio,"snd_dash","assets/snd_dash.wav");
+    // individual hero frames for the custom multi-motion character demo
+    int HM[6]; for(int i=0;i<6;i++) HM[i]=p->assets.addExisting(AssetType::Image,
+        "hero_m"+std::to_string(i),"assets/hero_m"+std::to_string(i)+".png");
 
     // database
     Database& db = p->database;
@@ -253,6 +262,18 @@ int main(int argc,char**argv){
     db.fieldSkills.push_back(mkSkill(5,"십자베기",4,false,0,1,3,1.2f,110,{0,0,0,-1,1},{0,-1,1,0,0},FX_slash,SN_slash));
     // G 관통창: 전방 3칸 직선 범위
     db.fieldSkills.push_back(mkSkill(6,"관통창",5,false,0,1,5,1.6f,150,{0,0,0},{-1,-2,-3},FX_bolt,SN_magic));
+
+    // ---- demo custom multi-motion character (image-sequence builder example) ----
+    // Each motion is a flipbook of the sliced hero frames (m0..m3 walk, m4..m5 attack).
+    { CharacterDef hc; hc.id=1; hc.name="용사(모션)";
+      hc.motions[MO_Walk].frames   = {HM[0],HM[1],HM[2],HM[3]}; hc.motions[MO_Walk].fps=8;
+      hc.motions[MO_Attack].frames = {HM[4],HM[5]};             hc.motions[MO_Attack].fps=12;
+      hc.motions[MO_Skill1].frames = {HM[5],HM[4]};             hc.motions[MO_Skill1].fps=12;
+      hc.motions[MO_Skill2].frames = {HM[4],HM[5],HM[4]};       hc.motions[MO_Skill2].fps=14;
+      hc.motions[MO_Ult].frames    = {HM[4],HM[5],HM[4],HM[5]}; hc.motions[MO_Ult].fps=12;
+      hc.motions[MO_Death].frames  = {HM[0]};                   hc.motions[MO_Death].fps=4;
+      db.characters.push_back(hc); }
+    p->playerCharId = 1;     // drive the player with the custom motion character
 
     auto m = p->addMap("윌로우브룩 마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;

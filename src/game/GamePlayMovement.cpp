@@ -18,6 +18,14 @@ void GamePlay::updateField(float dt) {
 
     static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
 
+    // death sequence: play the death motion, then hand off to the GameOver screen
+    if (dyingTimer_ > 0) {
+        dyingTimer_ -= dt;
+        updateMotion(dt);
+        if (dyingTimer_ <= 0) phase_ = Phase::GameOver;
+        return;
+    }
+
     if (attackTimer_ > 0) attackTimer_ -= dt;
     for (float& c : skillCd_) if (c > 0) c -= dt;
     if (playerHurt_ > 0)  playerHurt_ -= dt;
@@ -124,6 +132,7 @@ void GamePlay::updateField(float dt) {
     engine_.state().playerDir = dir_;
 
     worldTime_ += dt;
+    updateMotion(dt);           // advance custom-character motion frames
     updateMonsters(dt);
     updateNpcs(dt);
 }

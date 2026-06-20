@@ -12,6 +12,59 @@
 
 namespace tsukuru {
 
+// ----------------------------- custom-character motion -----------------------------
+const CharacterDef* GamePlay::customChar() const {
+    int id = engine_.project().playerCharId;
+    if (id < 0) return nullptr;
+    return engine_.project().database.character(id);
+}
+
+void GamePlay::triggerMotion(int motionId) {
+    const CharacterDef* cd = customChar();
+    if (!cd) return;
+    playMotion_ = motionId; motionFrame_ = 0; motionAnim_ = 0;
+    const MotionClip& clip = cd->motions[motionId];
+    int n = (int)clip.frames.size();
+    int fps = std::max(1, clip.fps);
+    motionTimer_ = (motionId == MO_Walk) ? 0.0f : (n > 0 ? (float)n / fps : 0.25f);
+}
+
+void GamePlay::updateMotion(float dt) {
+    const CharacterDef* cd = customChar();
+    if (!cd) return;
+    if (motionTimer_ > 0) {
+        motionTimer_ -= dt;
+        if (motionTimer_ <= 0 && playMotion_ != MO_Death) {
+            playMotion_ = MO_Walk; motionFrame_ = 0; motionAnim_ = 0;
+        }
+    }
+    const MotionClip& clip = cd->motions[playMotion_];
+    int n = (int)clip.frames.size();
+    if (n <= 0) return;
+    if (playMotion_ == MO_Walk && !moving_) { motionFrame_ = 0; motionAnim_ = 0; return; }
+    motionAnim_ += dt;
+    float spf = 1.0f / std::max(1, clip.fps);
+    while (motionAnim_ >= spf) {
+        motionAnim_ -= spf;
+        ++motionFrame_;
+        if (playMotion_ == MO_Walk) motionFrame_ %= n;
+        else if (motionFrame_ >= n) motionFrame_ = n - 1;   // one-shot holds last frame
+    }
+}
+
+int GamePlay::motionFrameAsset() const {
+    const CharacterDef* cd = customChar();
+    if (!cd) return -1;
+    int m = playMotion_;
+    if (cd->motions[m].frames.empty()) m = MO_Walk;          // fall back to walk
+    const MotionClip& clip = cd->motions[m];
+    if (clip.frames.empty()) return -1;                       // none -> use sheet sprite
+    int fi = motionFrame_;
+    if (fi < 0) fi = 0;
+    if (fi >= (int)clip.frames.size()) fi = (int)clip.frames.size() - 1;
+    return clip.frames[fi];
+}
+
 void GamePlay::drawWeather(float dt) {
     if (!map_ || map_->weather == 0) return;
     int sw = GetScreenWidth(), sh = GetScreenHeight();
@@ -145,20 +198,30 @@ void GamePlay::drawField() {
     drawNpcs();
     drawMonsters();
 
-    // player: walk frames, or attack frames (appended after walk) while striking
+    // player: a custom CharacterDef motion flipbook, else the walk/attack sheet
     Color ptint = playerHurt_ > 0 ? Color{ 255, 130, 130, 255 } : WHITE;
     const Project& proj = engine_.project();
-    int walk = std::max(1, proj.playerFrames);
-    int atk  = std::max(0, proj.playerAtkFrames);
-    int total = walk + atk;
-    int col;
-    if (attackTimer_ > 0 && atk > 0) {
-        float prog = 1.0f - attackTimer_ / 0.18f;            // 0..1 through the swing
-        col = walk + std::min(atk - 1, std::max(0, (int)(prog * atk)));
+    int frameAsset = motionFrameAsset();
+    if (frameAsset >= 0) {
+        const Texture2D& ftex = engine_.assetTexture(frameAsset);
+        float sz = TS * 1.25f;
+        Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };
+        if (dir_ == (int)Direction::Left) src.width = -src.width;   // mirror facing left
+        Rectangle dst = { pxX_ + (TS - sz)/2, pxY_ + (TS - sz)/2 + 2, sz, sz };
+        DrawTexturePro(ftex, src, dst, {0,0}, 0, ptint);
     } else {
-        col = moving_ ? frame_ : 0;
+        int walk = std::max(1, proj.playerFrames);
+        int atk  = std::max(0, proj.playerAtkFrames);
+        int total = walk + atk;
+        int col;
+        if (attackTimer_ > 0 && atk > 0) {
+            float prog = 1.0f - attackTimer_ / 0.18f;            // 0..1 through the swing
+            col = walk + std::min(atk - 1, std::max(0, (int)(prog * atk)));
+        } else {
+            col = moving_ ? frame_ : 0;
+        }
+        drawCharacter(proj.playerSprite, dir_, col, pxX_, pxY_, ptint, total);
     }
-    drawCharacter(proj.playerSprite, dir_, col, pxX_, pxY_, ptint, total);
 
     drawProjectiles();
     drawFx();

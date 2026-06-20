@@ -81,6 +81,12 @@ private:
     NpcInst* npcAt(int x, int y);
     void runAutoruns();
 
+    // --- custom-character motion playback (GamePlayRender.cpp) ---
+    const CharacterDef* customChar() const;  // null unless a CharacterDef drives the player
+    void triggerMotion(int motionId);        // play a one-shot motion (attack/skill/death)
+    void updateMotion(float dt);             // advance the current motion's frames
+    int  motionFrameAsset() const;           // current frame's image id, or -1 (use sheet)
+
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4);
@@ -112,6 +118,13 @@ private:
     Rectangle skillBtn_[kSkillSlots] = {}; // screen rects for click/touch casting
     float mpRegen_ = 0;         // MP regenerates slowly over time
     std::vector<FieldSkill> skills_;       // active skill set (from db or defaults)
+
+    // custom-character motion playback
+    int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)
+    int   motionFrame_ = 0;     // current frame index within the motion
+    float motionAnim_ = 0;      // frame timer
+    float motionTimer_ = 0;     // >0 while a non-walk one-shot motion plays
+    float dyingTimer_ = 0;      // death-motion countdown before GameOver
 
     std::vector<FieldMonster> monsters_;
     std::vector<NpcInst>      npcs_;

@@ -45,6 +45,10 @@ const FieldSkill* Database::fieldSkillForSlot(int slot) const {
     for (const auto& s : fieldSkills) if (s.slot == slot) return &s;
     return nullptr;
 }
+const CharacterDef* Database::character(int id) const {
+    for (const auto& c : characters) if (c.id == id) return &c;
+    return nullptr;
+}
 
 std::vector<FieldSkill> Database::defaultFieldSkills() {
     FieldSkill atk;  atk.id=1; atk.name="공격"; atk.slot=0; atk.cooldown=0.32f;
@@ -99,6 +103,13 @@ json Database::toJson() const {
             {"mpCost", s.mpCost}, {"cooldown", s.cooldown}, {"powerPct", s.powerPct},
             {"patX", s.patX}, {"patY", s.patY},
             {"effectAsset", s.effectAsset}, {"soundAsset", s.soundAsset}});
+
+    j["characters"] = json::array();
+    for (const auto& c : characters) {
+        json mo = json::array();
+        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames}, {"fps", m.fps}});
+        j["characters"].push_back({{"id", c.id}, {"name", c.name}, {"motions", mo}});
+    }
     return j;
 }
 
@@ -159,6 +170,17 @@ void Database::fromJson(const json& j) {
         fs.effectAsset = s.value("effectAsset", -1);
         fs.soundAsset = s.value("soundAsset", -1);
         fieldSkills.push_back(fs);
+    }
+    characters.clear();
+    for (const auto& c : j.value("characters", json::array())) {
+        CharacterDef cd;
+        cd.id = c.value("id", -1); cd.name = c.value("name", "캐릭터");
+        const auto& mo = c.value("motions", json::array());
+        for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
+            cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});
+            cd.motions[i].fps = mo[i].value("fps", 8);
+        }
+        characters.push_back(cd);
     }
 }
 

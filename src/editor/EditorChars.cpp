@@ -98,72 +98,133 @@ void Editor::drawCharsTab() {
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
+    Database& db = p.database;
+    bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 
-    ui::label("캐릭터 / 이펙트 에셋", 20, (int)kToolbarH + 14, 24, ui::kAccent);
-    DrawTextU("캐릭터/이펙트를 엔진에서 생성하거나, PNG 시트(N프레임 x 4방향)를 창에 끌어다 놓으세요.",
-             20, (int)kToolbarH + 44, 15, ui::kTextDim);
-    if (ui::button({ 20, kToolbarH + 68, 220, 30 }, "+ 새 캐릭터 생성"))
-        generateCharacter();
-    // generate one of each effect style (slash/bolt/dash/burst)
-    static const char* fxBtn[4] = { "+ 베기", "+ 볼트", "+ 대시", "+ 폭발" };
+    ui::label("캐릭터 제작", 20, (int)kToolbarH + 10, 22, ui::kAccent);
+    // quick generators + sheet-player frame config
+    if (ui::button({ 20, kToolbarH + 38, 150, 26 }, "+ 시트 캐릭터")) generateCharacter();
+    static const char* fxBtn[4] = { "이펙트:베기", "볼트", "대시", "폭발" };
     for (int s = 0; s < 4; ++s)
-        if (ui::button({ 252.0f + s*110, kToolbarH + 68, 104, 30 }, fxBtn[s]))
-            generateEffect(s);
-    handleAssetDrop(); // allow dropping character/effect sheets here too
+        if (ui::button({ 178.0f + s*92, kToolbarH + 38, 88, 26 }, fxBtn[s])) generateEffect(s);
+    ui::intStepper({ 560, kToolbarH + 38, 150, 26 }, "시트걷기", p.playerFrames, 1, 4, 7);
+    ui::intStepper({ 718, kToolbarH + 38, 150, 26 }, "시트공격", p.playerAtkFrames, 1, 0, 4);
+    handleAssetDrop(); // drop new images/sheets to register them
 
     auto imgs = p.assets.byType(AssetType::Image);
 
-    // ---- player motion panel (walk + attack frames, live preview) ----
-    float py = kToolbarH + 104;
-    ui::panel({ 20, py, 470, 116 }, ui::kPanel);
-    ui::label("플레이어 모션", 30, (int)py + 6, 16, ui::kAccent);
-    ui::intStepper({ 30, py + 30, 200, 26 }, "걷기 프레임", p.playerFrames, 1, 4, 7);
-    ui::intStepper({ 30, py + 62, 200, 26 }, "공격 프레임", p.playerAtkFrames, 1, 0, 4);
-    DrawTextU("스킬 이펙트/사운드는 [스킬] 탭에서 스킬마다 지정합니다.", 30, (int)py + 94, 11, ui::kTextDim);
+    // ============ custom multi-motion character builder ============
+    float bx = 16, by = kToolbarH + 72, bw = area.width - 32, bh = 250;
+    ui::panel({ bx, by, bw, bh }, ui::kPanel);
+    ui::label("커스텀 캐릭터 (이미지 모션 빌더)", (int)bx + 12, (int)by + 8, 17, ui::kAccent);
 
-    // live motion preview (down-facing): loops walk, then plays the attack swing
-    if (p.playerSprite >= 0) {
-        const Texture2D& ptex = engine_.assetTexture(p.playerSprite);
-        int walk = std::max(1, p.playerFrames), atk = std::max(0, p.playerAtkFrames);
-        float fh = ptex.height / 4.0f, fw = fh;          // frames are square
-        double cyc = fmod(GetTime(), 2.4);
-        int col;
-        if (atk > 0 && cyc > 2.0) col = walk + std::min(atk-1, (int)((cyc-2.0)/0.2));
-        else col = (int)(GetTime()*6) % walk;
-        Rectangle src = { col*fw, 0, fw, fh };           // row 0 = facing down
-        Rectangle box = { 250, py + 30, 72, 72 };
-        DrawRectangleRec(box, Color{20,22,30,255});
-        DrawTexturePro(ptex, src, { box.x, box.y, 72, 72 }, {0,0}, 0, WHITE);
-        DrawTextU("미리보기(공격 포함)", 336, (int)py + 36, 12, ui::kTextDim);
-        DrawTextU(atk > 0 ? "공격 모션 있음" : "공격 모션 없음", 336, (int)py + 58, 12,
-                  atk > 0 ? ui::kGood : ui::kTextDim);
+    float cy = by + 34;
+    if (ui::button({ bx + 12, cy, 110, 26 }, "+ 새 캐릭터")) {
+        CharacterDef cd; cd.id = (int)db.characters.size() + 1;
+        cd.name = "캐릭터" + std::to_string(cd.id);
+        db.characters.push_back(cd); charDefSel_ = (int)db.characters.size() - 1; p.save();
+    }
+    float clx = bx + 130;
+    for (int i = 0; i < (int)db.characters.size(); ++i) {
+        if (ui::button({ clx, cy, 120, 26 }, db.characters[i].name, charDefSel_ == i)) {
+            charDefSel_ = i; charDefNameFocus_ = false;
+        }
+        clx += 126;
+        if (clx > bx + bw - 130) break;
     }
 
-    // grid of image assets — show the whole sheet scaled to fit (all frames)
-    float x = 20, y = py + 132, cell = 150;
-    for (auto* a : imgs) {
-        Rectangle c = { x, y, cell, cell + 56 };
-        bool isPlayer = (a->id == p.playerSprite);
-        ui::panel(c, isPlayer ? ui::kPanelHi : ui::kPanel);
-        const Texture2D& tex = engine_.assetTexture(a->id);
-        float sc = std::min((cell-16) / std::max(1, tex.width), 104.0f / std::max(1, tex.height));
-        Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
-        Rectangle dst = { x + (cell - tex.width*sc)/2, y + 8, tex.width*sc, tex.height*sc };
-        DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
-        DrawTextU(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
-        if (ui::button({ x + 8, y + cell - 16, cell - 16, 26 },
-                       isPlayer ? "플레이어" : "플레이어로 설정", isPlayer)) {
-            p.playerSprite = a->id;
-            // engine-generated characters are walk4 + attack2; auto-configure so
-            // the attack motion just works without manual frame tweaking.
-            if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
-            p.save(); setStatus("플레이어 캐릭터 설정됨.");
+    if (charDefSel_ < 0 && !db.characters.empty()) charDefSel_ = 0;
+    if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) {
+        DrawTextU("'+ 새 캐릭터'로 만든 뒤, 모션 탭마다 아래 이미지를 클릭해 프레임을 추가하세요.",
+                 (int)bx + 12, (int)by + 72, 14, ui::kTextDim);
+    } else {
+        CharacterDef& cd = db.characters[charDefSel_];
+        float ry = cy + 34;
+        ui::label("이름:", (int)bx + 12, (int)ry, 12, ui::kTextDim);
+        Rectangle nf = { bx + 50, ry - 4, 200, 24 };
+        if (ui::mouseIn(nf) && lclick) charDefNameFocus_ = true;
+        else if (lclick && !ui::mouseIn(nf)) charDefNameFocus_ = false;
+        ui::textField(nf, cd.name, charDefNameFocus_, 20);
+        bool isP = (p.playerCharId == cd.id);
+        if (ui::button({ bx + 262, ry - 4, 156, 24 }, isP ? "플레이어 (현재)" : "플레이어로 설정", isP)) {
+            p.playerCharId = cd.id; p.save(); setStatus("커스텀 캐릭터를 플레이어로 설정.");
         }
-        x += cell + 14;
-        if (x + cell > area.width - 20) { x = 20; y += cell + 70; }
+        if (ui::button({ bx + 426, ry - 4, 80, 24 }, "삭제", false)) {
+            if (p.playerCharId == cd.id) p.playerCharId = -1;
+            db.characters.erase(db.characters.begin() + charDefSel_);
+            charDefSel_ = -1; p.save(); return;
+        }
+
+        // motion tabs (with frame counts)
+        float ty = ry + 32;
+        for (int m = 0; m < MO_COUNT; ++m) {
+            std::string lbl = std::string(kMotionNames[m]) + "(" + std::to_string((int)cd.motions[m].frames.size()) + ")";
+            if (ui::button({ bx + 12 + m*88, ty, 84, 26 }, lbl, charMotionTab_ == m)) charMotionTab_ = m;
+        }
+        MotionClip& clip = cd.motions[charMotionTab_];
+
+        float fy = ty + 34;
+        ui::intStepper({ bx + 12, fy, 150, 24 }, "fps", clip.fps, 1, 1, 30);
+        // animated preview of the selected motion
+        Rectangle pv = { bx + 176, fy - 4, 60, 60 };
+        DrawRectangleRec(pv, Color{ 20, 22, 30, 255 });
+        if (!clip.frames.empty()) {
+            int n = (int)clip.frames.size();
+            int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;
+            const Texture2D& t = engine_.assetTexture(clip.frames[fi]);
+            float sc = std::min(56.0f / std::max(1, t.width), 56.0f / std::max(1, t.height));
+            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
+                           { pv.x + (60 - t.width*sc)/2, pv.y + (60 - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+        }
+        DrawTextU(TextFormat("%s 모션 · %d 프레임", kMotionNames[charMotionTab_], (int)clip.frames.size()),
+                 (int)bx + 248, (int)fy, 13, ui::kText);
+        DrawTextU("아래 라이브러리 이미지 클릭 = 프레임 추가 · 아래 프레임 클릭 = 삭제",
+                 (int)bx + 248, (int)fy + 20, 12, ui::kTextDim);
+        // current motion's frame thumbnails (click to remove)
+        float frx = bx + 248, fry = fy + 40;
+        for (int i = 0; i < (int)clip.frames.size() && frx + i*40 < bx + bw - 60; ++i) {
+            Rectangle fr = { frx + i*40, fry, 36, 36 };
+            DrawRectangleRec(fr, ui::kPanelHi);
+            const Texture2D& t = engine_.assetTexture(clip.frames[i]);
+            float sc = std::min(32.0f / std::max(1, t.width), 32.0f / std::max(1, t.height));
+            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
+                           { fr.x + (36 - t.width*sc)/2, fr.y + (36 - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+            DrawRectangleLinesEx(fr, 1, Fade(BLACK, 0.5f));
+            DrawTextU(TextFormat("%d", i+1), (int)fr.x+1, (int)fr.y+1, 10, ui::kTextDim);
+            if (ui::mouseIn(fr) && lclick) { clip.frames.erase(clip.frames.begin() + i); p.save(); break; }
+        }
+    }
+
+    // ============ image library ============
+    bool building = (charDefSel_ >= 0 && charDefSel_ < (int)db.characters.size());
+    float gy2 = by + bh + 10;
+    ui::label(building ? "이미지 라이브러리 (이미지 클릭 = 현재 모션에 프레임 추가)"
+                       : "이미지 라이브러리", 20, (int)gy2, 16, ui::kAccent);
+    float x = 20, y = gy2 + 24, cell = 116;
+    for (auto* a : imgs) {
+        Rectangle c = { x, y, cell, cell + 44 };
+        bool isSheet = (a->id == p.playerSprite && p.playerCharId < 0);
+        ui::panel(c, isSheet ? ui::kPanelHi : ui::kPanel);
+        const Texture2D& tex = engine_.assetTexture(a->id);
+        float sc = std::min((cell-12) / std::max(1, tex.width), 74.0f / std::max(1, tex.height));
+        DrawTexturePro(tex, { 0,0,(float)tex.width,(float)tex.height },
+                       { x + (cell - tex.width*sc)/2, y + 6, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
+        DrawTextU(a->name.c_str(), (int)x + 6, (int)(y + cell - 30), 12, ui::kText);
+        Rectangle clickArea = { x, y, cell, cell - 22 };   // image area = add-frame target
+        if (building && ui::mouseIn(clickArea) && lclick) {
+            db.characters[charDefSel_].motions[charMotionTab_].frames.push_back(a->id);
+            p.save(); setStatus(std::string(kMotionNames[charMotionTab_]) + " 프레임 추가: " + a->name);
+        }
+        if (ui::button({ x + 6, y + cell - 16, cell - 12, 22 }, "시트 플레이어")) {
+            p.playerSprite = a->id; p.playerCharId = -1;
+            if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
+            p.save(); setStatus("시트 플레이어 설정.");
+        }
+        x += cell + 12;
+        if (x + cell > area.width - 20) { x = 20; y += cell + 50; }
     }
     if (imgs.empty())
-        ui::label("(아직 캐릭터가 없습니다 - 생성을 클릭하세요)", 20, (int)kToolbarH + 120, 18, ui::kTextDim);
+        ui::label("(이미지가 없습니다 - 시트 캐릭터 생성 또는 이미지를 드롭하세요)", 20, (int)gy2 + 30, 16, ui::kTextDim);
 }
 
 

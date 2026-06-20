@@ -51,6 +51,9 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
     gs.party[0].mp -= s.mpCost;
     skillCd_[slot] = s.cooldown;
     attackTimer_ = 0.18f;
+    // drive the custom character's matching motion (attack / skill1 / skill2 / ult)
+    static const int slotMotion[kSkillSlots] = { MO_Attack, MO_Skill1, MO_Skill2, MO_Ult, MO_Attack, MO_Attack };
+    triggerMotion(slot < kSkillSlots ? slotMotion[slot] : MO_Attack);
 
     // sound: registered asset if set, else built-in
     if (s.soundAsset >= 0) engine_.audio().playSfxFile(engine_.assetPath(s.soundAsset), 0.8f);
