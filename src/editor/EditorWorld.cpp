@@ -23,6 +23,7 @@ void Editor::drawWorldTab() {
     ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
     ui::label("맵 목록", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
     DrawTextU(TextFormat("%d개", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
+    DrawTextU(kBuildTag, 12, GetScreenHeight() - 22, 14, ui::kGood);   // build-confirm tag (bottom-left)
 
     // search box: filter the list by name (or #id)
     Rectangle sf = { lx + 10, ly + 40, lw - 20, 26 };

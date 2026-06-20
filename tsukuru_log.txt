@@ -50,42 +50,12 @@ STAGE: run engine (InitWindow + main loop)
 [INFO ] TIMER: Target time per frame: 16.667 milliseconds
 [INFO ] FILEIO: [assets/korean.ttf] File loaded successfully
 [INFO ] TEXTURE: [ID 3] Texture loaded successfully (1024x1024 | GRAY_ALPHA | 1 mipmaps)
-[INFO ] FONT: Data loaded successfully (36 pixel size | 563 glyphs)
-[INFO ] UI font loaded: assets/korean.ttf (563 glyphs)
+[INFO ] FONT: Data loaded successfully (36 pixel size | 562 glyphs)
+[INFO ] UI font loaded: assets/korean.ttf (562 glyphs)
 [WARN ] AUDIO: Failed to initialize playback device
-[INFO ] FILEIO: [projects/sample_rpg/assets/tileset.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (256x192 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 4] Texture loaded successfully (256x192 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/elder.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 5] Texture loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/villager1.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 6] Texture loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/villager2.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 7] Texture loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/girl.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 8] Texture loaded successfully (128x128 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/slime.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (48x48 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 9] Texture loaded successfully (48x48 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/bat.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (48x48 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 10] Texture loaded successfully (48x48 | R8G8B8A8 | 1 mipmaps)
-[INFO ] FILEIO: [projects/sample_rpg/assets/hero_m0.png] File loaded successfully
-[INFO ] IMAGE: Data loaded successfully (32x32 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 11] Texture loaded successfully (32x32 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 12] Texture loaded successfully (44x34 | R8G8B8A8 | 1 mipmaps)
-[INFO ] TEXTURE: [ID 11] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 10] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 9] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 7] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 8] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 6] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 5] Unloaded texture data from VRAM (GPU)
-[INFO ] TEXTURE: [ID 4] Unloaded texture data from VRAM (GPU)
+[INFO ] FILEIO: [/home/user/Yeshuahamashiah/bin/shot_world.png] File saved successfully
+[INFO ] FILEIO: [/home/user/Yeshuahamashiah/bin/shot_world.png] Image exported successfully
+[INFO ] SYSTEM: [/home/user/Yeshuahamashiah/bin/shot_world.png] Screenshot taken successfully
 [INFO ] TEXTURE: [ID 3] Unloaded texture data from VRAM (GPU)
 [INFO ] TEXTURE: [ID 2] Unloaded texture data from VRAM (GPU)
 [INFO ] SHADER: [ID 3] Default shader unloaded successfully
