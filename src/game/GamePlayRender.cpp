@@ -47,7 +47,7 @@ void GamePlay::updateMotion(float dt) {
     while (motionAnim_ >= spf) {
         motionAnim_ -= spf;
         ++motionFrame_;
-        if (playMotion_ == MO_Walk) motionFrame_ %= n;
+        if (clip.loop) motionFrame_ %= n;                   // looping motion cycles
         else if (motionFrame_ >= n) motionFrame_ = n - 1;   // one-shot holds last frame
     }
 }

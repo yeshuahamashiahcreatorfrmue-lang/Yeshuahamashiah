@@ -6,6 +6,7 @@
 #include <vector>
 #include "raylib.h"
 #include "world/Map.h"
+#include "database/Database.h"
 
 namespace tsukuru {
 
@@ -73,6 +74,9 @@ private:
     int  charFrameSel_ = -1;          // selected frame within the current motion
     bool charSliceMode_ = false;      // library click adds N sliced frames instead of 1
     int  charSliceN_ = 4;             // number of columns to slice into
+    MotionClip charClip_;             // motion clipboard (copy/paste)
+    bool charClipSet_ = false;        // clipboard has content
+    bool charLibFilter_ = false;      // library shows only character-frame images
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to

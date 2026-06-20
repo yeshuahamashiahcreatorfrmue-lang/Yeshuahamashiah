@@ -285,6 +285,7 @@ int main(int argc,char**argv){
         c.motions[MO_Skill2]={{M[4],M[5],M[4],M[5]},afps+2};
         c.motions[MO_Ult]={{M[4],M[5],M[4],M[5],M[4]},afps};
         c.motions[MO_Death]={{M[3],M[0]},4};
+        c.motions[MO_Walk].loop = true;       // walk cycles continuously
         db.characters.push_back(c);
     };
     mkChar(1,"용사(파랑)",HM,8,12);

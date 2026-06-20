@@ -107,7 +107,7 @@ json Database::toJson() const {
     j["characters"] = json::array();
     for (const auto& c : characters) {
         json mo = json::array();
-        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames}, {"fps", m.fps}});
+        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames}, {"fps", m.fps}, {"loop", m.loop}});
         j["characters"].push_back({{"id", c.id}, {"name", c.name}, {"motions", mo}});
     }
     return j;
@@ -179,6 +179,7 @@ void Database::fromJson(const json& j) {
         for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
             cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});
             cd.motions[i].fps = mo[i].value("fps", 8);
+            cd.motions[i].loop = mo[i].value("loop", i == MO_Walk); // walk loops by default
         }
         characters.push_back(cd);
     }

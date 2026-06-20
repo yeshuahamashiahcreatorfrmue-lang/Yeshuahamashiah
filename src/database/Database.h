@@ -68,6 +68,7 @@ inline const char* const kMotionNames[MO_COUNT] = { "걷기","공격","스킬1",
 struct MotionClip {
     std::vector<int> frames;     // image asset ids, played in order
     int fps = 8;                 // playback speed
+    bool loop = false;           // true = cycle continuously, false = play once
 };
 
 struct CharacterDef {
