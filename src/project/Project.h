@@ -28,13 +28,6 @@ public:
     int playerFrames = 4;           // walk frames per direction in the sheet (4..7)
     int playerAtkFrames = 0;        // attack frames appended after the walk frames
 
-    // Skill effect sprites (asset ids). Drawn as animated overlays when the
-    // matching skill fires. -1 = use the built-in procedural effect.
-    int attackEffect = -1;          // Z  basic melee
-    int rangedEffect = -1;          // X  ranged bolt
-    int dashEffect   = -1;          // C  dodge dash
-    int ultEffect    = -1;          // V  blink + AoE ultimate
-
     // Loaded maps (lazy-managed; the editor keeps the active one).
     std::vector<std::shared_ptr<Map>> maps;
 

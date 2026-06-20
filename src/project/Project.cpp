@@ -69,10 +69,6 @@ bool Project::load(const std::string& projectDir) {
     playerSprite= meta.value("playerSprite", -1);
     playerFrames= meta.value("playerFrames", 4);
     playerAtkFrames = meta.value("playerAtkFrames", 0);
-    attackEffect= meta.value("attackEffect", -1);
-    rangedEffect= meta.value("rangedEffect", -1);
-    dashEffect  = meta.value("dashEffect", -1);
-    ultEffect   = meta.value("ultEffect", -1);
     if (meta.contains("assets")) assets.fromJson(meta["assets"]);
 
     json db;
@@ -110,8 +106,6 @@ bool Project::save() const {
         {"startMap", startMap}, {"startX", startX}, {"startY", startY},
         {"startActor", startActor}, {"playerSprite", playerSprite},
         {"playerFrames", playerFrames}, {"playerAtkFrames", playerAtkFrames},
-        {"attackEffect", attackEffect}, {"rangedEffect", rangedEffect},
-        {"dashEffect", dashEffect}, {"ultEffect", ultEffect},
         {"assets", assets.toJson()},
         {"maps", ids}
     };

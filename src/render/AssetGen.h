@@ -40,11 +40,13 @@ inline Image characterSheet(Color shirt, Color skin, int attackFrames = 0) {
             rect(&img, ox+22, oy+15, 2, 7, skin);
             if (atk) {
                 // weapon thrust in the facing direction; reach grows over frames
-                int reach = 6 + (f - WALK) * 6;
-                if (d == 0) rect(&img, ox+14, oy+24, 4, reach, weapon);          // down
-                else if (d == 3) rect(&img, ox+14, oy+4 - reach + 6, 4, reach, weapon); // up
-                else if (d == 1) rect(&img, ox+8 - reach, oy+16, reach, 4, weapon);     // left
-                else rect(&img, ox+24, oy+16, reach, 4, weapon);                 // right
+                // but stays inside the 32px cell (no bleed into adjacent frames).
+                int reach = 4 + (f - WALK) * 4;                                   // 4, 8, ...
+                if (reach > 8) reach = 8;
+                if (d == 0)      rect(&img, ox+14, oy+22, 4, reach, weapon);      // down
+                else if (d == 3) rect(&img, ox+14, oy+10 - reach, 4, reach, weapon); // up
+                else if (d == 1) rect(&img, ox+10 - reach, oy+16, reach, 4, weapon); // left
+                else             rect(&img, ox+18, oy+16, reach, 4, weapon);      // right
             }
         }
     }

@@ -70,13 +70,14 @@ void Editor::drawSkillsTab() {
 
     // ---- middle: tile pattern designer + shape presets ----
     float gx = lx + lw + 22, gy = ly + 8;
+    bool usesPattern = !s.projectile;          // projectiles ignore the tile pattern
     ui::label("효과 적용 범위 (플레이어 기준, 위=정면)", (int)gx, (int)gy, 16, ui::kAccent);
     gy += 24;
-    // quick shape presets — fill the pattern for the user (manual edit still works)
+    // quick shape presets — only meaningful for range-type skills
     ui::label("범위 프리셋:", (int)gx, (int)gy, 13, ui::kTextDim); gy += 18;
     static const char* shapeName[6] = { "정면","직선","십자","부채꼴","원형","주변" };
     for (int i = 0; i < 6; ++i)
-        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i]))
+        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i], false) && usesPattern)
             applyShape(s, i, skillPatSize_);
     gy += 28;
     ui::intStepper({ gx, gy, 200, 24 }, "범위/사거리", skillPatSize_, 1, 1, 4); gy += 28;
@@ -95,10 +96,11 @@ void Editor::drawSkillsTab() {
             bool on = false;
             for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) { on = true; break; }
             Color c = isPlayer ? ui::kAccent : (on ? Color{210,120,90,255} : ui::kPanelHi);
+            if (!usesPattern) c = Fade(c, 0.35f);   // dim — pattern unused for projectiles
             DrawRectangleRec(cell, c);
             DrawRectangleLinesEx(cell, 1, Fade(BLACK,0.5f));
             if (isPlayer) DrawTextU("P", (int)cell.x+9, (int)cell.y+6, 16, BLACK);
-            if (!isPlayer && ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (usesPattern && !isPlayer && ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 if (on) {
                     for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) {
                         s.patX.erase(s.patX.begin()+k); s.patY.erase(s.patY.begin()+k); break; }
@@ -107,8 +109,12 @@ void Editor::drawSkillsTab() {
         }
     }
     float gridBottom = gy + GRID*cs + 6;
-    DrawTextU(TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size()),
-             (int)gx, (int)gridBottom, 12, ui::kTextDim);
+    if (usesPattern)
+        DrawTextU(TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size()),
+                 (int)gx, (int)gridBottom, 12, ui::kTextDim);
+    else
+        DrawTextU("발사체 모드: 범위 패턴은 사용 안 함 · 오른쪽 '사거리'만 적용",
+                 (int)gx, (int)gridBottom, 12, ui::kAccentHi);
 
     // ---- right: parameters + one-click effect/sound creation ----
     float dx = gx + GRID*cs + 28, dy = ly + 8, dw = area.width - dx - 16;

@@ -89,7 +89,8 @@ int Editor::generateSound(int style) {
     std::string rel = (fs::path("assets") / dest.filename()).generic_string();
     int id = p.assets.addExisting(AssetType::Audio, dest.stem().string(), rel);
     p.save();
-    setStatus(std::string("효과음 생성됨: ") + gen::skillSoundName(s));
+    engine_.audio().playSfxFile(dest.string(), 0.9f);   // immediate audio preview
+    setStatus(std::string("효과음 생성됨 (재생): ") + gen::skillSoundName(s));
     return id;
 }
 
@@ -112,25 +113,13 @@ void Editor::drawCharsTab() {
 
     auto imgs = p.assets.byType(AssetType::Image);
 
-    // ---- player movement frames + skill-effect assignment ----
-    auto imgName = [&](int id)->std::string {
-        if (id < 0) return "없음";
-        const AssetEntry* e = p.assets.find(id);
-        return e ? e->name : "없음";
-    };
-    auto cycleAsset = [&](int& slot){            // None -> each image -> None
-        int idx = -1;
-        for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == slot) idx = i;
-        idx++;
-        slot = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
-        p.save();
-    };
+    // ---- player motion panel (walk + attack frames, live preview) ----
     float py = kToolbarH + 104;
-    ui::panel({ 20, py, 760, 124 }, ui::kPanel);
-    ui::label("플레이어 모션 / 스킬 이펙트 지정", 30, (int)py + 6, 16, ui::kAccent);
+    ui::panel({ 20, py, 470, 116 }, ui::kPanel);
+    ui::label("플레이어 모션", 30, (int)py + 6, 16, ui::kAccent);
     ui::intStepper({ 30, py + 30, 200, 26 }, "걷기 프레임", p.playerFrames, 1, 4, 7);
     ui::intStepper({ 30, py + 62, 200, 26 }, "공격 프레임", p.playerAtkFrames, 1, 0, 4);
-    DrawTextU("엔진 생성 캐릭터 = 걷기4+공격2", 30, (int)py + 94, 11, ui::kTextDim);
+    DrawTextU("스킬 이펙트/사운드는 [스킬] 탭에서 스킬마다 지정합니다.", 30, (int)py + 94, 11, ui::kTextDim);
 
     // live motion preview (down-facing): loops walk, then plays the attack swing
     if (p.playerSprite >= 0) {
@@ -142,22 +131,16 @@ void Editor::drawCharsTab() {
         if (atk > 0 && cyc > 2.0) col = walk + std::min(atk-1, (int)((cyc-2.0)/0.2));
         else col = (int)(GetTime()*6) % walk;
         Rectangle src = { col*fw, 0, fw, fh };           // row 0 = facing down
-        Rectangle box = { 244, py + 28, 64, 64 };
+        Rectangle box = { 250, py + 30, 72, 72 };
         DrawRectangleRec(box, Color{20,22,30,255});
-        DrawTexturePro(ptex, src, { box.x, box.y, 64, 64 }, {0,0}, 0, WHITE);
-        DrawTextU("미리보기", 244, (int)py + 94, 11, ui::kTextDim);
-    }
-
-    static const char* slotName[4] = { "공격(Z)", "원거리(X)", "회피(C)", "궁극기(V)" };
-    int* slots[4] = { &p.attackEffect, &p.rangedEffect, &p.dashEffect, &p.ultEffect };
-    for (int i = 0; i < 4; ++i) {
-        Rectangle r = { 330.0f + (i%2)*222, py + 30 + (i/2)*30, 214, 26 };
-        if (ui::button(r, std::string(slotName[i]) + ": " + imgName(*slots[i]), *slots[i] >= 0))
-            cycleAsset(*slots[i]);
+        DrawTexturePro(ptex, src, { box.x, box.y, 72, 72 }, {0,0}, 0, WHITE);
+        DrawTextU("미리보기(공격 포함)", 336, (int)py + 36, 12, ui::kTextDim);
+        DrawTextU(atk > 0 ? "공격 모션 있음" : "공격 모션 없음", 336, (int)py + 58, 12,
+                  atk > 0 ? ui::kGood : ui::kTextDim);
     }
 
     // grid of image assets — show the whole sheet scaled to fit (all frames)
-    float x = 20, y = py + 140, cell = 150;
+    float x = 20, y = py + 132, cell = 150;
     for (auto* a : imgs) {
         Rectangle c = { x, y, cell, cell + 56 };
         bool isPlayer = (a->id == p.playerSprite);
@@ -170,7 +153,11 @@ void Editor::drawCharsTab() {
         DrawTextU(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
         if (ui::button({ x + 8, y + cell - 16, cell - 16, 26 },
                        isPlayer ? "플레이어" : "플레이어로 설정", isPlayer)) {
-            p.playerSprite = a->id; p.save(); setStatus("플레이어 캐릭터 설정됨.");
+            p.playerSprite = a->id;
+            // engine-generated characters are walk4 + attack2; auto-configure so
+            // the attack motion just works without manual frame tweaking.
+            if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
+            p.save(); setStatus("플레이어 캐릭터 설정됨.");
         }
         x += cell + 14;
         if (x + cell > area.width - 20) { x = 20; y += cell + 70; }
