@@ -714,32 +714,8 @@ void Editor::drawCharSkillEditor() {
     gy += 28;
     ui::intStepper({ gx, gy, 200, 24 }, "범위/사거리", skillPatSize_, 1, 1, 4); gy += 28;
 
-    const int GRID = 9, HALF = GRID/2; float cs = 30;
-    DrawTriangle({ gx + HALF*cs + cs/2, gy }, { gx + HALF*cs + cs/2 - 7, gy + 11 },
-                 { gx + HALF*cs + cs/2 + 7, gy + 11 }, ui::kGood);
-    DrawTextU("정면", (int)(gx + HALF*cs + cs/2 + 12), (int)gy, 12, ui::kGood);
-    gy += 14;
-    for (int ry = 0; ry < GRID; ++ry) for (int rx = 0; rx < GRID; ++rx) {
-        int ox = rx - HALF, oy = ry - HALF;
-        Rectangle cell = { gx + rx*cs, gy + ry*cs, cs-2, cs-2 };
-        bool isPlayer = (ox == 0 && oy == 0);
-        bool on = false;
-        for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) { on = true; break; }
-        Color c = isPlayer ? ui::kAccent : (on ? Color{210,120,90,255} : ui::kPanelHi);
-        if (!usesPattern) c = Fade(c, 0.35f);
-        DrawRectangleRec(cell, c);
-        DrawRectangleLinesEx(cell, 1, Fade(BLACK,0.5f));
-        if (isPlayer) DrawTextU("P", (int)cell.x+9, (int)cell.y+6, 16, BLACK);
-        if (usesPattern && !isPlayer && ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if (on) { for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) {
-                          s.patX.erase(s.patX.begin()+k); s.patY.erase(s.patY.begin()+k); break; } }
-            else { s.patX.push_back(ox); s.patY.push_back(oy); }
-        }
-    }
-    float gridBottom = gy + GRID*cs + 6;
-    DrawTextU(usesPattern ? TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size())
-                          : "발사체 모드: 범위 패턴 미사용 · 오른쪽 '사거리'만 적용",
-              (int)gx, (int)gridBottom, 12, usesPattern ? ui::kTextDim : ui::kAccentHi);
+    const int GRID = 9; float cs = 30;
+    drawSkillPatternGrid(s, gx, gy, usesPattern);
 
     // ---- parameters + one-click effect/sound creation ----
     float dx = gx + GRID*cs + 28, dy = kToolbarH + 50, dw = area.width - dx - 16;
@@ -761,38 +737,7 @@ void Editor::drawCharSkillEditor() {
     int cdTenths = (int)(s.cooldown * 10 + 0.5f);
     if (ui::intStepper({ dx, dy, 260, 24 }, "쿨다운(0.1초)", cdTenths, 1, 1, 200)) s.cooldown = cdTenths / 10.0f;
     dy += 32;
-    auto name = [&](int id){ const AssetEntry* e = p.assets.find(id); return e ? e->name : std::string("없음"); };
-    auto cycle = [&](int& cur, AssetType t){
-        auto list = p.assets.byType(t);
-        int idx = -1; for (int i=0;i<(int)list.size();++i) if (list[i]->id==cur) idx=i;
-        idx++; cur = (idx >= (int)list.size()) ? -1 : list[idx]->id;
-    };
-    if (ui::button({ dx, dy, 260, 24 }, std::string("이펙트: ") + name(s.effectAsset), s.effectAsset>=0))
-        cycle(s.effectAsset, AssetType::Image);
-    dy += 26;
-    DrawTextU("이펙트 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
-    static const char* fxName[4] = { "베기","볼트","대시","폭발" };
-    for (int i = 0; i < 4; ++i) if (ui::button({ dx + 78 + i*46, dy, 44, 22 }, fxName[i])) s.effectAsset = generateEffect(i);
-    dy += 28;
-    if (ui::button({ dx, dy, 260, 22 }, "이펙트 불러오기 (외부 이미지·움짤)"))
-        { pendingEffectSkill_ = &s; pendingEffectImport_ = true; }
-    dy += 26;
-    if (s.effectAsset >= 0) {
-        const AssetEntry* ae = p.assets.find(s.effectAsset);
-        int fr = ae ? ae->frames : 1, fpsv = ae ? ae->fps : 12;
-        if (ui::intStepper({ dx, dy, 126, 24 }, "프레임", fr, 1, 1, 32))
-            p.assets.setAnim(s.effectAsset, fr, fpsv);
-        if (ui::intStepper({ dx + 134, dy, 126, 24 }, "속도fps", fpsv, 1, 1, 60))
-            p.assets.setAnim(s.effectAsset, fr, fpsv);
-        dy += 27;
-    }
-    ui::intStepper({ dx, dy, 260, 24 }, "반복(회) 1·3·7…", s.effectLoops, 1, 1, 20); dy += 28;
-    if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + name(s.soundAsset), s.soundAsset>=0))
-        cycle(s.soundAsset, AssetType::Audio);
-    dy += 26;
-    DrawTextU("효과음 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
-    static const char* sndName[5] = { "베기","마법","폭발","대시","회복" };
-    for (int i = 0; i < 5; ++i) if (ui::button({ dx + 78 + i*38, dy, 36, 22 }, sndName[i])) s.soundAsset = generateSound(i);
+    drawSkillFxControls(s, dx, dy);     // 이펙트·사운드 지정/생성/불러오기 + 프레임/반복
 }
 
 

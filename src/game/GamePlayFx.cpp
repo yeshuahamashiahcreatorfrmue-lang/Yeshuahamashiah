@@ -52,10 +52,7 @@ void GamePlay::updateProjectiles(float dt) {
             pr.life = 0;
         }
     }
-    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
-                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
-    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
-                    [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+    reapDead();
     projectiles_.erase(std::remove_if(projectiles_.begin(), projectiles_.end(),
                     [](const Projectile& p){ return p.life <= 0; }), projectiles_.end());
 }

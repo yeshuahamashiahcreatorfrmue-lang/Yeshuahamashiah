@@ -12,7 +12,14 @@
 
 namespace tsukuru {
 
-static int isign(int v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+// Drop every monster/NPC that died this frame. Centralised so the four call
+// sites (melee, projectile, monster & NPC updates) prune identically.
+void GamePlay::reapDead() {
+    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
+                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
+                [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+}
 
 void GamePlay::spawnMonsters() {
     monsters_.clear();
@@ -113,7 +120,7 @@ void GamePlay::updateMonsters(float dt) {
             m.moveCd -= dt;
             if (m.moveCd <= 0) {
                 m.moveCd = 0.45f + (std::rand() % 60) / 100.0f;
-                int cheb = std::max(std::abs(m.x - destX_), std::abs(m.y - destY_));
+                int cheb = chebyshev(m.x, m.y, destX_, destY_);
                 int ddx = 0, ddy = 0;
                 if (cheb <= 6) {                  // chase the player
                     ddx = isign(destX_ - m.x);
@@ -131,7 +138,7 @@ void GamePlay::updateMonsters(float dt) {
                     if (nx == destX_ && ny == destY_) continue; // don't step onto player
                     if (walkable(nx, ny)) {
                         m.destX = nx; m.destY = ny; m.moving = true;
-                        m.dir = t[1] > 0 ? 0 : t[1] < 0 ? 3 : t[0] < 0 ? 1 : 2;
+                        m.dir = dirFromDelta(t[0], t[1]);
                         break;
                     }
                 }
@@ -139,7 +146,7 @@ void GamePlay::updateMonsters(float dt) {
         }
 
         // attack the player when adjacent
-        int cheb = std::max(std::abs(m.x - destX_), std::abs(m.y - destY_));
+        int cheb = chebyshev(m.x, m.y, destX_, destY_);
         if (cheb <= 1 && m.atkCd <= 0 && !gs.party.empty()) {
             m.atkCd = 1.1f;
             int dmg = std::max(1, m.atk - pdef);
@@ -160,14 +167,12 @@ void GamePlay::updateMonsters(float dt) {
             // not next to the player — swat an adjacent ally NPC instead
             for (auto& a : npcs_) {
                 if (a.faction != NpcFaction::Ally || !a.alive()) continue;
-                if (std::max(std::abs(a.x - m.x), std::abs(a.y - m.y)) > 1) continue;
+                if (chebyshev(a.x, a.y, m.x, m.y) > 1) continue;
                 m.atkCd = 1.1f; damageNpc(a, std::max(1, m.atk - a.def)); break;
             }
         }
     }
-    // an ally may have been killed by a monster this frame
-    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
-                [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+    reapDead();   // an ally may have been killed by a monster this frame
 }
 
 // ----------------------------- monster rendering -----------------------------

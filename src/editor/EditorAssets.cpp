@@ -13,6 +13,20 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
+// --- shared asset pickers (one definition for every editor panel) -----------
+std::string Editor::assetName(int id) const {
+    const AssetEntry* e = engine_.project().assets.find(id);
+    return e ? e->name : std::string("없음");
+}
+
+void Editor::cycleAsset(int& cur, AssetType t) {
+    auto list = engine_.project().assets.byType(t);
+    int idx = -1;
+    for (int i = 0; i < (int)list.size(); ++i) if (list[i]->id == cur) idx = i;
+    ++idx;
+    cur = (idx >= (int)list.size()) ? -1 : list[idx]->id;
+}
+
 void Editor::drawAssetsTab() {
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });

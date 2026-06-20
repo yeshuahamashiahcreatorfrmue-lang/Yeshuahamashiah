@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <unordered_set>
 #include "raylib.h"
 #include "world/Map.h"
 #include "core/Types.h"
@@ -57,6 +58,7 @@ private:
     FieldMonster* monsterAt(int x, int y);
     bool damageMonster(FieldMonster& m, int dmg); // returns true if killed
     void onMonsterKilled(const FieldMonster& m);
+    void reapDead();                              // drop killed monsters & NPCs in one pass
 
     // --- data-driven skills (GamePlaySkills.cpp): definition + cast + HUD ---
     void loadSkills();                       // pull from db (or built-in defaults)
@@ -104,6 +106,7 @@ private:
 
     Phase phase_ = Phase::Field;
     std::set<long> firedOnce_;   // (mapId<<16 | eventId) one-shot events this session
+    std::unordered_set<int> animTileSet_;  // map's animated tile ids (built once per map)
 
     // Player smooth movement (grid -> pixel interpolation)
     float pxX_ = 0, pxY_ = 0;

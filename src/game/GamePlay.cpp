@@ -52,6 +52,10 @@ void GamePlay::loadMap(int id) {
     monsters_.clear();
     weatherP_.clear();
     if (minimapValid_) { UnloadTexture(minimapTex_); minimapValid_ = false; }
+    // Cache the map's animated-tile ids once so drawField() doesn't rebuild a
+    // hash set every frame it shows the "+1" animation phase.
+    animTileSet_.clear();
+    if (map_) animTileSet_.insert(map_->animTiles.begin(), map_->animTiles.end());
     spawnNpcs();
     if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
 }

@@ -13,11 +13,6 @@
 
 namespace tsukuru {
 
-static int npcSign(int v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
-static int dirFromDelta(int dx, int dy) {
-    return dy > 0 ? 0 : dy < 0 ? 3 : dx < 0 ? 1 : 2;   // Down/Up/Left/Right
-}
-
 void GamePlay::spawnNpcs() {
     npcs_.clear();
     if (!map_) return;
@@ -72,16 +67,16 @@ void GamePlay::npcDecide(NpcInst& n, float dt) {
     constexpr int kAggro = 6;     // enemies notice the player within this range
     constexpr int kHelp  = 7;     // allies look for foes within this range
 
-    int cheb = std::max(std::abs(n.x - destX_), std::abs(n.y - destY_));
+    int cheb = chebyshev(n.x, n.y, destX_, destY_);
 
     // attempt to step toward (gx,gy); returns true if a move was committed.
     auto stepToward = [&](int gx, int gy, bool away) -> bool {
-        int ddx = npcSign(gx - n.x), ddy = npcSign(gy - n.y);
+        int ddx = isign(gx - n.x), ddy = isign(gy - n.y);
         if (away) { ddx = -ddx; ddy = -ddy; }
         int tries[4][2] = { {ddx, ddy}, {ddx, 0}, {0, ddy}, {ddy, ddx} };
         for (auto& t : tries) {
             if (t[0] == 0 && t[1] == 0) continue;
-            int nx = n.x + npcSign(t[0]), ny = n.y + npcSign(t[1]);
+            int nx = n.x + isign(t[0]), ny = n.y + isign(t[1]);
             if (nx == destX_ && ny == destY_) continue;     // never step onto the player
             if (!walkable(nx, ny)) continue;
             n.destX = nx; n.destY = ny; n.moving = true;
@@ -90,10 +85,7 @@ void GamePlay::npcDecide(NpcInst& n, float dt) {
         }
         return false;
     };
-    auto faceTile = [&](int gx, int gy) {
-        int dx = gx - n.x, dy = gy - n.y;
-        n.dir = std::abs(dx) >= std::abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
-    };
+    auto faceTile = [&](int gx, int gy) { n.dir = faceDir(gx - n.x, gy - n.y); };
     auto wanderStep = [&]() {
         int r = std::rand() % 4;
         int ddx = (r == 2) - (r == 1), ddy = (r == 0) - (r == 3);
@@ -120,12 +112,12 @@ void GamePlay::npcDecide(NpcInst& n, float dt) {
         int best = 1 << 30; bool found = false;
         for (auto& m : monsters_) {
             if (!m.alive()) continue;
-            int d = std::max(std::abs(m.x - n.x), std::abs(m.y - n.y));
+            int d = chebyshev(m.x, m.y, n.x, n.y);
             if (d <= kHelp && d < best) { best = d; fx = m.x; fy = m.y; found = true; }
         }
         for (auto& o : npcs_) {
             if (o.faction != NpcFaction::Enemy || !o.alive()) continue;
-            int d = std::max(std::abs(o.x - n.x), std::abs(o.y - n.y));
+            int d = chebyshev(o.x, o.y, n.x, n.y);
             if (d <= kHelp && d < best) { best = d; fx = o.x; fy = o.y; found = true; }
         }
         return found;
@@ -144,7 +136,7 @@ void GamePlay::npcDecide(NpcInst& n, float dt) {
     case NpcFaction::Ally: {
         int fx, fy;
         if (nearestFoe(fx, fy)) {                                 // engage the foe
-            int fd = std::max(std::abs(fx - n.x), std::abs(fy - n.y));
+            int fd = chebyshev(fx, fy, n.x, n.y);
             if (fd > 1) stepToward(fx, fy, false);
             else faceTile(fx, fy);
             return;
@@ -201,11 +193,8 @@ void GamePlay::updateNpcs(float dt) {
                 npcDecide(n, dt);
             } else {
                 // still face the player when adjacent even between move ticks
-                int cheb = std::max(std::abs(n.x-destX_), std::abs(n.y-destY_));
-                if (cheb == 1 && n.faction != NpcFaction::Enemy) {
-                    int dx=destX_-n.x, dy=destY_-n.y;
-                    n.dir = std::abs(dx)>=std::abs(dy) ? (dx>0?2:1) : (dy>0?0:3);
-                }
+                if (chebyshev(n.x, n.y, destX_, destY_) == 1 && n.faction != NpcFaction::Enemy)
+                    n.dir = faceDir(destX_ - n.x, destY_ - n.y);
             }
         }
 
@@ -213,8 +202,7 @@ void GamePlay::updateNpcs(float dt) {
         if (n.combatant() && n.atkCd <= 0) {
             if (n.faction == NpcFaction::Enemy) {
                 // hit the player if adjacent...
-                int cheb = std::max(std::abs(n.x-destX_), std::abs(n.y-destY_));
-                if (cheb <= 1 && !gs.party.empty()) {
+                if (chebyshev(n.x, n.y, destX_, destY_) <= 1 && !gs.party.empty()) {
                     n.atkCd = 1.1f;
                     int dmg = std::max(1, n.atk - pdef);
                     PartyMember& hero = gs.party[0];
@@ -233,7 +221,7 @@ void GamePlay::updateNpcs(float dt) {
                     // ...otherwise strike an adjacent ally
                     for (auto& a : npcs_) {
                         if (a.faction != NpcFaction::Ally || !a.alive()) continue;
-                        if (std::max(std::abs(a.x-n.x), std::abs(a.y-n.y)) > 1) continue;
+                        if (chebyshev(a.x, a.y, n.x, n.y) > 1) continue;
                         n.atkCd = 1.1f; damageNpc(a, std::max(1, n.atk - a.def)); break;
                     }
                 }
@@ -242,23 +230,19 @@ void GamePlay::updateNpcs(float dt) {
                 bool struck = false;
                 for (auto& m : monsters_) {
                     if (!m.alive()) continue;
-                    if (std::max(std::abs(m.x-n.x), std::abs(m.y-n.y)) > 1) continue;
+                    if (chebyshev(m.x, m.y, n.x, n.y) > 1) continue;
                     n.atkCd = 1.0f; damageMonster(m, std::max(1, n.atk - m.def)); struck = true; break;
                 }
                 if (!struck) for (auto& o : npcs_) {
                     if (o.faction != NpcFaction::Enemy || !o.alive()) continue;
-                    if (std::max(std::abs(o.x-n.x), std::abs(o.y-n.y)) > 1) continue;
+                    if (chebyshev(o.x, o.y, n.x, n.y) > 1) continue;
                     n.atkCd = 1.0f; damageNpc(o, std::max(1, n.atk - o.def)); break;
                 }
             }
         }
     }
 
-    // clear out monsters an ally killed, and any dead combatant NPCs
-    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
-                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
-    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
-                [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+    reapDead();   // clear out monsters an ally killed, and any dead combatant NPCs
 }
 
 void GamePlay::drawNpcs() {

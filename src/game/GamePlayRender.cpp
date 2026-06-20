@@ -174,13 +174,11 @@ void GamePlay::drawField() {
     const Texture2D& ts = engine_.assetTexture(map_->tileset.assetId);
     const Tileset& set = map_->tileset;
 
-    // animated tiles: cycle base id <-> id+1. Hoist the membership test out of the
-    // per-tile inner loop into an O(1) hash set built once per frame (only when the
-    // animation is on its "+1" phase and there are animated tiles to begin with).
+    // animated tiles: cycle base id <-> id+1 on the "+1" phase. The id set is
+    // cached per-map (animTileSet_), so here we only flip a flag — no per-frame
+    // allocation. `animOn` gates the O(1) membership test in the tile loop.
     int phase = (int)(GetTime() * 2.5) % 2;
-    std::unordered_set<int> animSet;
-    if (phase == 1 && !map_->animTiles.empty())
-        animSet.insert(map_->animTiles.begin(), map_->animTiles.end());
+    bool animOn = (phase == 1) && !animTileSet_.empty();
 
     int vx0, vy0, vx1, vy1; visibleRange(vx0, vy0, vx1, vy1); // cull to viewport
     BeginMode2D(cam_);
@@ -189,7 +187,7 @@ void GamePlay::drawField() {
             for (int x = vx0; x <= vx1; ++x) {
                 int t = map_->tilemap.tile(layer, x, y);
                 if (t < 0) continue;
-                if (!animSet.empty() && animSet.count(t)) t = t + 1;
+                if (animOn && animTileSet_.count(t)) t = t + 1;
                 int sx, sy; set.srcOf(t, sx, sy);
                 Rectangle src = { (float)sx, (float)sy, (float)set.tileWidth, (float)set.tileHeight };
                 Rectangle dst = { (float)x*TS, (float)y*TS, (float)TS, (float)TS };

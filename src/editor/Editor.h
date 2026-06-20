@@ -7,6 +7,7 @@
 #include "raylib.h"
 #include "world/Map.h"
 #include "database/Database.h"
+#include "project/AssetManager.h"   // AssetType (asset-cycle helpers)
 #include "render/Segmenter.h"
 
 namespace tsukuru {
@@ -35,6 +36,12 @@ private:
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void drawCharDataEditor();         // bulk editor: all of a character's stats + every skill
     void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
+    // --- shared skill-editor widgets (used by the global Skills tab AND the
+    //     per-character skill editor, so both stay in lockstep) ---
+    std::string assetName(int id) const;                 // asset display name, or "없음"
+    void cycleAsset(int& cur, AssetType t);              // advance to the next asset id (wraps to -1)
+    float drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesPattern); // -> grid bottom Y
+    void drawSkillFxControls(FieldSkill& s, float dx, float& dy); // effect/sound assign + import + frames/loops
     void drawAssetsTab();
     void drawDatabaseTab();
     void drawSkillsTab();

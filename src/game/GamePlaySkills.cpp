@@ -108,10 +108,7 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
         if (FieldMonster* m = monsterAt(tx, ty)) { damageMonster(*m, dmg - m->def); hit = true; }
         if (NpcInst* en = hostileNpcAt(tx, ty)) { damageNpc(*en, dmg - en->def); hit = true; }
     }
-    monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
-                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
-    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
-                    [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+    reapDead();
 
     if (hit) engine_.audio().playSfx("hit", 0.8f);
     else if (slot == 0 && s.powerPct > 0) interact(); // basic attack hit nothing -> talk
