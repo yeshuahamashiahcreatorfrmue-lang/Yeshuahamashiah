@@ -10,6 +10,13 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Statically link the C/C++ runtime on MSVC (/MT) so the .exe runs on a stock
+# Windows PC with NOTHING installed — no Visual C++ Redistributable required.
+# Applies to every target below (raylib, core, the engine) for a consistent CRT.
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # Optimization flags (C++ 최적화)
@@ -124,6 +131,13 @@ if(BUILD_ENGINE)
         target_include_directories(TsukuruEngine PRIVATE "${ONNXRUNTIME_ROOT}/include")
         if(WIN32)
             target_link_libraries(TsukuruEngine PRIVATE "${ONNXRUNTIME_ROOT}/lib/onnxruntime.lib")
+            # Delay-load onnxruntime.dll: the engine starts even if the AI runtime
+            # (or its deps) is absent; Segmenter::load() probes it first and falls
+            # back to colour cut-out. So a bare PC never fails to launch over AI.
+            if(MSVC)
+                target_link_options(TsukuruEngine PRIVATE /DELAYLOAD:onnxruntime.dll)
+                target_link_libraries(TsukuruEngine PRIVATE delayimp)
+            endif()
             # Ship onnxruntime.dll next to the exe so the AI model loads at runtime.
             file(GLOB _ort_dlls "${ONNXRUNTIME_ROOT}/lib/*.dll")
             foreach(_dll ${_ort_dlls})

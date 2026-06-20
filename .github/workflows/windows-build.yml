@@ -122,6 +122,12 @@ jobs:
           Copy-Item "$dir\TsukuruEngine.exe" $out
           Copy-Item "$dir\opengl32.dll" $out
           Copy-Item "$dir\libgallium_wgl.dll" $out
+          # VC++ runtime DLLs: the engine .exe is statically linked (/MT) and needs
+          # none, but the prebuilt onnxruntime.dll does — bundling them lets the AI
+          # cut-out work on a stock PC with NO Visual C++ Redistributable installed.
+          foreach ($vc in "vcruntime140.dll","vcruntime140_1.dll","msvcp140.dll") {
+            Copy-Item "$env:SystemRoot\System32\$vc" $out -ErrorAction SilentlyContinue
+          }
           # AI subject cut-out runtime + model (bundled so it works out of the box).
           Copy-Item "$dir\onnxruntime.dll" $out -ErrorAction SilentlyContinue
           Get-ChildItem "$dir" -Filter "onnxruntime*.dll" | ForEach-Object { Copy-Item $_.FullName $out -Force }

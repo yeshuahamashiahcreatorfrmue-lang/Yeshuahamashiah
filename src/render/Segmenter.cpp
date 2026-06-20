@@ -10,12 +10,19 @@ namespace tsukuru {
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#ifdef _WIN32
+#define NOMINMAX          // keep std::min/std::max usable below (no windows.h macros)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>     // LoadLibraryA — probe the runtime before delay-loaded calls
+#endif
 namespace tsukuru {
 
 struct Segmenter::Impl {
-    Ort::Env env{ ORT_LOGGING_LEVEL_WARNING, "tsukuru" };
+    // Constructed lazily in load() so merely *creating* a Segmenter never touches
+    // the (delay-loaded) ONNX Runtime — a bare PC with no runtime must not crash.
+    std::unique_ptr<Ort::Env> env;
     std::unique_ptr<Ort::Session> session;
-    Ort::AllocatorWithDefaultOptions alloc;
+    std::unique_ptr<Ort::AllocatorWithDefaultOptions> alloc;
     std::string inName, outName;
     int side = 320;           // U^2-Net input is 320x320
     bool ok = false;
@@ -25,18 +32,26 @@ Segmenter::Segmenter() : impl_(new Impl) {}
 Segmenter::~Segmenter() = default;
 
 bool Segmenter::load(const std::string& modelPath) {
+#ifdef _WIN32
+    // The ONNX Runtime import is delay-loaded; probe it (and its VC++ deps) here.
+    // If it can't load, fall back to colour cut-out instead of faulting on the
+    // first delay-loaded call. Keeps the engine launching on a stock Windows PC.
+    if (!LoadLibraryA("onnxruntime.dll")) return false;
+#endif
     try {
+        impl_->env.reset(new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "tsukuru"));
+        impl_->alloc.reset(new Ort::AllocatorWithDefaultOptions());
         Ort::SessionOptions so;
         so.SetIntraOpNumThreads(2);
         so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 #ifdef _WIN32
         std::wstring wp(modelPath.begin(), modelPath.end());   // ASCII model path -> wide
-        impl_->session.reset(new Ort::Session(impl_->env, wp.c_str(), so));
+        impl_->session.reset(new Ort::Session(*impl_->env, wp.c_str(), so));
 #else
-        impl_->session.reset(new Ort::Session(impl_->env, modelPath.c_str(), so));
+        impl_->session.reset(new Ort::Session(*impl_->env, modelPath.c_str(), so));
 #endif
-        impl_->inName  = impl_->session->GetInputNameAllocated(0, impl_->alloc).get();
-        impl_->outName = impl_->session->GetOutputNameAllocated(0, impl_->alloc).get();
+        impl_->inName  = impl_->session->GetInputNameAllocated(0, *impl_->alloc).get();
+        impl_->outName = impl_->session->GetOutputNameAllocated(0, *impl_->alloc).get();
         impl_->ok = true;
     } catch (...) { impl_->ok = false; }
     return impl_->ok;
