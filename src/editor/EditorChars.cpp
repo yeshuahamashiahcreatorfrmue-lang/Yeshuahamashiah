@@ -811,7 +811,7 @@ void Editor::drawCharDataEditor() {
     ui::intStepper({ lx, ly, lw, 26 }, "기력 (GP)",     cd.maxGp,  5, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "공격력",        cd.atk,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
-    ui::intStepper({ lx, ly, lw, 26 }, "속도",          cd.spd,    1, 0, 999);   ly += 36;
+    ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 36;
     DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
     DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
     bool isP = (p.playerCharId == cd.id);

@@ -108,7 +108,11 @@ void GamePlay::updateField(float dt) {
 
     if (moving_) {
         float tx = destX_ * (float)TS, ty = destY_ * (float)TS;
-        float speed = TS * 5.0f;
+        // Walk speed scales with the player's 속도(spd) stat. spd=5 keeps the
+        // baseline feel (TS*5); each point shifts it by TS*0.2 (clamped sane).
+        const auto& gsParty = engine_.state().party;
+        int spd = gsParty.empty() ? 5 : gsParty[0].spd;
+        float speed = TS * std::clamp(4.0f + spd * 0.2f, 2.5f, 12.0f);
         float dx = tx - pxX_, dy = ty - pxY_;
         float dist = std::sqrt(dx*dx + dy*dy);
         float step = speed * dt;
