@@ -69,6 +69,9 @@ private:
     // Full "차지 칸수" block (label + grid + W×H readout + 미세% stepper). Advances y.
     void drawFootprintControl(float x, float& y, float w, int& wTiles, int& hTiles, int& pct, int previewAsset, bool sheet4dir);
     void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
+    void drawEventInspector(Event& ev, Map& m, Rectangle panel); // full event editor (all object types) + delete
+    void drawObjectPalette(Rectangle area);            // left panel: all placeable object types
+    void newObjectAt(Map& m, int tx, int ty);          // create the selected object preset on a tile
     void drawNpcTab();                                 // NPC/몹/플레이어 통합 관리 탭
     void drawPlayerEditor(Rectangle panel);            // edit the player character's stats/footprint
     void drawNpcStatRows(Event& ev, float x, float& y, float w); // 진영/AI/크기/전투 rows (shared)
@@ -99,7 +102,8 @@ private:
     Tool tool_ = Tool::Pencil;
     int  activeLayer_ = 0;
     bool collisionMode_ = false;
-    bool npcMode_ = false;           // Map tab: place/select NPCs instead of painting
+    bool objMode_ = false;           // Map tab: place/select/delete map objects (events) instead of painting
+    int  objPlaceType_ = 0;          // selected object-type preset to drop
     bool npcTabPlayer_ = true;       // NPC tab: the player row is selected (default view)
     int  npcListScroll_ = 0;         // NPC tab: list scroll offset
     int  selectedTile_ = 0;

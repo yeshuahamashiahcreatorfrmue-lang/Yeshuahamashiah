@@ -40,6 +40,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
+    if (getenv("TSUKURU_OBJ")) { tab_ = Tab::Map; objMode_ = true; }   // debug: object mode
     if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview
         tab_ = Tab::World; worldSelected_ = 0;
         worldPreviewFull_ = true;
@@ -171,13 +172,13 @@ void Editor::drawToolbar() {
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {
-        float bw = 54, gap = 56;
-        float rx = sw - 8 - 7*gap;
-        auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_ && !npcMode_)){tool_=t;collisionMode_=false;npcMode_=false;} rx+=gap; };
+        float bw = 52, gap = 54;
+        float rx = sw - 8 - (6*gap + 72);             // 6 tool buttons + a wider 오브젝트 button
+        auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_ && !objMode_)){tool_=t;collisionMode_=false;objMode_=false;} rx+=gap; };
         tbtn("펜",Tool::Pencil); tbtn("지우개",Tool::Erase); tbtn("채우기",Tool::Fill);
         tbtn("사각형",Tool::Rect); tbtn("스탬프",Tool::Stamp);
-        if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) { collisionMode_ = !collisionMode_; if(collisionMode_) npcMode_=false; } rx += gap;
-        if (ui::button({ rx, 6, bw, 28 }, "NPC", npcMode_)) { npcMode_ = !npcMode_; if(npcMode_) collisionMode_=false; }
+        if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) { collisionMode_ = !collisionMode_; if(collisionMode_) objMode_=false; } rx += gap;
+        if (ui::button({ rx, 6, 72, 28 }, "오브젝트", objMode_)) { objMode_ = !objMode_; if(objMode_) collisionMode_=false; }
     }
 }
 

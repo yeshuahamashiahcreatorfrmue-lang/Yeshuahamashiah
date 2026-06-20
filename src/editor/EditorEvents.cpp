@@ -193,6 +193,144 @@ void Editor::drawNpcTab() {
     DrawTextU(kBuildTag, 12, screenH() - 22, 13, ui::kGood);
 }
 
+// ---- placeable object presets (the Map-tab 오브젝트 palette) ----
+namespace {
+struct ObjPreset { const char* name; EventType type; bool sprite; NpcFaction fac; TriggerType trig; const char* dft; };
+static const ObjPreset kObjPresets[] = {
+    { "표지판/대화",  EventType::Message,    false, NpcFaction::Neutral, TriggerType::ActionButton, "안녕하세요!" },
+    { "NPC (중립)",   EventType::Message,    true,  NpcFaction::Neutral, TriggerType::ActionButton, "안녕하세요!" },
+    { "NPC (아군)",   EventType::Message,    true,  NpcFaction::Ally,    TriggerType::ActionButton, "함께 싸우자!" },
+    { "적 몹",        EventType::Message,    true,  NpcFaction::Enemy,   TriggerType::PlayerTouch,  "" },
+    { "문/이동",      EventType::Teleport,   false, NpcFaction::Neutral, TriggerType::PlayerTouch,  "" },
+    { "아이템 지급",  EventType::GiveItem,   false, NpcFaction::Neutral, TriggerType::ActionButton, "아이템을 얻었다!" },
+    { "전투 발생",    EventType::StartBattle,false, NpcFaction::Neutral, TriggerType::PlayerTouch,  "" },
+    { "상점",         EventType::Shop,       false, NpcFaction::Neutral, TriggerType::ActionButton, "어서 오세요!" },
+    { "스위치",       EventType::SetSwitch,  false, NpcFaction::Neutral, TriggerType::ActionButton, "" },
+    { "퀘스트",       EventType::Quest,      false, NpcFaction::Neutral, TriggerType::Autorun,      "목표: " },
+    { "엔딩",         EventType::Ending,     false, NpcFaction::Neutral, TriggerType::Autorun,      "" },
+};
+static const int kObjCount = (int)(sizeof(kObjPresets)/sizeof(kObjPresets[0]));
+} // namespace
+
+// Create the currently-selected object preset on a tile (Map-tab 오브젝트 모드).
+void Editor::newObjectAt(Map& m, int tx, int ty) {
+    const ObjPreset& pr = kObjPresets[std::max(0, std::min(kObjCount-1, objPlaceType_))];
+    Event ne; ne.id = m.nextEventId(); ne.x = tx; ne.y = ty;
+    ne.type = pr.type; ne.trigger = pr.trig; ne.text = pr.dft;
+    if (pr.sprite) {
+        auto imgs = engine_.project().assets.byType(AssetType::Image);
+        ne.graphicAsset = imgs.empty() ? -1 : imgs.front()->id;
+        ne.faction = pr.fac;
+        ne.behavior = (pr.fac == NpcFaction::Neutral) ? NpcBehavior::Wander : NpcBehavior::Chase;
+        if (pr.fac == NpcFaction::Enemy) { ne.npcHp = 30; ne.npcAtk = 8; ne.npcDef = 2; }
+    }
+    m.events.push_back(ne);
+    editingEventId_ = ne.id;
+    setStatus(std::string("오브젝트 추가: ") + pr.name);
+}
+
+// Left palette listing every placeable object type (Map-tab 오브젝트 모드).
+void Editor::drawObjectPalette(Rectangle area) {
+    ui::panel(area, ui::kPanel);
+    ui::label("오브젝트 종류", (int)area.x + 10, (int)area.y + 8, 16, ui::kAccent);
+    DrawTextU("종류 선택 → 빈 칸 클릭=배치", (int)area.x + 10, (int)area.y + 32, 12, ui::kTextDim);
+    DrawTextU("기존 클릭=편집 · 우클릭=삭제", (int)area.x + 10, (int)area.y + 48, 12, ui::kTextDim);
+    float by = area.y + 72;
+    for (int i = 0; i < kObjCount; ++i) {
+        if (ui::button({ area.x + 8, by, area.width - 16, 26 }, kObjPresets[i].name, objPlaceType_ == i))
+            objPlaceType_ = i;
+        by += 30;
+    }
+}
+
+// Full event editor for ANY object type + delete. Shared by the Events tab and
+// the Map-tab 오브젝트 inspector.
+void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
+    Event* ev = &evRef;
+    float y = panel.y + 44;
+    const char* typeNames[] = { "메시지", "이동", "아이템지급", "스위치설정", "전투", "상점", "퀘스트", "엔딩" };
+    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("종류: %s", typeNames[(int)ev->type]))) {
+        ev->type = (EventType)(((int)ev->type + 1) % 8);
+    }
+    y += 32;
+    const char* trigNames[] = { "말걸기", "접촉", "자동실행" };
+    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("트리거: %s", trigNames[(int)ev->trigger]))) {
+        ev->trigger = (TriggerType)(((int)ev->trigger + 1) % 3);
+    }
+    y += 36;
+    ui::label("텍스트:", (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
+    Rectangle tf = { panel.x + 12, y, 296, 26 };
+    if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
+    ui::textField(tf, ev->text, eventTextFocus_, 120);
+    y += 34;
+    switch (ev->type) {
+        case EventType::Teleport:
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "X", ev->targetX, 1, 0, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "Y", ev->targetY, 1, 0, 999); y += 28;
+            break;
+        case EventType::GiveItem:
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수량", ev->amount, 1, 1, 99); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
+            break;
+        case EventType::SetSwitch:
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치ID", ev->switchId, 1, 0, 999); y += 28;
+            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "값: 켜짐" : "값: 꺼짐"))
+                ev->switchValue = !ev->switchValue;
+            y += 28;
+            break;
+        case EventType::StartBattle:
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "적ID", ev->itemId, 1, -1, 999); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수", ev->amount, 1, 1, 6); y += 28;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "처치스위치", ev->switchId, 1, -1, 999); y += 28;
+            break;
+        case EventType::Shop:
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
+            break;
+        case EventType::Quest:
+            DrawTextU("텍스트 = HUD에 표시되는 목표.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
+            break;
+        case EventType::Ending:
+            DrawTextU("게임 클리어 화면을 표시합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
+            break;
+        default: break;
+    }
+    y += 6;
+    ui::intStepper({ panel.x + 12, y, 296, 24 }, "조건스위치", ev->conditionSwitch, 1, -1, 999); y += 28;
+    if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
+    if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
+        auto imgs = engine_.project().assets.byType(AssetType::Image);
+        if (imgs.empty()) ev->graphicAsset = -1;
+        else {
+            int idx = -1;
+            for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == ev->graphicAsset) idx = i;
+            idx++;
+            ev->graphicAsset = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
+        }
+    }
+    y += 32;
+    if (ev->graphicAsset >= 0) {
+        DrawTextU("─ NPC 설정 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+        if (ui::button({ panel.x + 12, y, 296, 22 }, "캐릭터 에셋 가져오기 (외부)", true)) {
+            pendingNpcEventId_ = ev->id; pendingNpcCharImport_ = true;
+        }
+        y += 26;
+        drawNpcStatRows(*ev, panel.x + 12, y, 296);
+    }
+    y += 8;
+    DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
+    y += 22;
+    if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트(오브젝트) 삭제", false)) {
+        auto& evs = m.events;
+        evs.erase(std::remove_if(evs.begin(), evs.end(),
+                  [&](const Event& e){ return e.id == editingEventId_; }), evs.end());
+        editingEventId_ = -1;
+    }
+}
+
 void Editor::drawEventsTab() {
     Rectangle canvasArea = { 0, kToolbarH, (float)screenW() - 320, (float)screenH() - kToolbarH };
     auto m = activeMap();
@@ -257,96 +395,7 @@ void Editor::drawEventsTab() {
     if (!ev) { ui::label("타일을 클릭해 추가하거나", (int)panel.x + 12, (int)panel.y + 48, 16, ui::kTextDim);
                ui::label("이벤트를 선택하세요.", (int)panel.x + 12, (int)panel.y + 68, 16, ui::kTextDim);
                return; }
-
-    float y = panel.y + 44;
-    const char* typeNames[] = { "메시지", "이동", "아이템지급", "스위치설정", "전투", "상점", "퀘스트", "엔딩" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("종류: %s", typeNames[(int)ev->type]))) {
-        ev->type = (EventType)(((int)ev->type + 1) % 8);
-    }
-    y += 32;
-    const char* trigNames[] = { "말걸기", "접촉", "자동실행" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("트리거: %s", trigNames[(int)ev->trigger]))) {
-        ev->trigger = (TriggerType)(((int)ev->trigger + 1) % 3);
-    }
-    y += 36;
-
-    // text field (used by Message/GiveItem/SetSwitch/Shop)
-    ui::label("텍스트:", (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
-    Rectangle tf = { panel.x + 12, y, 296, 26 };
-    if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
-    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
-    ui::textField(tf, ev->text, eventTextFocus_, 120);
-    y += 34;
-
-    // type-specific params
-    switch (ev->type) {
-        case EventType::Teleport:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "X", ev->targetX, 1, 0, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "Y", ev->targetY, 1, 0, 999); y += 28;
-            break;
-        case EventType::GiveItem:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수량", ev->amount, 1, 1, 99); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
-            break;
-        case EventType::SetSwitch:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치ID", ev->switchId, 1, 0, 999); y += 28;
-            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "값: 켜짐" : "값: 꺼짐"))
-                ev->switchValue = !ev->switchValue;
-            y += 28;
-            break;
-        case EventType::StartBattle:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "적ID", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수", ev->amount, 1, 1, 6); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "처치스위치", ev->switchId, 1, -1, 999); y += 28;
-            break;
-        case EventType::Shop:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
-            break;
-        case EventType::Quest:
-            DrawTextU("텍스트 = HUD에 표시되는 목표.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
-            break;
-        case EventType::Ending:
-            DrawTextU("게임 클리어 화면을 표시합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
-            break;
-        default: break;
-    }
-    y += 6;
-    // condition switch
-    ui::intStepper({ panel.x + 12, y, 296, 24 }, "조건스위치", ev->conditionSwitch, 1, -1, 999); y += 28;
-    if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
-    // graphic asset cycle
-    if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
-        auto imgs = engine_.project().assets.byType(AssetType::Image);
-        if (imgs.empty()) ev->graphicAsset = -1;
-        else {
-            int idx = -1;
-            for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == ev->graphicAsset) idx = i;
-            idx++;
-            ev->graphicAsset = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
-        }
-    }
-    y += 32;
-    // ---- NPC settings (only meaningful when the event carries a sprite) ----
-    if (ev->graphicAsset >= 0) {
-        DrawTextU("─ NPC 설정 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
-        if (ui::button({ panel.x + 12, y, 296, 22 }, "캐릭터 에셋 가져오기 (외부)", true)) {
-            pendingNpcEventId_ = ev->id; pendingNpcCharImport_ = true;
-        }
-        y += 26;
-        drawNpcStatRows(*ev, panel.x + 12, y, 296);   // 진영/AI/크기/전투 (shared)
-    }
-    y += 8;
-    DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
-    y += 22;
-    if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트 삭제", false)) {
-        auto& evs = m->events;
-        evs.erase(std::remove_if(evs.begin(), evs.end(),
-                  [&](const Event& e){ return e.id == editingEventId_; }), evs.end());
-        editingEventId_ = -1;
-    }
+    drawEventInspector(*ev, *m, panel);
 }
 
 
