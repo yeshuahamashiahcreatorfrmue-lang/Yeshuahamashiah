@@ -83,6 +83,124 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
     DrawTextU("정밀 설정(이동/전투/조건)은 '이벤트' 탭.", (int)x, (int)y, 11, ui::kTextDim);
 }
 
+// Player editor: pick which character drives the player + edit its core stats and
+// tile footprint. Deep motion/skill editing links out to the 캐릭터 탭.
+void Editor::drawPlayerEditor(Rectangle panel) {
+    Project& p = engine_.project();
+    auto& db = p.database;
+    float x = panel.x + 12, y = panel.y + 12;
+    ui::label("플레이어 데이터", (int)x, (int)y, 22, ui::kAccent); y += 40;
+
+    CharacterDef* cd = nullptr;
+    for (auto& c : db.characters) if (c.id == p.playerCharId) cd = &c;
+    std::string who = cd ? cd->name : "(없음 — 시트 스프라이트)";
+    if (ui::button({ x, y, 320, 28 }, std::string("플레이어 캐릭터: ") + who, cd != nullptr)) {
+        int idx = -1;
+        for (int i = 0; i < (int)db.characters.size(); ++i) if (db.characters[i].id == p.playerCharId) idx = i;
+        idx++;
+        p.playerCharId = (idx >= (int)db.characters.size()) ? -1 : db.characters[idx].id;
+        p.save();
+        cd = nullptr; for (auto& c : db.characters) if (c.id == p.playerCharId) cd = &c;
+    }
+    y += 34;
+    DrawTextU("위 버튼 = 플레이어로 쓸 캐릭터 순환 선택", (int)x, (int)y, 12, ui::kTextDim); y += 24;
+
+    if (!cd) {
+        DrawTextU("캐릭터 탭에서 캐릭터를 만든 뒤 위에서 선택하세요.", (int)x, (int)y, 14, ui::kText); y += 26;
+        if (ui::button({ x, y, 240, 28 }, "캐릭터 탭으로 이동")) tab_ = Tab::Chars;
+        return;
+    }
+    ui::intStepper({ x, y, 300, 26 }, "체력 (HP)",   cd->maxHp, 10, 1, 99999); y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "기력 (GP)",   cd->maxGp,  5, 0, 9999);  y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "공격력",      cd->atk,    1, 0, 9999);  y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "방어력",      cd->def,    1, 0, 9999);  y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "속도 (이동)", cd->spd,    1, 0, 999);   y += 36;
+    DrawTextU("차지 칸수 (드래그/클릭)", (int)x, (int)y, 13, ui::kTextDim); y += 18;
+    int prev = cd->motions[MO_Walk].frames.empty() ? -1 : cd->motions[MO_Walk].frames.front();
+    drawFootprintGrid({ x, y, 120, 120 }, cd->drawTilesW, cd->drawTilesH, prev, false);
+    DrawTextU(TextFormat("%d×%d칸", cd->drawTilesW, cd->drawTilesH), (int)x + 132, (int)y + 6, 16, ui::kAccentHi);
+    ui::intStepper({ x + 132, y + 34, 168, 24 }, "미세 %", cd->drawPct, 5, 25, 400);
+    y += 130;
+    if (ui::button({ x, y, 300, 28 }, "캐릭터 탭에서 모션·스킬 상세 편집")) {
+        for (int i = 0; i < (int)db.characters.size(); ++i) if (db.characters[i].id == cd->id) charDefSel_ = i;
+        charDataEdit_ = true; tab_ = Tab::Chars;
+    }
+    y += 34;
+    if (ui::button({ x, y, 300, 26 }, "변경사항 저장")) { p.save(); setStatus("플레이어 데이터 저장됨"); }
+    y += 32;
+    DrawTextU("스탯은 플레이 시작 시 파티에 적용됩니다.", (int)x, (int)y, 12, ui::kTextDim);
+}
+
+// NPC tab: one place to see & edit every NPC and mob (across all maps) plus the
+// player. The left list groups them with a faction colour dot; the right panel
+// edits the selected one (reusing the NPC inspector / player editor).
+void Editor::drawNpcTab() {
+    Project& p = engine_.project();
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
+    DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
+
+    float lx = 12, ly = kToolbarH + 12, lw = 360;
+    ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
+    ui::label("NPC · 몹 · 플레이어", (int)lx + 12, (int)ly + 10, 20, ui::kAccent);
+    int npcCount = 0, mobCount = 0;
+    for (auto& m : p.maps) for (auto& e : m->events) if (e.graphicAsset >= 0) {
+        if (e.faction == NpcFaction::Enemy) ++mobCount; else ++npcCount;
+    }
+    DrawTextU(TextFormat("NPC %d개 · 몹 %d개  (클릭=편집)", npcCount, mobCount),
+              (int)lx + 12, (int)ly + 38, 13, ui::kTextDim);
+
+    Rectangle listR = { lx + 6, ly + 60, lw - 12, area.height - 24 - 60 - 6 };
+    const float rowH = 30;
+    int rows = 1;                                       // player + every npc/mob
+    for (auto& m : p.maps) for (auto& e : m->events) if (e.graphicAsset >= 0) ++rows;
+    float contentH = rows * rowH + 4;
+    uiScissor((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
+    if (ui::mouseIn(listR)) npcListScroll_ -= (int)(GetMouseWheelMove() * 42);
+    int maxS = (int)std::max(0.0f, contentH - listR.height);
+    npcListScroll_ = std::max(0, std::min(npcListScroll_, maxS));
+    float ry = listR.y - npcListScroll_;
+    // player row
+    if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
+        if (ui::button({ listR.x + 4, ry, listR.width - 8, 28 }, "★ 플레이어", npcTabPlayer_)) {
+            npcTabPlayer_ = true; editingEventId_ = -1;
+        }
+    }
+    ry += rowH;
+    for (auto& m : p.maps) for (auto& e : m->events) {
+        if (e.graphicAsset < 0) continue;
+        if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
+            const char* fac = e.faction == NpcFaction::Enemy ? "적"
+                            : e.faction == NpcFaction::Ally  ? "아군" : "중립";
+            std::string lbl = std::string("[") + m->name + "] " + assetName(e.graphicAsset) + " (" + fac + ")";
+            bool sel = (!npcTabPlayer_ && activeMapId_ == m->id && editingEventId_ == e.id);
+            Rectangle r = { listR.x + 4, ry, listR.width - 8, 28 };
+            if (ui::button(r, lbl, sel)) { npcTabPlayer_ = false; activeMapId_ = m->id; editingEventId_ = e.id; }
+            Color fc = e.faction == NpcFaction::Enemy ? ui::kDanger
+                     : e.faction == NpcFaction::Ally  ? Color{ 90,170,255,255 } : Color{ 200,200,200,255 };
+            DrawCircle((int)(r.x + r.width - 13), (int)(r.y + 14), 5, fc);
+        }
+        ry += rowH;
+    }
+    EndScissorMode();
+
+    // right editor
+    Rectangle panel = { lx + lw + 16, ly, area.width - (lx + lw + 16) - 12, area.height - 24 };
+    ui::panel(panel, ui::kPanel);
+    if (npcTabPlayer_) {
+        drawPlayerEditor(panel);
+    } else {
+        Event* ev = nullptr;
+        if (auto m = p.map(activeMapId_)) for (auto& e : m->events) if (e.id == editingEventId_) ev = &e;
+        if (ev && ev->graphicAsset >= 0) drawNpcInspector(*ev, panel);
+        else {
+            ui::label("좌측에서 NPC/몹/플레이어를 선택하세요.", (int)panel.x + 14, (int)panel.y + 16, 16, ui::kTextDim);
+            DrawTextU("· NPC/몹: 맵에 배치된 캐릭터(진영=중립/아군/적)", (int)panel.x + 14, (int)panel.y + 48, 13, ui::kText);
+            DrawTextU("· 새 NPC 추가는 '맵' 탭의 NPC 모드에서.", (int)panel.x + 14, (int)panel.y + 70, 13, ui::kTextDim);
+        }
+    }
+    DrawTextU(kBuildTag, 12, screenH() - 22, 13, ui::kGood);
+}
+
 void Editor::drawEventsTab() {
     Rectangle canvasArea = { 0, kToolbarH, (float)screenW() - 320, (float)screenH() - kToolbarH };
     auto m = activeMap();

@@ -23,7 +23,7 @@ public:
     void draw();
 
 private:
-    enum class Tab { World, WorldView, Map, Events, Chars, Assets, Database };
+    enum class Tab { World, WorldView, Map, Npc, Events, Chars, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
@@ -67,6 +67,8 @@ private:
     // chosen block as a live preview. Updates wTiles/hTiles in place.
     void drawFootprintGrid(Rectangle gridArea, int& wTiles, int& hTiles, int previewAsset, bool sheet4dir, int maxN = 4);
     void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
+    void drawNpcTab();                                 // NPC/몹/플레이어 통합 관리 탭
+    void drawPlayerEditor(Rectangle panel);            // edit the player character's stats/footprint
     void drawNpcStatRows(Event& ev, float x, float& y, float w); // 진영/AI/크기/전투 rows (shared)
     int  stageImportImage(const std::string& src, const char* prefix); // copy ext image -> asset id, -1 fail
     void pickAndImportNpcChar();                     // file picker -> assign an NPC's character sprite
@@ -75,6 +77,7 @@ private:
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
     void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
     void pickAndImportSound();                        // file picker -> assign a skill sound
+    void pickAndImportBgm();                          // file picker -> import + assign a map's BGM
     void pickAndImportTileset();                      // file picker -> assign the active map's tileset (no crop)
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
     void deleteAssets(const std::vector<int>& ids);  // unregister assets + scrub character motion refs
@@ -95,6 +98,8 @@ private:
     int  activeLayer_ = 0;
     bool collisionMode_ = false;
     bool npcMode_ = false;           // Map tab: place/select NPCs instead of painting
+    bool npcTabPlayer_ = true;       // NPC tab: the player row is selected (default view)
+    int  npcListScroll_ = 0;         // NPC tab: list scroll offset
     int  selectedTile_ = 0;
     int  activeMapId_ = -1;
 
@@ -144,6 +149,8 @@ private:
     bool pendingImport_ = false;      // request the native file picker outside the draw frame
     bool pendingEffectImport_ = false;     // request the picker to assign a skill effect strip
     bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
+    bool pendingBgmImport_ = false;        // request the picker to import a map BGM
+    int  pendingBgmMapId_ = -1;            // map awaiting an imported BGM
     bool pendingTilesetImport_ = false;    // request the picker to assign the map tileset
     bool pendingNpcCharImport_ = false;    // request the picker to assign an NPC sprite
     int  pendingNpcEventId_ = -1;          // event awaiting an imported NPC sprite

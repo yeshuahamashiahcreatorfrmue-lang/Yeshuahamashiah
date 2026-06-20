@@ -34,6 +34,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         std::string s = t;
         if (s == "world") tab_ = Tab::World;     else if (s == "worldview") tab_ = Tab::WorldView;
         else if (s == "map") tab_ = Tab::Map;
+        else if (s == "npc") tab_ = Tab::Npc;
         else if (s == "events") tab_ = Tab::Events;
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
@@ -61,6 +62,7 @@ void Editor::update(float dt) {
     if (pendingImport_) { pendingImport_ = false; pickAndImportImages(); }
     if (pendingEffectImport_) { pendingEffectImport_ = false; pickAndImportEffect(); }
     if (pendingSoundImport_)  { pendingSoundImport_  = false; pickAndImportSound(); }
+    if (pendingBgmImport_)    { pendingBgmImport_    = false; pickAndImportBgm(); }
     if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
     if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
@@ -129,6 +131,7 @@ void Editor::draw() {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
         case Tab::Map:      drawMapTab();      break;
+        case Tab::Npc:      drawNpcTab();      break;
         case Tab::Events:   drawEventsTab();   break;
         case Tab::Chars:    drawCharsTab();    break;
         case Tab::Assets:   drawAssetsTab();   break;
@@ -147,14 +150,15 @@ void Editor::drawToolbar() {
     int sw = screenW();
     ui::panel({ 0, 0, (float)sw, kToolbarH }, ui::kPanelHi);
 
-    float x = 8;
+    float x = 6;
     auto tabBtn = [&](const char* name, Tab t) {
-        if (ui::button({ x, 6, 78, 28 }, name, tab_ == t)) tab_ = t;
-        x += 80;
+        if (ui::button({ x, 6, 70, 28 }, name, tab_ == t)) tab_ = t;
+        x += 72;
     };
     tabBtn("월드", Tab::World);
     tabBtn("전맵뷰어", Tab::WorldView);
     tabBtn("맵", Tab::Map);
+    tabBtn("NPC", Tab::Npc);
     tabBtn("이벤트", Tab::Events);
     tabBtn("캐릭터", Tab::Chars);
     tabBtn("에셋", Tab::Assets);

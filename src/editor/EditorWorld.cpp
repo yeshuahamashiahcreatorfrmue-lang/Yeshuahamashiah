@@ -212,7 +212,11 @@ void Editor::drawWorldTab() {
         idx++;
         m->bgmAsset = (idx >= (int)auds.size()) ? -1 : auds[idx]->id;
     }
-    cy += 40;
+    cy += 30;
+    if (ui::button({ cx, cy, 250, 24 }, "BGM 파일 찾아 등록 (외부)", true)) {
+        pendingBgmImport_ = true; pendingBgmMapId_ = m->id;
+    }
+    cy += 34;
 
     ui::label("필드 몬스터", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
     for (auto& en : p.database.enemies) {

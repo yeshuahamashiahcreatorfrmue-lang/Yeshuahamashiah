@@ -417,6 +417,29 @@ void Editor::pickAndImportSound() {
     setStatus("사운드 적용됨: " + assetName(id));
 }
 
+// Open the audio file picker and import the chosen file as a map's BGM, then
+// assign it. "찾아서 등록" — browse like a web file dialog and register in one step.
+void Editor::pickAndImportBgm() {
+    int mapId = pendingBgmMapId_; pendingBgmMapId_ = -1;
+    Project& p = engine_.project();
+    auto m = p.map(mapId);
+    if (!m) { setStatus("맵을 찾지 못했습니다."); return; }
+    std::vector<std::string> files = plat::openAudioFiles();
+    if (files.empty()) { setStatus("BGM 불러오기 취소됨."); return; }
+    int id = -1;
+    for (auto& f : files) {
+        std::string ext = fs::path(f).extension().string();
+        for (auto& c : ext) c = (char)tolower((unsigned char)c);
+        if (!isAudioExt(ext)) continue;
+        id = p.assets.registerAsset(p.dir, f, AssetType::Audio);   // copies into the project
+        if (id >= 0) break;
+    }
+    if (id < 0) { setStatus("BGM 불러오기 실패 (오디오 파일이 아님)."); return; }
+    m->bgmAsset = id;
+    p.save();
+    setStatus("BGM 등록됨: " + assetName(id));
+}
+
 // Make the BORDER background transparent (magic-wand flood-fill from the edges),
 // so interior same-colour pixels are kept. The top-left corner is the background
 // colour. Saves a NEW asset (non-destructive). Single images are cropped to the
