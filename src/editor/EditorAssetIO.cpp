@@ -30,24 +30,50 @@ bool Editor::isAudioExt(const std::string& e) {
     return false;
 }
 
-static bool rgbClose(Color a, Color b, int t) {
-    return std::abs(a.r-b.r) + std::abs(a.g-b.g) + std::abs(a.b-b.b) <= t;
+// Per-channel max colour difference (0..255). Matches how image editors measure
+// "tolerance" — more intuitive and precise than a summed distance.
+static int chDiff(Color a, Color b) {
+    int r = std::abs(a.r-b.r), g = std::abs(a.g-b.g), bl = std::abs(a.b-b.b);
+    return std::max(r, std::max(g, bl));
 }
 
-// Magic-wand style background removal with a soft (anti-aliased) edge, the way
-// Photoshop's "remove background / defringe" behaves. Flood-fills from the image
-// EDGES through pixels within `tolSoft` of the background colour, so only the
-// border-connected background is touched (interior same-colour pixels are kept).
-// Pixels within `tolHard` are made fully transparent; pixels between tolHard and
-// tolSoft get PARTIAL alpha proportional to how subject-like they are, which
-// feathers the cut precisely and removes the white halo. Returns pixels cleared.
+// Detect the background colour the way a commercial tool does: sample the whole
+// border ring, histogram it (quantised), and take the dominant colour. `conf` is
+// the fraction of the border that colour covers — high conf => a genuine
+// single-colour background (works even if the corners differ or the subject
+// touches an edge). Returns false on an empty image.
+static bool detectBg(const Color* px, int W, int H, Color& bg, float& conf) {
+    std::vector<int> cnt(4096, 0);
+    std::vector<long> sr(4096,0), sg(4096,0), sb(4096,0);
+    int total = 0;
+    auto add = [&](Color c){ int k = (c.r>>4)*256 + (c.g>>4)*16 + (c.b>>4);
+                             cnt[k]++; sr[k]+=c.r; sg[k]+=c.g; sb[k]+=c.b; total++; };
+    for (int x = 0; x < W; ++x) { add(px[x]); add(px[(H-1)*W+x]); }
+    for (int y = 0; y < H; ++y) { add(px[y*W]); add(px[y*W+W-1]); }
+    if (total == 0) return false;
+    int best = 0; for (int k = 1; k < 4096; ++k) if (cnt[k] > cnt[best]) best = k;
+    if (cnt[best] == 0) return false;
+    bg = Color{ (unsigned char)(sr[best]/cnt[best]), (unsigned char)(sg[best]/cnt[best]),
+                (unsigned char)(sb[best]/cnt[best]), 255 };
+    int near = 0;
+    auto chk = [&](Color c){ if (chDiff(c, bg) <= 24) near++; };
+    for (int x = 0; x < W; ++x) { chk(px[x]); chk(px[(H-1)*W+x]); }
+    for (int y = 0; y < H; ++y) { chk(px[y*W]); chk(px[y*W+W-1]); }
+    conf = (float)near / (float)total;
+    return true;
+}
+
+// Magic-wand background removal: flood-fill from the image EDGES through pixels
+// within `tolSoft` of the background colour, so only the border-connected
+// background is touched (interior same-colour pixels are kept). Pixels within
+// `tolHard` go fully transparent; the thin tolHard..tolSoft band gets partial
+// alpha (anti-aliased edge / defringe). Tolerances are per-channel (chDiff).
 static int floodFillBorder(Color* px, int W, int H, Color bg, int tolHard, int tolSoft) {
     std::vector<unsigned char> vis(W * H, 0);
     std::vector<int> stk; stk.reserve(W + H);
-    auto dist = [&](const Color& c){ return std::abs(c.r-bg.r) + std::abs(c.g-bg.g) + std::abs(c.b-bg.b); };
     auto seed = [&](int x, int y) {
         int i = y*W + x;
-        if (!vis[i] && px[i].a > 0 && dist(px[i]) <= tolSoft) { vis[i] = 1; stk.push_back(i); }
+        if (!vis[i] && px[i].a > 0 && chDiff(px[i], bg) <= tolSoft) { vis[i] = 1; stk.push_back(i); }
     };
     for (int x = 0; x < W; ++x) { seed(x, 0); seed(x, H-1); }
     for (int y = 0; y < H; ++y) { seed(0, y); seed(W-1, y); }
@@ -55,11 +81,10 @@ static int floodFillBorder(Color* px, int W, int H, Color bg, int tolHard, int t
     float span = (float)std::max(1, tolSoft - tolHard);
     while (!stk.empty()) {
         int i = stk.back(); stk.pop_back();
-        int d = dist(px[i]);
+        int d = chDiff(px[i], bg);
         if (d <= tolHard) { px[i] = Color{ 0, 0, 0, 0 }; ++cleared; }   // solid background
-        else {                                                          // anti-aliased fringe -> feather
-            float keep = (float)(d - tolHard) / span;                   // 0 (bg) .. 1 (subject)
-            unsigned char na = (unsigned char)(px[i].a * keep);
+        else {                                                          // thin anti-aliased fringe
+            unsigned char na = (unsigned char)(px[i].a * ((float)(d - tolHard) / span));
             px[i].a = na;
             if (na == 0) ++cleared;
         }
@@ -84,20 +109,21 @@ static void cropToOpaque(Image& img) {
         ImageCrop(&img, { (float)minx, (float)miny, (float)(maxx-minx+1), (float)(maxy-miny+1) });
 }
 
-// Auto-trim on import: if the four corners are the same solid colour, remove the
-// border-connected background (flood fill, like Photoshop's magic wand) and crop
-// the margins. Interior pixels of the same colour are preserved. Returns true if
-// it processed the image.
+// Auto background removal on import. Detects whether the image sits on a single
+// colour background (border histogram) — even without an obvious frame — and if
+// so removes the border-connected background and crops. Busy/photographic
+// borders (low confidence) are left untouched. Returns true if it processed.
 static bool autoRemoveBg(Image& img) {
     if (!img.data || img.width < 3 || img.height < 3) return false;
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     int W = img.width, H = img.height;
     Color* px = (Color*)img.data;
     Color c0 = px[0], c1 = px[W-1], c2 = px[(H-1)*W], c3 = px[(H-1)*W + (W-1)];
-    bool transparentCorners = (c0.a==0 && c1.a==0 && c2.a==0 && c3.a==0);
-    bool uniformColor = c0.a>0 && rgbClose(c0,c1,28) && rgbClose(c0,c2,28) && rgbClose(c0,c3,28);
-    if (!transparentCorners && !uniformColor) return false;     // border isn't a single colour
-    if (uniformColor) floodFillBorder(px, W, H, c0, 60, 150);        // remove only the connected border bg
+    if (c0.a==0 && c1.a==0 && c2.a==0 && c3.a==0) { cropToOpaque(img); return true; } // already transparent
+    Color bg; float conf;
+    if (!detectBg(px, W, H, bg, conf)) return false;
+    if (conf < 0.55f) return false;                 // border isn't predominantly one colour -> leave it
+    floodFillBorder(px, W, H, bg, 40, 72);          // tight, precise, thin AA edge
     cropToOpaque(img);
     return true;
 }
@@ -219,7 +245,9 @@ int Editor::makeTransparentBg(int assetId) {
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     if (img.width <= 0 || img.height <= 0) { UnloadImage(img); return -1; }
     Color* px = (Color*)img.data;
-    floodFillBorder(px, img.width, img.height, px[0], 60, 150);   // px[0] = corner = background
+    Color bg; float conf;                                    // robust background detection
+    if (!detectBg(px, img.width, img.height, bg, conf)) bg = px[0];
+    floodFillBorder(px, img.width, img.height, bg, 40, 72);  // border-connected, thin AA edge
     if (e->frames <= 1) cropToOpaque(img);                   // don't crop strips (keeps frame grid)
     fs::create_directories(fs::path(p.dir) / "assets");
     int n = 1; fs::path dest;
