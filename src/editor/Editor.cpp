@@ -48,6 +48,7 @@ std::shared_ptr<Map> Editor::activeMap() {
 }
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
+    ensureThumbsForTab();   // build map thumbnails OUTSIDE the frame render texture
     // Open the native file dialog OUTSIDE the draw frame: showing a modal Win32
     // dialog mid-render (between BeginDrawing/EndDrawing) corrupts the GL frame
     // and crashes. Deferring it here (update runs before BeginDrawing) is safe.

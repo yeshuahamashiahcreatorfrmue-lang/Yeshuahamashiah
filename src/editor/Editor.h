@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "raylib.h"
 #include "world/Map.h"
 #include "database/Database.h"
@@ -28,6 +29,11 @@ private:
     void drawToolbar();
     void drawWorldTab();
     void drawWorldViewTab();   // All-Map Viewer: lay maps on a zone grid for edge-to-edge travel
+    // map thumbnails (rendered to cached textures in update(), drawn on World/WorldView)
+    void buildMapThumb(Map& m);
+    const RenderTexture2D* mapThumb(int mapId);
+    void clearMapThumbs();
+    void ensureThumbsForTab();   // build any missing thumbnails for the current tab
     void drawMapTab();
     void drawEventsTab();
     void drawCharsTab();
@@ -100,6 +106,8 @@ private:
     int  worldViewSel_ = -1;        // map selected in the All-Map Viewer
     Camera2D worldCam_{};           // pan/zoom for the zone grid
     bool worldCamInit_ = false;
+    std::unordered_map<int, RenderTexture2D> mapThumbs_;  // map id -> cached thumbnail
+    Tab  prevTab_ = Tab::Map;       // detect tab changes to refresh thumbnails
     int  newMapW_ = 30, newMapH_ = 24;
     int  newMapTier_ = 0;           // standardized size tier for a new map (0..13)
     // Character generation

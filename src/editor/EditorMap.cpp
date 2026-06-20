@@ -118,12 +118,12 @@ void Editor::drawTilePalette(Rectangle area) {
 
 void Editor::drawMapCanvas(Rectangle area) {
     auto m = activeMap();
-    BeginScissorMode((int)area.x, (int)area.y, (int)area.width, (int)area.height);
+    uiScissor((int)area.x, (int)area.y, (int)area.width, (int)area.height);
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     if (!m) { EndScissorMode(); return; }
     int TS = m->tileset.tileWidth;
 
-    BeginMode2D(cam_);
+    uiBeginWorld(cam_);
     const Texture2D& tex = engine_.assetTexture(m->tileset.assetId);
     const Tileset& set = m->tileset;
     int w = m->tilemap.width(), h = m->tilemap.height();
@@ -173,7 +173,7 @@ void Editor::drawMapCanvas(Rectangle area) {
                                  e.id==editingEventId_ ? ui::kAccentHi : fc);
         }
     }
-    EndMode2D();
+    uiEndWorld();
 
     // NPC placement mode: click adds/selects an NPC event (no tile painting)
     if (npcMode_) {
@@ -208,7 +208,7 @@ void Editor::drawMapCanvas(Rectangle area) {
         bool eyedrop = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
 
         // hover highlight + rectangle preview
-        BeginMode2D(cam_);
+        uiBeginWorld(cam_);
         if (inMap)
             DrawRectangleLinesEx({ (float)tx*TS,(float)ty*TS,(float)TS,(float)TS }, 2,
                                  eyedrop ? GREEN : ui::kAccentHi);
@@ -224,7 +224,7 @@ void Editor::drawMapCanvas(Rectangle area) {
             DrawRectangle(tx*TS, ty*TS, pf.w*TS, pf.h*TS, Fade(ui::kAccent, 0.25f));
             DrawRectangleLinesEx({ (float)tx*TS,(float)ty*TS,(float)pf.w*TS,(float)pf.h*TS }, 2, ui::kAccentHi);
         }
-        EndMode2D();
+        uiEndWorld();
 
         if (inMap) {
             if (eyedrop) {                                  // eyedropper: pick a tile

@@ -286,7 +286,7 @@ void Editor::drawCharsTab() {
         float listTop = panelTop + 32, listH = panelH - 290;
         Rectangle listReg = { leftX, listTop, leftW, listH };
         int rows = (int)db.characters.size();
-        BeginScissorMode((int)leftX, (int)listTop, (int)leftW, (int)listH);
+        uiScissor((int)leftX, (int)listTop, (int)leftW, (int)listH);
         float ly = listTop - charListScroll_;
         for (int i = 0; i < rows; ++i) {
             if (ly + 28 > listTop && ly < listTop + listH)
@@ -430,7 +430,7 @@ void Editor::drawCharsTab() {
         int per = std::max(1, (int)(w / (cell + 8)));
         int frows = ((int)fv.size() + per - 1) / per;
         Rectangle gReg = { midX, gridTop, midW, gridH };
-        BeginScissorMode((int)midX, (int)gridTop, (int)midW, (int)gridH);
+        uiScissor((int)midX, (int)gridTop, (int)midW, (int)gridH);
         for (int i = 0; i < (int)fv.size(); ++i) {
             float fx = x + (i % per) * (cell + 8);
             float fy = gridTop + (i / per) * (cell + 8) - charFrameScroll_;
@@ -529,7 +529,7 @@ void Editor::drawCharsTab() {
             charLibDragStart_ = m; charLibDragMaybe_ = true; charLibDragging_ = false; charLibPressOnCard_ = false;
         }
 
-        BeginScissorMode((int)rightX, (int)gridTop, (int)rightW, (int)gridH);
+        uiScissor((int)rightX, (int)gridTop, (int)rightW, (int)gridH);
         for (int idx = 0; idx < (int)vis.size(); ++idx) {
             const AssetEntry* a = vis[idx];
             Rectangle card = cardRect(idx);

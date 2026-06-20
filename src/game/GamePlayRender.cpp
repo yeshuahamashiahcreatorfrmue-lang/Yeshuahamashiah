@@ -181,7 +181,7 @@ void GamePlay::drawField() {
     bool animOn = (phase == 1) && !animTileSet_.empty();
 
     int vx0, vy0, vx1, vy1; visibleRange(vx0, vy0, vx1, vy1); // cull to viewport
-    BeginMode2D(cam_);
+    uiBeginWorld(cam_);
     auto drawLayer = [&](int layer) {
         for (int y = vy0; y <= vy1; ++y)
             for (int x = vx0; x <= vx1; ++x) {
@@ -234,7 +234,7 @@ void GamePlay::drawField() {
     drawFx();
     // overhead layer (treetops, roof edges) on top of the player
     drawLayer(kLayerCount - 1);
-    EndMode2D();
+    uiEndWorld();
 
     // darkness + torch-light (cave / night atmosphere)
     if (map_->darkness > 0) {

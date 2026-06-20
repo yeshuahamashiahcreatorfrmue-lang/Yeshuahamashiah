@@ -79,13 +79,17 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
             if (wheel != 0) setUiScale(uiScale() + wheel * 0.1f);
         }
         float sc = uiScale();
+        // Layout happens in LOGICAL space (window / uiScale) so elements reflow,
+        // but we render into a NATIVE-resolution texture and scale the drawing up
+        // with the modelview — so text is rasterized at full window density and
+        // stays crisp instead of being magnified from a low-res frame.
         int lw = std::max(640, (int)(winW / sc)), lh = std::max(360, (int)(winH / sc));
         setLogicalScreen(lw, lh);
-        if (rtW_ != lw || rtH_ != lh) {
+        if (rtW_ != winW || rtH_ != winH) {
             if (frameRT_.id) UnloadRenderTexture(frameRT_);
-            frameRT_ = LoadRenderTexture(lw, lh);
-            SetTextureFilter(frameRT_.texture, TEXTURE_FILTER_BILINEAR);
-            rtW_ = lw; rtH_ = lh;
+            frameRT_ = LoadRenderTexture(winW, winH);
+            SetTextureFilter(frameRT_.texture, TEXTURE_FILTER_POINT);
+            rtW_ = winW; rtH_ = winH;
         }
         // map mouse into logical space so all hit-testing matches the scaled view
         SetMouseScale(1.0f / sc, 1.0f / sc);
@@ -94,15 +98,17 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
 
         BeginTextureMode(frameRT_);
         ClearBackground(Color{ 18, 20, 26, 255 });
+        uiBeginScaled();      // logical -> native modelview scale
         draw();
         drawUiScaleBar();
+        uiEndScaled();
         EndTextureMode();
 
         BeginDrawing();
         ClearBackground(BLACK);
-        // blit the logical frame to the window, scaled up (flip Y for RT)
+        // blit the native frame to the window 1:1 (flip Y for RT) — no magnify
         DrawTexturePro(frameRT_.texture,
-                       { 0, 0, (float)lw, -(float)lh },
+                       { 0, 0, (float)winW, -(float)winH },
                        { 0, 0, (float)winW, (float)winH }, { 0, 0 }, 0, WHITE);
         EndDrawing();
         ++frame;

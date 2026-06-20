@@ -81,11 +81,11 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
 void Editor::drawEventsTab() {
     Rectangle canvasArea = { 0, kToolbarH, (float)screenW() - 320, (float)screenH() - kToolbarH };
     auto m = activeMap();
-    BeginScissorMode((int)canvasArea.x, (int)canvasArea.y, (int)canvasArea.width, (int)canvasArea.height);
+    uiScissor((int)canvasArea.x, (int)canvasArea.y, (int)canvasArea.width, (int)canvasArea.height);
     DrawRectangleRec(canvasArea, Color{ 24, 26, 34, 255 });
     if (m) {
         int TS = m->tileset.tileWidth;
-        BeginMode2D(cam_);
+        uiBeginWorld(cam_);
         const Texture2D& tex = engine_.assetTexture(m->tileset.assetId);
         const Tileset& set = m->tileset;
         int w = m->tilemap.width(), h = m->tilemap.height();
@@ -111,7 +111,7 @@ void Editor::drawEventsTab() {
                                  e.id == editingEventId_ ? ui::kAccentHi : ui::kAccent);
             DrawTextU(TextFormat("%d", e.id), e.x*TS+3, e.y*TS+2, 14, WHITE);
         }
-        EndMode2D();
+        uiEndWorld();
 
         // click to select/create event
         if (ui::mouseIn(canvasArea) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)

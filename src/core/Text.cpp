@@ -1,4 +1,5 @@
 #include "core/Text.h"
+#include "rlgl.h"
 #include <vector>
 #include <algorithm>
 
@@ -30,8 +31,9 @@ void LoadUIFont(const std::string& ttfPath, const std::string& glyphSourceUtf8) 
     }
     UnloadCodepoints(found);
 
-    // Bake at a comfortable size; DrawTextEx scales down crisply for small UI.
-    const int kBaseSize = 36;
+    // Bake at a high resolution so glyphs stay sharp at the larger UI sizes and
+    // when the whole UI is scaled up; DrawTextEx samples this atlas crisply.
+    const int kBaseSize = 72;
     Font f = LoadFontEx(ttfPath.c_str(), kBaseSize, cps.data(), (int)cps.size());
     if (f.texture.id == 0 || f.glyphCount == 0) {
         TraceLog(LOG_WARNING, "UI font failed to bake: %s", ttfPath.c_str());
@@ -74,5 +76,27 @@ int  screenW() { return s_logicalW; }
 int  screenH() { return s_logicalH; }
 void setUiScale(float s) { s_uiScale = s < 1.0f ? 1.0f : (s > 3.0f ? 3.0f : s); }
 float uiScale() { return s_uiScale; }
+
+// Push the global logical->native scale onto the modelview (whole-frame wrap).
+void uiBeginScaled() { rlPushMatrix(); rlScalef(s_uiScale, s_uiScale, 1.0f); }
+void uiEndScaled()   { rlPopMatrix(); }
+
+// Enter a Camera2D region: compose the global scale into the camera so world
+// content is rasterized at native density. (A pure scale about the origin folds
+// into the camera as offset*=s, zoom*=s; target/rotation are unchanged.)
+void uiBeginWorld(Camera2D cam) {
+    cam.offset.x *= s_uiScale; cam.offset.y *= s_uiScale; cam.zoom *= s_uiScale;
+    BeginMode2D(cam);
+}
+// Leave the region. EndMode2D resets the modelview, so re-apply the global scale
+// for the UI drawn afterwards (balanced by the single uiEndScaled() pop).
+void uiEndWorld() { EndMode2D(); rlScalef(s_uiScale, s_uiScale, 1.0f); }
+
+// Scissor clips in framebuffer pixels, which are unaffected by the modelview
+// scale, so convert the logical rect to native pixels here.
+void uiScissor(int x, int y, int w, int h) {
+    float s = s_uiScale;
+    BeginScissorMode((int)(x * s), (int)(y * s), (int)(w * s), (int)(h * s));
+}
 
 } // namespace tsukuru

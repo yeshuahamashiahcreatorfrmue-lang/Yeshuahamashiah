@@ -59,10 +59,11 @@ void Editor::drawWorldTab() {
     std::vector<int> shown;
     for (int i = 0; i < (int)p.maps.size(); ++i) if (matches(p.maps[i], p.maps[i]->id)) shown.push_back(i);
 
-    // scrollable filtered list
-    Rectangle listR = { lx + 6, ly + 108, lw - 12, area.height - 24 - (ly + 108 - ly) - 6 };
+    // scrollable filtered list (leave room at the bottom for a live preview)
+    const float previewH = 168;
+    Rectangle listR = { lx + 6, ly + 108, lw - 12, area.height - 24 - (ly + 108 - ly) - 6 - previewH };
     float rowH = 32, contentH = shown.size() * rowH + 4;
-    BeginScissorMode((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
+    uiScissor((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
     if (ui::mouseIn(listR)) worldListScroll_ -= GetMouseWheelMove() * 48;
     float maxScroll = std::max(0.0f, contentH - listR.height);
     if (worldListScroll_ < 0) worldListScroll_ = 0;
@@ -84,6 +85,25 @@ void Editor::drawWorldTab() {
     EndScissorMode();
     if (shown.empty())
         DrawTextU("검색 결과 없음", (int)listR.x + 10, (int)listR.y + 8, 15, ui::kTextDim);
+
+    // selected-map preview pinned to the bottom of the left panel (always visible)
+    {
+        float pvY = listR.y + listR.height + 6;
+        DrawTextU("미리보기", (int)lx + 12, (int)pvY, 15, ui::kAccent);
+        Rectangle pvBox = { lx + 8, pvY + 20, lw - 16, previewH - 28 };
+        DrawRectangleRec(pvBox, Color{ 18, 20, 28, 255 });
+        int selIdx = (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) ? worldSelected_ : -1;
+        if (selIdx >= 0) {
+            if (const RenderTexture2D* th = mapThumb(p.maps[selIdx]->id)) {
+                float tw = (float)th->texture.width, tht = (float)th->texture.height;
+                float s = std::min(pvBox.width / tw, pvBox.height / tht);
+                float pw = tw * s, ph = tht * s;
+                float bx = pvBox.x + (pvBox.width - pw) / 2, by = pvBox.y + (pvBox.height - ph) / 2;
+                DrawTexturePro(th->texture, { 0,0,tw,-tht }, { bx,by,pw,ph }, {0,0}, 0, WHITE);
+            }
+        }
+        DrawRectangleLinesEx(pvBox, 1, Fade(BLACK, 0.6f));
+    }
 
     // ---- right panel ----
     float dx = lx + lw + 24, dy = ly;
@@ -220,7 +240,7 @@ void Editor::drawWorldTab() {
         }
     }
     DrawTextU("팁: 이동 이벤트로 맵을 연결하세요 (이벤트 탭).",
-             (int)dx, (int)(ly + area.height - 60), 14, ui::kTextDim);
+             (int)dx, (int)(ly + area.height - 58), 14, ui::kTextDim);
 }
 
 // ===================== All-Map Viewer (zone grid) =====================
@@ -238,8 +258,8 @@ void Editor::drawWorldViewTab() {
     float lx = 12, ly = kToolbarH + 12, lw = 270;
     ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
     ui::label("전맵 뷰어", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
-    DrawTextU("맵 선택 후 격자 빈칸 클릭 = 배치", (int)lx + 12, (int)ly + 40, 12, ui::kTextDim);
-    DrawTextU("붙어있는 맵끼리 가장자리로 이동", (int)lx + 12, (int)ly + 56, 12, ui::kTextDim);
+    DrawTextU("맵 선택→빈칸 좌클릭=배치, 다시=복제", (int)lx + 12, (int)ly + 40, 12, ui::kTextDim);
+    DrawTextU("우클릭=제거 · 붙은 맵끼리 가장자리 이동", (int)lx + 12, (int)ly + 56, 12, ui::kTextDim);
     float yb = ly + 80;
     if (worldViewSel_ >= 0 && worldViewSel_ < (int)p.maps.size()) {
         auto& sm = p.maps[worldViewSel_];
@@ -249,7 +269,7 @@ void Editor::drawWorldViewTab() {
     }
     yb += 32;
     Rectangle listR = { lx + 6, yb, lw - 12, area.height - 24 - (yb - ly) - 6 };
-    BeginScissorMode((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
+    uiScissor((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
     if (ui::mouseIn(listR)) worldListScroll_ -= GetMouseWheelMove() * 48;
     float contentH = p.maps.size() * 30.0f + 4;
     float maxS = std::max(0.0f, contentH - listR.height);
@@ -268,7 +288,7 @@ void Editor::drawWorldViewTab() {
 
     // ---- right: zone grid canvas ----
     Rectangle canvas = { lx + lw + 12, ly, area.width - (lx + lw + 12) - 12, area.height - 24 };
-    BeginScissorMode((int)canvas.x, (int)canvas.y, (int)canvas.width, (int)canvas.height);
+    uiScissor((int)canvas.x, (int)canvas.y, (int)canvas.width, (int)canvas.height);
     DrawRectangleRec(canvas, Color{ 26, 28, 38, 255 });
     if (!worldCamInit_) { worldCam_.zoom = 0.7f; worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 }; worldCam_.target = { cell, cell }; worldCamInit_ = true; }
     worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 };
@@ -278,7 +298,7 @@ void Editor::drawWorldViewTab() {
         if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) { Vector2 dd = GetMouseDelta(); worldCam_.target.x -= dd.x/worldCam_.zoom; worldCam_.target.y -= dd.y/worldCam_.zoom; }
     }
 
-    BeginMode2D(worldCam_);
+    uiBeginWorld(worldCam_);
     // grid lines around the visible area
     Vector2 tl = GetScreenToWorld2D({ canvas.x, canvas.y }, worldCam_);
     Vector2 br = GetScreenToWorld2D({ canvas.x+canvas.width, canvas.y+canvas.height }, worldCam_);
@@ -299,11 +319,16 @@ void Editor::drawWorldViewTab() {
         auto& m = p.maps[i];
         if (!m->placed) continue;
         Rectangle box = { m->worldX*cell+6, m->worldY*cell+6, cell-12, cell-12 };
-        Color fill = { (unsigned char)(60+(m->id*53)%120), (unsigned char)(70+(m->id*97)%110), (unsigned char)(90+(m->id*29)%120), 255 };
-        DrawRectangleRec(box, fill);
+        if (const RenderTexture2D* th = mapThumb(m->id)) {     // real map thumbnail
+            DrawRectangleRec(box, Color{ 20, 22, 30, 255 });
+            DrawTexturePro(th->texture, { 0,0,(float)th->texture.width,-(float)th->texture.height }, box, {0,0}, 0, WHITE);
+        } else {
+            Color fill = { (unsigned char)(60+(m->id*53)%120), (unsigned char)(70+(m->id*97)%110), (unsigned char)(90+(m->id*29)%120), 255 };
+            DrawRectangleRec(box, fill);
+        }
         DrawRectangleLinesEx(box, worldViewSel_==i ? 3 : 1, worldViewSel_==i ? ui::kAccentHi : Fade(BLACK,0.6f));
     }
-    EndMode2D();
+    uiEndWorld();
 
     // labels in screen space (so text stays crisp)
     for (auto& m : p.maps) {
@@ -313,7 +338,8 @@ void Editor::drawWorldViewTab() {
         DrawTextU(TextFormat("#%d  (%d,%d)", m->id, m->worldX, m->worldY), (int)sp.x, (int)sp.y+18, 11, Fade(WHITE,0.8f));
     }
 
-    // click: select an occupied cell, or drop the selected map on an empty cell
+    // left-click: select an occupied cell; on an empty cell place the selected
+    // map (first time) or stamp a sequentially-numbered copy of it (copy-paste).
     if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
         Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
         int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
@@ -321,14 +347,99 @@ void Editor::drawWorldViewTab() {
         if (occ) {
             for (int i = 0; i < (int)p.maps.size(); ++i) if (p.maps[i] == occ) worldViewSel_ = i;
         } else if (worldViewSel_ >= 0 && worldViewSel_ < (int)p.maps.size()) {
-            auto& sm = p.maps[worldViewSel_];
-            sm->worldX = cx; sm->worldY = cy; sm->placed = true; p.save();
-            setStatus(TextFormat("%s 배치: (%d,%d)", sm->name.c_str(), cx, cy));
+            auto sm = p.maps[worldViewSel_];
+            if (!sm->placed) {                       // first instance: place the map itself
+                sm->worldX = cx; sm->worldY = cy; sm->placed = true; p.save();
+                setStatus(TextFormat("%s 배치: (%d,%d)", sm->name.c_str(), cx, cy));
+            } else {                                  // already placed: drop a numbered copy
+                auto nm = std::make_shared<Map>(*sm);
+                nm->id = p.nextMapId();
+                std::string stem = sm->name;          // strip an existing " (N)" suffix
+                auto pos = stem.rfind(" (");
+                if (pos != std::string::npos && !stem.empty() && stem.back() == ')') stem = stem.substr(0, pos);
+                auto taken = [&](const std::string& s){ for (auto& mm : p.maps) if (mm->name == s) return true; return false; };
+                std::string cand; int n = 2;
+                do { cand = stem + " (" + std::to_string(n) + ")"; ++n; } while (taken(cand));
+                nm->name = cand;
+                nm->worldX = cx; nm->worldY = cy; nm->placed = true;
+                p.maps.push_back(nm);
+                p.save();                             // thumbnail builds next frame (update())
+                setStatus(TextFormat("%s 복제 배치: (%d,%d)", nm->name.c_str(), cx, cy));
+            }
+        }
+    }
+    // right-click: remove (un-place) the map under the cursor from the grid.
+    if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+        Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
+        int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
+        if (auto occ = p.mapAtWorld(cx, cy)) {
+            occ->placed = false; p.save();
+            setStatus(TextFormat("%s 배치 제거", occ->name.c_str()));
         }
     }
     EndScissorMode();
-    DrawTextU("휠=확대/축소 · 가운데드래그=이동 · 좌클릭=배치/선택", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 13, ui::kTextDim);
+    DrawTextU("좌클릭=배치/복제 · 우클릭=제거 · 휠=확대/축소 · 가운데드래그=이동", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 13, ui::kTextDim);
     DrawTextU(kBuildTag, 12, screenH()-22, 13, ui::kGood);
+}
+
+// ---- map thumbnails (rendered once into cached RenderTextures) ----
+// Built in Editor::update() (outside the engine's frame render texture, so the
+// nested BeginTextureMode is valid) and drawn on the World / All-Map Viewer tabs.
+void Editor::buildMapThumb(Map& m) {
+    int mw = m.tilemap.width(), mh = m.tilemap.height();
+    if (mw <= 0 || mh <= 0) return;
+    int TS = m.tileset.tileWidth > 0 ? m.tileset.tileWidth : 32;
+    const float MAXW = 220, MAXH = 165;
+    float sc = std::min(MAXW / (mw*TS), MAXH / (mh*TS));
+    int tw = std::max(1, (int)(mw*TS*sc)), th = std::max(1, (int)(mh*TS*sc));
+    RenderTexture2D rt = LoadRenderTexture(tw, th);
+    BeginTextureMode(rt);
+    ClearBackground(Color{ 24, 26, 34, 255 });
+    const Tileset& set = m.tileset;
+    if (set.assetId >= 0) {
+        const Texture2D& tex = engine_.assetTexture(set.assetId);
+        for (int layer = 0; layer < kLayerCount; ++layer)
+            for (int y = 0; y < mh; ++y)
+                for (int x = 0; x < mw; ++x) {
+                    int t = m.tilemap.tile(layer, x, y);
+                    if (t < 0) continue;
+                    int sx, sy; set.srcOf(t, sx, sy);
+                    DrawTexturePro(tex, { (float)sx,(float)sy,(float)set.tileWidth,(float)set.tileHeight },
+                                   { x*TS*sc, y*TS*sc, TS*sc, TS*sc }, {0,0}, 0, WHITE);
+                }
+    }
+    EndTextureMode();
+    auto it = mapThumbs_.find(m.id);
+    if (it != mapThumbs_.end()) UnloadRenderTexture(it->second);
+    mapThumbs_[m.id] = rt;
+}
+
+const RenderTexture2D* Editor::mapThumb(int mapId) {
+    auto it = mapThumbs_.find(mapId);
+    return it == mapThumbs_.end() ? nullptr : &it->second;
+}
+
+void Editor::clearMapThumbs() {
+    for (auto& kv : mapThumbs_) UnloadRenderTexture(kv.second);
+    mapThumbs_.clear();
+}
+
+void Editor::ensureThumbsForTab() {
+    // refresh thumbnails whenever we (re)enter a tab that shows them, so map
+    // edits are reflected; then lazily build the ones actually needed.
+    if (tab_ != prevTab_) {
+        if (tab_ == Tab::World || tab_ == Tab::WorldView) clearMapThumbs();
+        prevTab_ = tab_;
+    }
+    Project& p = engine_.project();
+    if (tab_ == Tab::WorldView) {
+        for (auto& m : p.maps) if (m->placed && !mapThumb(m->id)) buildMapThumb(*m);
+    } else if (tab_ == Tab::World) {
+        if (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) {
+            auto& m = p.maps[worldSelected_];
+            if (!mapThumb(m->id)) buildMapThumb(*m);
+        }
+    }
 }
 
 } // namespace tsukuru

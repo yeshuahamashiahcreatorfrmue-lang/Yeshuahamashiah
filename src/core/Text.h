@@ -36,4 +36,16 @@ int  screenH();           // logical height (= window height / uiScale)
 void  setUiScale(float s); // clamps to [1.0, 3.0]
 float uiScale();
 
+// --- crisp scaling helpers -------------------------------------------------
+// The UI is laid out in LOGICAL coordinates but rendered at NATIVE resolution
+// for sharp text: a modelview scale of uiScale() maps logical -> native pixels.
+// uiBeginScaled/uiEndScaled wrap the whole frame; uiBeginWorld/uiEndWorld wrap
+// a Camera2D region (the scale is composed into the camera, then restored on
+// end); uiScissor clips in native pixels (logical * uiScale).
+void uiBeginScaled();
+void uiEndScaled();
+void uiBeginWorld(Camera2D cam);
+void uiEndWorld();
+void uiScissor(int x, int y, int w, int h);
+
 } // namespace tsukuru
