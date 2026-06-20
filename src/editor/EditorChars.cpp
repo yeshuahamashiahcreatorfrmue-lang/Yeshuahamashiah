@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <utility>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -31,6 +32,41 @@ static int castSlotForMotion(int m) {
         case MO_Ult:    return 3;   // V
         default:        return -1;  // 걷기 / 죽음 — no skill
     }
+}
+
+// Unregister a set of image assets from the project and remove any references to
+// them from every character motion (so no frame points at a deleted id).
+void Editor::deleteAssets(const std::vector<int>& ids) {
+    Project& p = engine_.project();
+    auto hit = [&](int id){ return std::find(ids.begin(), ids.end(), id) != ids.end(); };
+    auto scrub = [&](std::vector<int>& v){ v.erase(std::remove_if(v.begin(), v.end(), hit), v.end()); };
+    for (auto& cd : p.database.characters)
+        for (int mi = 0; mi < MO_COUNT; ++mi) {
+            MotionClip& mc = cd.motions[mi];
+            scrub(mc.frames); scrub(mc.left); scrub(mc.right); scrub(mc.up);
+        }
+    for (int id : ids) p.assets.remove(id);
+    charFrameSel_ = -1;
+    p.save();
+}
+
+// Duplicate an image asset: copy its file under a new name and register it.
+int Editor::duplicateAsset(int id) {
+    Project& p = engine_.project();
+    const AssetEntry* e = p.assets.find(id);
+    if (!e) return -1;
+    fs::path src = p.assetFullPath(id);
+    std::string ext = fs::path(e->relPath).extension().string();
+    std::string base = fs::path(e->relPath).stem().string();
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir)/"assets"/(base + "_copy" + std::to_string(n++) + ext); } while (fs::exists(dest));
+    std::error_code ec; fs::copy_file(src, dest, ec);
+    if (ec) return -1;
+    std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+    int nid = p.assets.addExisting(e->type, dest.stem().string(), rel);
+    if (e->frames > 1) p.assets.setAnim(nid, e->frames, e->fps);
+    return nid;
 }
 
 int Editor::generateCharacter() {
@@ -406,33 +442,85 @@ void Editor::drawCharsTab() {
     {
         float x = rightX + 10, w = rightW - 20;
         ui::label("이미지 소스", (int)x, (int)panelTop + 8, 15, ui::kAccent);
+        bool ctrl  = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        bool shift = IsKeyDown(KEY_LEFT_SHIFT)   || IsKeyDown(KEY_RIGHT_SHIFT);
+        bool blocked = charLibMenuOpen_ || charLibRenameId_ >= 0;   // overlay eats grid input
+
         if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { pendingImport_ = true; }
         float ry = panelTop + 66;
         if (ui::button({ x, ry, w/2 - 2, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_)) charLibFilter_ = !charLibFilter_;
         if (ui::button({ x + w/2 + 2, ry, w/2 - 2, 24 }, charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_)) charSliceMode_ = !charSliceMode_;
         ry += 28;
         if (charSliceMode_) { ui::intStepper({ x, ry, w, 24 }, "분할수", charSliceN_, 1, 2, 16); ry += 28; }
+
+        // visible asset list (stable indices for shift-range & rubber-band select)
+        std::vector<const AssetEntry*> vis;
+        for (auto* a : imgs) {
+            if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; }
+            vis.push_back(a);
+        }
+        auto isSel    = [&](int id){ return std::find(charLibSel_.begin(), charLibSel_.end(), id) != charLibSel_.end(); };
+        auto toggleSel= [&](int id){ auto it = std::find(charLibSel_.begin(), charLibSel_.end(), id);
+                                     if (it != charLibSel_.end()) charLibSel_.erase(it); else charLibSel_.push_back(id); };
+        auto addToMotion = [&](int assetId){
+            if (!building) return 0;
+            const AssetEntry* a = p.assets.find(assetId); if (!a) return 0;
+            MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
+            charUndo_ = mc; charUndoSet_ = true;
+            auto& mf = dirVecOf(mc, charDirTab_);
+            int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
+            int n = (a->frames > 1) ? a->frames : (charSliceMode_ ? charSliceN_ : 1);
+            if (n > 1) {
+                std::vector<int> sl = sliceAsset(a->id, n);
+                mf.insert(mf.begin() + pos, sl.begin(), sl.end());
+                if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
+                return (int)sl.size();
+            }
+            mf.insert(mf.begin() + pos, a->id);
+            if (charFrameSel_ >= 0) charFrameSel_++;
+            return 1;
+        };
+
+        // ---- selection toolbar ----
+        DrawTextU(TextFormat("선택 %d개  (Ctrl=다중·Shift=범위·드래그=상자·우클릭=메뉴)", (int)charLibSel_.size()),
+                  (int)x, (int)ry, 11, charLibSel_.empty() ? ui::kTextDim : ui::kAccentHi);
+        ry += 18;
+        float tb = (w - 8) / 3;
+        if (ui::button({ x, ry, tb, 22 }, "전체 선택")) { charLibSel_.clear(); for (auto* a : vis) charLibSel_.push_back(a->id); }
+        if (ui::button({ x + tb + 4, ry, tb, 22 }, "선택 해제")) charLibSel_.clear();
+        if (ui::button({ x + 2*(tb + 4), ry, tb, 22 }, TextFormat("삭제(%d)", (int)charLibSel_.size())) && !charLibSel_.empty()) {
+            auto ids = charLibSel_; deleteAssets(ids); charLibSel_.clear();
+            setStatus(TextFormat("%d개 삭제됨", (int)ids.size())); return;
+        }
+        ry += 26;
         {
             static const char* dn[4] = { "아래","왼쪽","오른쪽","위" };
             DrawTextU(building ? TextFormat("클릭 → '%s·%s'에 추가 (움짤 통째로)", kMotionNames[charMotionTab_], dn[charDirTab_])
                                : "먼저 캐릭터를 선택/생성하세요",
                       (int)x, (int)ry, 12, building ? ui::kAccentHi : ui::kTextDim);
         }
-        ry += 20;
+        ry += 18;
 
         float gridTop = ry, gridH = panelBot - 8 - gridTop;
         float cell = (w - 8) / 2, cardH = cell + 34;
-        int visN = 0;
-        for (auto* a : imgs) { if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; } visN++; }
-        int grows = (visN + 1) / 2;
+        int grows = ((int)vis.size() + 1) / 2;
         Rectangle gReg = { rightX, gridTop, rightW, gridH };
+        Vector2 m = GetMousePosition();
+        auto cardRect = [&](int idx)->Rectangle {
+            int col = idx % 2, row = idx / 2;
+            return { x + col*(cell+8), gridTop + row*(cardH+8) - charLibScroll_, cell, cardH };
+        };
+
+        // rubber-band may begin on a left press inside the grid
+        if (!blocked && CheckCollisionPointRec(m, gReg) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            charLibDragStart_ = m; charLibDragMaybe_ = true; charLibDragging_ = false; charLibPressOnCard_ = false;
+        }
+
         BeginScissorMode((int)rightX, (int)gridTop, (int)rightW, (int)gridH);
-        int idx = 0;
-        for (auto* a : imgs) {
-            if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; }
-            int col = idx % 2, row = idx / 2; idx++;
-            float cx = x + col * (cell + 8);
-            float cy = gridTop + row * (cardH + 8) - charLibScroll_;
+        for (int idx = 0; idx < (int)vis.size(); ++idx) {
+            const AssetEntry* a = vis[idx];
+            Rectangle card = cardRect(idx);
+            float cx = card.x, cy = card.y;
             if (cy + cardH < gridTop || cy > panelBot) continue;
             ui::panel({ cx, cy, cell, cardH }, ui::kPanelHi);
             const Texture2D& tex = engine_.assetTexture(a->id);
@@ -441,28 +529,35 @@ void Editor::drawCharsTab() {
                            { cx + (cell - tex.width*sc)/2, cy + 4, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
             if (a->frames > 1) DrawTextU(TextFormat("움짤%d", a->frames), (int)cx + 4, (int)cy + 4, 11, ui::kGood);
             DrawTextU(a->name.c_str(), (int)cx + 4, (int)(cy + cardH - 30), 10, ui::kText);
+            bool sel = isSel(a->id);
+            if (sel) {
+                DrawRectangleLinesEx({ cx, cy, cell, cardH }, 3, ui::kGood);
+                DrawRectangleRec({ cx + cell - 19, cy + 3, 16, 16 }, ui::kGood);
+                DrawTextU("✓", (int)cx + cell - 16, (int)cy + 3, 14, BLACK);
+            }
+            // right-click: select this card (unless already in a multi-selection) + open menu
+            if (!blocked && CheckCollisionPointRec(m, { cx, cy, cell, cardH }) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+                if (!sel) charLibSel_ = { a->id };
+                charLibMenuOpen_ = true; charLibMenuPos_ = m; charLibPressOnCard_ = true; charLibDragMaybe_ = false;
+            }
+            // left-click on the image area
             Rectangle clickArea = { cx, cy, cell, cardH - 18 };
-            if (building && ui::mouseIn(clickArea) && lclick) {
-                MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
-                charUndo_ = mc; charUndoSet_ = true;
-                auto& mf = dirVecOf(mc, charDirTab_);     // add into the selected direction
-                int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
-                int n = (a->frames > 1) ? a->frames : (charSliceMode_ ? charSliceN_ : 1);
-                if (n > 1) {
-                    std::vector<int> sl = sliceAsset(a->id, n);
-                    mf.insert(mf.begin() + pos, sl.begin(), sl.end());
-                    if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
-                    static const char* dn[4] = { "아래","왼쪽","오른쪽","위" };
-                    setStatus(TextFormat("%s·%s: %d프레임 추가", kMotionNames[charMotionTab_], dn[charDirTab_], (int)sl.size()));
-                } else {
-                    mf.insert(mf.begin() + pos, a->id);
-                    if (charFrameSel_ >= 0) charFrameSel_++;
-                    setStatus(std::string(kMotionNames[charMotionTab_]) + " 프레임 추가: " + a->name);
+            if (!blocked && ui::mouseIn(clickArea) && lclick) {
+                charLibPressOnCard_ = true;
+                if (ctrl) { toggleSel(a->id); charLibAnchor_ = idx; }
+                else if (shift && charLibAnchor_ >= 0) {
+                    int lo = std::min(charLibAnchor_, idx), hi = std::max(charLibAnchor_, idx);
+                    charLibSel_.clear();
+                    for (int k = lo; k <= hi && k < (int)vis.size(); ++k) charLibSel_.push_back(vis[k]->id);
+                } else {                              // plain click = add to motion (+ become selection)
+                    int n = addToMotion(a->id);
+                    charLibSel_ = { a->id }; charLibAnchor_ = idx;
+                    if (n > 0) { p.save(); setStatus(std::string(kMotionNames[charMotionTab_]) + " 프레임 추가: " + a->name); }
                 }
-                p.save();
             }
             float bhalf = (cell - 10) / 2;
-            if (building && ui::button({ cx + 4, cy + cardH - 16, bhalf, 14 }, "자동구성")) {
+            if (building && !blocked && ui::button({ cx + 4, cy + cardH - 16, bhalf, 14 }, "자동구성")) {
+                charLibPressOnCard_ = true;
                 CharacterDef& c = db.characters[charDefSel_];
                 std::vector<int> fr = sliceSheetRow0(a->id);
                 int wlk = std::min((int)fr.size(), 4);
@@ -472,13 +567,98 @@ void Editor::drawCharsTab() {
                 charFrameSel_ = -1; p.save();
                 setStatus(TextFormat("시트 자동구성: 걷기%d+공격%d", wlk, (int)fr.size() - wlk));
             }
-            if (ui::button({ cx + 6 + bhalf, cy + cardH - 16, bhalf, 14 }, "배경제거"))
-                makeTransparentBg(a->id);   // make the solid/white background transparent
+            if (!blocked && ui::button({ cx + 6 + bhalf, cy + cardH - 16, bhalf, 14 }, "배경제거")) {
+                charLibPressOnCard_ = true; makeTransparentBg(a->id);
+            }
         }
         EndScissorMode();
+
+        // ---- rubber-band box selection ----
+        if (!blocked && charLibDragMaybe_ && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            if (!charLibDragging_ && !charLibPressOnCard_ &&
+                (fabsf(m.x - charLibDragStart_.x) > 5 || fabsf(m.y - charLibDragStart_.y) > 5)) {
+                charLibDragging_ = true;
+                charLibSelBase_ = ctrl ? charLibSel_ : std::vector<int>{};   // additive only with Ctrl
+            }
+            if (charLibDragging_) {
+                Rectangle rub = { std::min(m.x, charLibDragStart_.x), std::min(m.y, charLibDragStart_.y),
+                                  fabsf(m.x - charLibDragStart_.x), fabsf(m.y - charLibDragStart_.y) };
+                charLibSel_ = charLibSelBase_;                               // rebuild each frame (box reflects exactly)
+                for (int idx = 0; idx < (int)vis.size(); ++idx) {
+                    Rectangle c = cardRect(idx);
+                    if (c.y + cardH < gridTop || c.y > panelBot) continue;   // only on-screen cards
+                    if (CheckCollisionRecs(c, rub) && !isSel(vis[idx]->id)) charLibSel_.push_back(vis[idx]->id);
+                }
+                DrawRectangleRec(rub, Fade(ui::kAccent, 0.20f));
+                DrawRectangleLinesEx(rub, 1, ui::kAccent);
+            }
+        }
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) { charLibDragMaybe_ = false; charLibDragging_ = false; charLibPressOnCard_ = false; }
+
         scrollbar(gReg, charLibScroll_, grows * (cardH + 8.0f) + 4);
-        if (imgs.empty())
+        if (vis.empty())
             DrawTextU("(이미지 없음 — 위 '+ 내 이미지 불러오기')", (int)x, (int)gridTop + 10, 12, ui::kTextDim);
+
+        // ---- right-click context menu (drawn on top) ----
+        if (charLibMenuOpen_) {
+            int nsel = (int)charLibSel_.size();
+            std::vector<std::pair<std::string,int>> items;
+            if (building) items.push_back({ std::string(TextFormat("모션에 추가 (%d)", nsel)), 1 });
+            items.push_back({ std::string(TextFormat("배경 제거 (%d)", nsel)), 2 });
+            items.push_back({ std::string(TextFormat("복제 (%d)", nsel)), 3 });
+            if (nsel == 1) items.push_back({ "이름 바꾸기", 4 });
+            items.push_back({ "전체 선택", 5 });
+            items.push_back({ "선택 해제", 6 });
+            items.push_back({ std::string(TextFormat("삭제 (%d)", nsel)), 7 });
+
+            float mw = 196, ih = 26, mh = items.size() * ih + 8;
+            float mx = std::min(charLibMenuPos_.x, W - mw - 6);
+            float my = std::min(charLibMenuPos_.y, H - mh - 6);
+            Rectangle menuR = { mx, my, mw, mh };
+            if ((IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) &&
+                !CheckCollisionPointRec(m, menuR))
+                charLibMenuOpen_ = false;
+            ui::panel(menuR, ui::kPanelHi);
+            DrawRectangleLinesEx(menuR, 1, ui::kAccent);
+            float iy = my + 4; int chosen = -1;
+            for (auto& it : items) { if (ui::button({ mx + 4, iy, mw - 8, ih - 2 }, it.first.c_str())) chosen = it.second; iy += ih; }
+            if (chosen >= 0) {
+                auto ids = charLibSel_;
+                charLibMenuOpen_ = false;
+                switch (chosen) {
+                    case 1: { int tot = 0; for (int id : ids) tot += addToMotion(id); p.save();
+                              setStatus(TextFormat("모션에 %d프레임 추가", tot)); return; }
+                    case 2: for (int id : ids) makeTransparentBg(id); setStatus(TextFormat("%d개 배경 제거", (int)ids.size())); return;
+                    case 3: { for (int id : ids) duplicateAsset(id); p.save(); setStatus(TextFormat("%d개 복제됨", (int)ids.size())); return; }
+                    case 4: if (nsel == 1) { charLibRenameId_ = ids[0]; const AssetEntry* e = p.assets.find(ids[0]);
+                                             charLibRenameBuf_ = e ? e->name : ""; charLibRenameFocus_ = true; } break;
+                    case 5: charLibSel_.clear(); for (auto* a : vis) charLibSel_.push_back(a->id); break;
+                    case 6: charLibSel_.clear(); break;
+                    case 7: deleteAssets(ids); charLibSel_.clear(); setStatus(TextFormat("%d개 삭제됨", (int)ids.size())); return;
+                }
+            }
+        }
+
+        // ---- rename overlay ----
+        if (charLibRenameId_ >= 0) {
+            const AssetEntry* e = p.assets.find(charLibRenameId_);
+            if (!e) charLibRenameId_ = -1;
+            else {
+                float rw = 320, rh = 100, rx = (W - rw)/2, ryy = (H - rh)/2;
+                ui::panel({ rx, ryy, rw, rh }, ui::kPanelHi);
+                DrawRectangleLinesEx({ rx, ryy, rw, rh }, 2, ui::kAccent);
+                DrawTextU("이름 바꾸기", (int)rx + 12, (int)ryy + 8, 15, ui::kAccent);
+                Rectangle nf = { rx + 12, ryy + 34, rw - 24, 26 };
+                if (lclick) charLibRenameFocus_ = ui::mouseIn(nf);
+                ui::textField(nf, charLibRenameBuf_, charLibRenameFocus_, 40);
+                if (ui::button({ rx + 12, ryy + 66, rw/2 - 16, 24 }, "확인") || IsKeyPressed(KEY_ENTER)) {
+                    p.assets.rename(charLibRenameId_, charLibRenameBuf_); charLibRenameId_ = -1; p.save();
+                    setStatus("이름 변경됨"); return;
+                }
+                if (ui::button({ rx + rw/2 + 4, ryy + 66, rw/2 - 16, 24 }, "취소") || IsKeyPressed(KEY_ESCAPE))
+                    charLibRenameId_ = -1;
+            }
+        }
     }
 }
 

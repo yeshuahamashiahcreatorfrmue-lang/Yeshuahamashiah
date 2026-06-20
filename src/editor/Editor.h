@@ -42,6 +42,8 @@ private:
     void handleAssetDrop();
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
+    void deleteAssets(const std::vector<int>& ids);  // unregister assets + scrub character motion refs
+    int  duplicateAsset(int id);                      // copy an image asset to a new file+entry
     static bool isImageExt(const std::string& ext);  // any raylib-loadable image extension
     static bool isAudioExt(const std::string& ext);
     int  generateCharacter();          // make + register a new character sheet
@@ -96,6 +98,19 @@ private:
     MotionClip charUndo_;             // 1-level undo snapshot of the active motion
     bool charUndoSet_ = false;        // undo snapshot available
     int  charLibScroll_ = 0;          // library grid scroll offset (px)
+    // Image-source panel: multi-select / rubber-band / right-click menu / rename
+    std::vector<int> charLibSel_;     // selected asset ids in the 이미지 소스 grid
+    std::vector<int> charLibSelBase_; // selection snapshot at rubber-band start (for live box)
+    int   charLibAnchor_ = -1;        // visible-index anchor for shift-range select
+    bool  charLibDragMaybe_ = false;  // left pressed in grid; may turn into a rubber-band
+    bool  charLibDragging_ = false;   // rubber-band box select is active
+    bool  charLibPressOnCard_ = false;// the press landed on a card (suppresses rubber-band)
+    Vector2 charLibDragStart_{};      // rubber-band anchor point (screen)
+    bool  charLibMenuOpen_ = false;   // right-click context menu is open
+    Vector2 charLibMenuPos_{};        // context menu top-left (screen)
+    int   charLibRenameId_ = -1;      // asset id being renamed (-1 = none)
+    bool  charLibRenameFocus_ = false;
+    std::string charLibRenameBuf_;    // edit buffer for rename overlay
     bool charSkillEdit_ = false;      // per-character skill editor modal is open
     int  charListScroll_ = 0;         // character list scroll (left column)
     int  charFrameScroll_ = 0;        // frame timeline scroll (center column)

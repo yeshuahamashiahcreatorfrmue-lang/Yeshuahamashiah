@@ -71,6 +71,11 @@ void AssetManager::remove(int id) {
     rebuildIndex();   // erase shifts indices
 }
 
+void AssetManager::rename(int id, const std::string& name) {
+    auto it = idIndex_.find(id);
+    if (it != idIndex_.end() && !name.empty()) assets_[it->second].name = name;
+}
+
 const AssetEntry* AssetManager::find(int id) const {
     auto it = idIndex_.find(id);
     return it == idIndex_.end() ? nullptr : &assets_[it->second];

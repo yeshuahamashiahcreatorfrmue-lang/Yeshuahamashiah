@@ -36,6 +36,7 @@ public:
     void setAnim(int id, int frames, int fps = 8);
 
     void remove(int id);
+    void rename(int id, const std::string& name);   // change an asset's display name
 
     const AssetEntry* find(int id) const;
     const std::vector<AssetEntry>& all() const { return assets_; }
