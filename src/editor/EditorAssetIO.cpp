@@ -30,9 +30,38 @@ bool Editor::isAudioExt(const std::string& e) {
     return false;
 }
 
+// Auto-trim a single-colour border: if the four corners are the same solid
+// colour, key that colour to transparent; then crop away the fully-transparent
+// margins so only the picture remains. Returns true if it changed the image.
+static bool autoRemoveBg(Image& img) {
+    if (!img.data || img.width < 3 || img.height < 3) return false;
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int W = img.width, H = img.height;
+    Color* px = (Color*)img.data;
+    Color c0 = px[0], c1 = px[W-1], c2 = px[(H-1)*W], c3 = px[(H-1)*W + (W-1)];
+    auto rgbClose = [](Color a, Color b, int t){
+        return std::abs(a.r-b.r) + std::abs(a.g-b.g) + std::abs(a.b-b.b) <= t;
+    };
+    bool transparentCorners = (c0.a==0 && c1.a==0 && c2.a==0 && c3.a==0);
+    bool uniformColor = c0.a>0 && rgbClose(c0,c1,28) && rgbClose(c0,c2,28) && rgbClose(c0,c3,28);
+    if (!transparentCorners && !uniformColor) return false;     // border isn't a single colour
+    if (uniformColor) {                                          // key the background colour out
+        const int tol = 42;
+        for (int i = 0; i < W*H; ++i)
+            if (px[i].a > 0 && rgbClose(px[i], c0, tol)) px[i] = Color{0,0,0,0};
+    }
+    int minx=W, miny=H, maxx=-1, maxy=-1;                        // bounding box of opaque pixels
+    for (int y=0;y<H;++y) for (int x=0;x<W;++x)
+        if (px[y*W+x].a > 0) { if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; }
+    if (maxx < minx) return true;                                // whole image was background
+    if (minx>0 || miny>0 || maxx<W-1 || maxy<H-1)
+        ImageCrop(&img, { (float)minx, (float)miny, (float)(maxx-minx+1), (float)(maxy-miny+1) });
+    return true;
+}
+
 // Import one image file into the project. An animated GIF is unpacked into a
-// horizontal sprite-strip with frame metadata (so it becomes a ready motion);
-// any other raylib-loadable image is registered as-is. Returns the asset id.
+// horizontal sprite-strip; a static image gets its single-colour background and
+// outer margin auto-removed, then saved as PNG. Returns the asset id.
 int Editor::importImageFile(const std::string& path) {
     Project& p = engine_.project();
     std::string ext = GetFileExtension(path.c_str() ? path.c_str() : "");
@@ -52,21 +81,33 @@ int Editor::importImageFile(const std::string& path) {
                 ImageDraw(&strip, one, { 0,0,(float)fw,(float)fh }, { (float)(f*fw),0,(float)fw,(float)fh }, WHITE);
             }
             fs::create_directories(fs::path(p.dir) / "assets");
-            fs::path base = fs::path(path).stem();
             int n = 1; fs::path dest;
-            do { dest = fs::path(p.dir)/"assets"/(base.string()+(n>1?("_"+std::to_string(n)):std::string())+".png"); n++; }
-            while (fs::exists(dest));
+            do { dest = fs::path(p.dir)/"assets"/("import_"+std::to_string(n++)+".png"); } while (fs::exists(dest));
             ExportImage(strip, dest.string().c_str());
             UnloadImage(strip); UnloadImage(anim);
             std::string rel = (fs::path("assets")/dest.filename()).generic_string();
-            int id = p.assets.addExisting(AssetType::Image, base.string(), rel);
+            int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
             p.assets.setAnim(id, frames, 12);
-            setStatus(TextFormat("움짤 등록됨: %s (%d프레임)", base.string().c_str(), frames));
+            setStatus(TextFormat("움짤 등록됨 (%d프레임)", frames));
             return id;
         }
-        if (anim.data) UnloadImage(anim);       // static gif -> register normally
+        if (anim.data) UnloadImage(anim);       // static gif -> handle as a normal image
     }
-    int id = p.assets.registerAsset(p.dir, path, AssetType::Image);
+    // static image: auto-remove a single-colour background + outer margin, save PNG
+    fs::create_directories(fs::path(p.dir) / "assets");
+    Image img = LoadImage(path.c_str());
+    if (img.data) {
+        bool trimmed = autoRemoveBg(img);
+        int n = 1; fs::path dest;
+        do { dest = fs::path(p.dir)/"assets"/("import_"+std::to_string(n++)+".png"); } while (fs::exists(dest));
+        ExportImage(img, dest.string().c_str());
+        UnloadImage(img);
+        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+        int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+        setStatus(trimmed ? "이미지 등록 (배경·여백 자동 제거)" : "이미지 등록됨");
+        return id;
+    }
+    int id = p.assets.registerAsset(p.dir, path, AssetType::Image);   // undecodable -> keep as-is
     if (id >= 0) setStatus("이미지 등록됨: " + std::string(GetFileName(path.c_str())));
     return id;
 }
@@ -99,15 +140,19 @@ void Editor::pickAndImportImages() {
     Project& p = engine_.project();
     fs::create_directories(fs::path(p.dir) / "assets");
     int added = 0;
+    std::error_code ec;
     for (const std::string& src : files) {
         std::string ext = fs::path(src).extension().string();
         for (auto& c : ext) c = (char)tolower((unsigned char)c);
         if (!isImageExt(ext)) continue;
-        int n = 1; fs::path dest;
-        do { dest = fs::path(p.dir) / "assets" / ("import_" + std::to_string(n++) + ext); }
-        while (fs::exists(dest));
-        if (!plat::copyFileUtf8(src, dest.string())) continue;   // Unicode-safe copy
-        if (importImageFile(dest.string()) >= 0) added++;        // GIF-aware, ASCII path
+        // Stage to an ASCII temp file (Unicode-safe), import it (importImageFile
+        // writes its own processed PNG asset), then delete the staging copy.
+        fs::path tmp = fs::path(p.dir) / "assets" / ("_staging" + ext);
+        int k = 1;
+        while (fs::exists(tmp)) tmp = fs::path(p.dir) / "assets" / ("_staging" + std::to_string(k++) + ext);
+        if (!plat::copyFileUtf8(src, tmp.string())) continue;
+        if (importImageFile(tmp.string()) >= 0) added++;
+        fs::remove(tmp, ec);
     }
     if (added > 0) { p.save(); setStatus(TextFormat("이미지 %d개 불러옴", added)); }
     else setStatus("불러온 이미지가 없습니다.");
