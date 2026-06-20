@@ -54,11 +54,17 @@ struct FieldSkill {
     int         mpCost = 0;
     float       cooldown = 0.5f;
     int         powerPct = 100;  // damage = ATK * powerPct/100
-    std::vector<int> patX, patY; // relative tiles (canonical facing-up)
-    int         effectAsset = -1;// sprite drawn on each hit tile (-1 = procedural)
+    std::vector<int> patX, patY; // relative DAMAGE tiles (canonical facing-up)
+    int         effectAsset = -1;// sprite drawn for the effect (-1 = procedural)
     int         effectLoops = 1; // how many times the effect's frame strip replays per cast
-    int         effectDist  = 0; // tiles FORWARD of the player where the effect appears
+    int         effectDist  = 0; // extra tiles FORWARD to shift the whole effect
     int         soundAsset  = -1;// audio asset to play (-1 = built-in "attack")
+    // Effect PLACEMENT — authored on its own grid layer like the damage range.
+    // efxX/efxY are the tiles the effect appears on (canonical facing-up); when
+    // empty the effect follows the damage tiles (patX/patY).
+    std::vector<int> efxX, efxY;
+    int         effectMode  = 0; // 0 = 각 타일마다(per tile), 1 = 한 곳에 크게(one big over the area)
+    int         effectScale = 100;// effect motion size, % of one tile (per-tile size / big size)
 };
 
 // A custom character built from registered images: each motion is a sequence of

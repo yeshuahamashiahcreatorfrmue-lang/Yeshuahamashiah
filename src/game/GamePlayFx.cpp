@@ -12,9 +12,9 @@
 
 namespace tsukuru {
 
-void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius, int loops) {
+void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius, int loops, float sizePx) {
     SkillFx f; f.type = type; f.px = px; f.py = py; f.dir = dir;
-    f.assetId = assetId; f.t = 0; f.radius = radius;
+    f.assetId = assetId; f.t = 0; f.radius = radius; f.sizePx = sizePx;
     f.loops = std::max(1, loops);
     // For an imported animated effect strip, play the whole strip at its own fps
     // for `loops` cycles so a 7-frame motion can repeat 1/3/7… times as authored.
@@ -94,7 +94,7 @@ void GamePlay::drawFx() {
                 fr = std::min(frames - 1, (int)(k * frames));
             }
             Rectangle src = { fr*fw, 0, fw, fh };
-            float sz = (f.type == 3) ? f.radius*2 : TS*1.3f;
+            float sz = f.sizePx > 0 ? f.sizePx : ((f.type == 3) ? f.radius*2 : TS*1.3f);
             Rectangle dst = { f.px + TS/2 - sz/2, f.py + TS/2 - sz/2, sz, sz };
             DrawTexturePro(tex, src, dst, {0,0}, 0, Fade(WHITE, 1.0f - k*0.3f));
             continue;

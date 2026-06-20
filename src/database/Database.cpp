@@ -11,7 +11,9 @@ static json skillToJson(const FieldSkill& s) {
             {"mpCost", s.mpCost}, {"cooldown", s.cooldown}, {"powerPct", s.powerPct},
             {"patX", s.patX}, {"patY", s.patY},
             {"effectAsset", s.effectAsset}, {"effectLoops", s.effectLoops},
-            {"effectDist", s.effectDist}, {"soundAsset", s.soundAsset}};
+            {"effectDist", s.effectDist}, {"soundAsset", s.soundAsset},
+            {"efxX", s.efxX}, {"efxY", s.efxY},
+            {"effectMode", s.effectMode}, {"effectScale", s.effectScale}};
 }
 static FieldSkill skillFromJson(const json& s) {
     FieldSkill fs;
@@ -26,6 +28,10 @@ static FieldSkill skillFromJson(const json& s) {
     fs.effectLoops = s.value("effectLoops", 1);
     fs.effectDist = s.value("effectDist", 0);
     fs.soundAsset = s.value("soundAsset", -1);
+    fs.efxX = s.value("efxX", std::vector<int>{});
+    fs.efxY = s.value("efxY", std::vector<int>{});
+    fs.effectMode = s.value("effectMode", 0);
+    fs.effectScale = s.value("effectScale", 100);
     return fs;
 }
 

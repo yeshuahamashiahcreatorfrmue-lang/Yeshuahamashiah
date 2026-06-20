@@ -202,7 +202,9 @@ static void testCharacterBuilder() {
     cs.range = 9; cs.powerPct = 250; cs.mpCost = 7; cs.cooldown = 1.2f;
     cs.patX = {0, 0}; cs.patY = {0, -1};
     cs.effectAsset = imgIds[0]; cs.effectLoops = 7;   // 7프레임 이펙트를 7회 반복
-    cs.effectDist = 3;                                 // 정면 3칸 앞에서 발생
+    cs.effectDist = 3;                                 // 정면 3칸 앞으로 밀기
+    cs.efxX = {0, 1, -1}; cs.efxY = {-1, -1, -1};      // 이펙트 범위(데미지와 별도)
+    cs.effectMode = 1; cs.effectScale = 250;          // 한 곳에 크게, 2.5칸 크기
     cd.skills.push_back(cs);
     // extra F/G slots (4·5) — editable per-character like Z/X/C/V
     FieldSkill fsk; fsk.slot = 4; fsk.name = "F스킬"; fsk.powerPct = 140; cd.skills.push_back(fsk);
@@ -234,6 +236,8 @@ static void testCharacterBuilder() {
     CHECK(c && c->skills[0].effectLoops == 7 && c->skills[0].effectAsset == imgIds[0],
           "skill effect image + 반복(회) count persisted");
     CHECK(c && c->skills[0].effectDist == 3, "skill effect distance(칸) persisted");
+    CHECK(c && c->skills[0].efxX.size() == 3 && c->skills[0].effectMode == 1 && c->skills[0].effectScale == 250,
+          "skill effect placement(범위/모드/크기) persisted");
     // F·G slots (4·5) authored per-character round-trip
     const FieldSkill* fS = nullptr; const FieldSkill* gS = nullptr;
     if (c) for (const auto& sk : c->skills) { if (sk.slot == 4) fS = &sk; if (sk.slot == 5) gS = &sk; }

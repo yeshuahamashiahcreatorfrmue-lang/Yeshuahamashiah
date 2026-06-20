@@ -77,6 +77,7 @@ struct SkillFx {
     int assetId = -1;
     float radius = 0;       // for aoe ring
     int loops = 1;          // times the sprite strip replays across `dur`
+    float sizePx = 0;       // explicit draw size in px (0 = use the type's default)
 };
 
 // --- atmosphere -------------------------------------------------------------

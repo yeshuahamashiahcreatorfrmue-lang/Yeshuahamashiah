@@ -35,7 +35,7 @@ private:
     void scrollbar(Rectangle region, int& scroll, float contentH); // wheel + middle-drag + draggable bar
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void drawCharDataEditor();         // bulk editor: all of a character's stats + every skill
-    void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
+    void applyShape(FieldSkill& s, int shape, int size, bool toEfx = false); // fill damage OR effect tiles from a preset
     // --- skill-editor widgets (used by the per-character skill editor) ---
     std::string assetName(int id) const;                 // asset display name, or "없음"
     void cycleAsset(int& cur, AssetType t);              // advance to the next asset id (wraps to -1)
@@ -88,6 +88,7 @@ private:
     // Per-character skill editor (range pattern + effect/sound)
     bool skillNameFocus_ = false;
     int  skillPatSize_ = 3;            // range/radius used by shape presets
+    bool editEfxLayer_ = false;        // grid edits the EFFECT tiles instead of damage tiles
     // Character builder (custom multi-motion characters)
     int  charDefSel_ = -1;            // selected custom character index
     int  charMotionTab_ = 0;          // selected motion tab (0..5)

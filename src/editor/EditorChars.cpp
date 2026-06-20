@@ -715,14 +715,18 @@ void Editor::drawCharSkillEditor() {
         p.save(); charSkillEdit_ = false; charSkillSlot_ = -1; return;
     }
 
-    // ---- effect-area tile grid + shape presets ----
+    // ---- tile grid + shape presets (damage layer / effect layer) ----
     float gx = 24, gy = kToolbarH + 50;
     bool usesPattern = !s.projectile;
-    ui::label("효과 적용 범위 (플레이어 기준, 위=정면)", (int)gx, (int)gy, 16, ui::kAccent); gy += 24;
-    ui::label("범위 프리셋:", (int)gx, (int)gy, 13, ui::kTextDim); gy += 18;
+    ui::label("범위 편집 (플레이어 기준, 위=정면)", (int)gx, (int)gy, 16, ui::kAccent); gy += 24;
+    // layer toggle: paint either the DAMAGE tiles or the EFFECT tiles
+    if (ui::button({ gx, gy, 132, 24 }, "데미지 범위", !editEfxLayer_)) editEfxLayer_ = false;
+    if (ui::button({ gx + 138, gy, 132, 24 }, "이펙트 범위", editEfxLayer_)) editEfxLayer_ = true;
+    gy += 30;
+    DrawTextU(editEfxLayer_ ? "프리셋:(이펙트 칸)" : "프리셋:(데미지 칸)", (int)gx, (int)gy, 13, ui::kTextDim); gy += 18;
     static const char* shapeName[6] = { "정면","직선","십자","부채꼴","원형","주변" };
     for (int i = 0; i < 6; ++i)
-        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i]) && usesPattern) applyShape(s, i, skillPatSize_);
+        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i]) && usesPattern) applyShape(s, i, skillPatSize_, editEfxLayer_);
     gy += 28;
     ui::intStepper({ gx, gy, 200, 24 }, "범위/사거리", skillPatSize_, 1, 1, 4); gy += 28;
 

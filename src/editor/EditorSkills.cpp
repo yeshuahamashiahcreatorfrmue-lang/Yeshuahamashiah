@@ -19,6 +19,12 @@ namespace tsukuru {
 // the Y just below the grid. Used by the per-character skill editor.
 float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesPattern) {
     const int GRID = 9, HALF = GRID/2; float cs = 30;
+    const bool efxLayer = editEfxLayer_;                 // which layer the clicks edit
+    std::vector<int>& ax = efxLayer ? s.efxX : s.patX;   // active (editable) tiles
+    std::vector<int>& ay = efxLayer ? s.efxY : s.patY;
+    auto has = [](const std::vector<int>& X, const std::vector<int>& Y, int ox, int oy){
+        for (size_t k = 0; k < X.size(); ++k) if (X[k]==ox && Y[k]==oy) return true;
+        return false; };
     DrawTriangle({ gx + HALF*cs + cs/2, gy }, { gx + HALF*cs + cs/2 - 7, gy + 11 },
                  { gx + HALF*cs + cs/2 + 7, gy + 11 }, ui::kGood);
     DrawTextU("정면", (int)(gx + HALF*cs + cs/2 + 12), (int)gy, 12, ui::kGood);
@@ -27,38 +33,43 @@ float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesP
         int ox = rx - HALF, oy = ry - HALF;     // offset relative to player
         Rectangle cell = { gx + rx*cs, gy + ry*cs, cs-2, cs-2 };
         bool isPlayer = (ox == 0 && oy == 0);
-        bool on = false;
-        for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) { on = true; break; }
-        Color c = isPlayer ? ui::kAccent : (on ? Color{210,120,90,255} : ui::kPanelHi);
-        if (!usesPattern) c = Fade(c, 0.35f);   // dim — pattern unused for projectiles
+        bool onDmg = has(s.patX, s.patY, ox, oy);
+        bool onEfx = has(s.efxX, s.efxY, ox, oy);
+        Color c = isPlayer ? ui::kAccent : ui::kPanelHi;
+        if (onDmg) c = Color{210,120,90,255};            // damage tile (red)
+        if (onEfx) c = Color{235,170,70,255};            // effect tile (orange, drawn over)
+        // dim the layer that is NOT being edited so the active one stands out
+        if (!isPlayer && ((efxLayer && onDmg && !onEfx) || (!efxLayer && onEfx && !onDmg)))
+            c = Fade(c, 0.5f);
+        if (!usesPattern) c = Fade(c, 0.35f);            // pattern unused for projectiles
         DrawRectangleRec(cell, c);
         DrawRectangleLinesEx(cell, 1, Fade(BLACK,0.5f));
         if (isPlayer) DrawTextU("P", (int)cell.x+9, (int)cell.y+6, 16, BLACK);
         if (usesPattern && !isPlayer && ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if (on) { for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) {
-                          s.patX.erase(s.patX.begin()+k); s.patY.erase(s.patY.begin()+k); break; } }
-            else { s.patX.push_back(ox); s.patY.push_back(oy); }
+            if (has(ax, ay, ox, oy)) {
+                for (size_t k = 0; k < ax.size(); ++k) if (ax[k]==ox && ay[k]==oy) {
+                    ax.erase(ax.begin()+k); ay.erase(ay.begin()+k); break; }
+            } else { ax.push_back(ox); ay.push_back(oy); }
         }
     }
-    // effect-spawn position preview: a ring `effectDist` tiles forward (up).
     Color efxCol = { 255, 170, 60, 255 };
-    if (s.effectDist > 0) {
-        int edy = HALF - s.effectDist;          // forward = up in the canonical grid
-        if (edy >= 0) {
-            Rectangle ec = { gx + HALF*cs, gy + edy*cs, cs-2, cs-2 };
-            DrawRectangleLinesEx(ec, 3, efxCol);
-            DrawCircle((int)(ec.x + cs/2), (int)(ec.y + cs/2), 5, Fade(efxCol, 0.9f));
-        }
-    }
     float gridBottom = gy + GRID*cs + 6;
-    DrawTextU(usesPattern ? TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size())
-                          : "발사체 모드: 범위 패턴 미사용 · 오른쪽 '사거리'만 적용",
-              (int)gx, (int)gridBottom, 12, usesPattern ? ui::kTextDim : ui::kAccentHi);
-    if (s.effectDist > 0) {
-        DrawCircle((int)gx + 5, (int)gridBottom + 22, 5, efxCol);
-        DrawTextU(TextFormat("이펙트 발생 위치: 정면 %d칸 앞", s.effectDist),
-                  (int)gx + 14, (int)gridBottom + 16, 12, efxCol);
+    if (!usesPattern) {
+        DrawTextU("발사체 모드: 범위 패턴 미사용 · 오른쪽 '사거리'만 적용",
+                  (int)gx, (int)gridBottom, 12, ui::kAccentHi);
+    } else if (efxLayer) {
+        DrawCircle((int)gx + 5, (int)gridBottom + 6, 5, Color{235,170,70,255});
+        DrawTextU(s.efxX.empty()
+                  ? "이펙트 칸: 비어있음 → 데미지 범위(빨강)에서 발생"
+                  : TextFormat("이펙트 칸 %d개 (주황) — 칸 클릭으로 편집", (int)s.efxX.size()),
+                  (int)gx + 14, (int)gridBottom, 12, Color{235,170,70,255});
+    } else {
+        DrawTextU(TextFormat("데미지 칸 %d개 (빨강) — 칸 클릭으로 편집 (시전 시 방향 회전)", (int)s.patX.size()),
+                  (int)gx, (int)gridBottom, 12, ui::kTextDim);
     }
+    if (s.effectDist > 0)
+        DrawTextU(TextFormat("+ 이펙트를 정면으로 %d칸 더 밀기", s.effectDist),
+                  (int)gx, (int)gridBottom + 16, 11, efxCol);
     return gridBottom;
 }
 
@@ -89,6 +100,11 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
         dy += 27;
     }
     ui::intStepper({ dx, dy, 260, 24 }, "반복(회) 1·3·7…", s.effectLoops, 1, 1, 20); dy += 28;
+    // effect output mode + size (placement is painted on the 이펙트 범위 grid layer)
+    if (ui::button({ dx, dy, 260, 24 }, s.effectMode == 1 ? "출력: 한 곳에 크게" : "출력: 각 타일마다"))
+        s.effectMode = s.effectMode ? 0 : 1;
+    dy += 26;
+    ui::intStepper({ dx, dy, 260, 24 }, "이펙트 크기(%, 100=1칸)", s.effectScale, 25, 25, 600); dy += 27;
     ui::intStepper({ dx, dy, 260, 24 }, "이펙트 거리(정면 칸)", s.effectDist, 1, 0, 12); dy += 28;
     if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + assetName(s.soundAsset), s.soundAsset>=0))
         cycleAsset(s.soundAsset, AssetType::Audio);
@@ -133,11 +149,13 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     }
 }
 
-// Fill a skill's hit pattern from a shape preset (canonical facing = up).
-// shape: 0 정면, 1 직선, 2 십자, 3 부채꼴, 4 원형, 5 주변(3x3).
-void Editor::applyShape(FieldSkill& s, int shape, int size) {
-    s.patX.clear(); s.patY.clear();
-    auto add = [&](int x, int y){ s.patX.push_back(x); s.patY.push_back(y); };
+// Fill a skill's damage (or effect, when toEfx) tiles from a shape preset
+// (canonical facing = up). shape: 0 정면, 1 직선, 2 십자, 3 부채꼴, 4 원형, 5 주변.
+void Editor::applyShape(FieldSkill& s, int shape, int size, bool toEfx) {
+    std::vector<int>& vx = toEfx ? s.efxX : s.patX;
+    std::vector<int>& vy = toEfx ? s.efxY : s.patY;
+    vx.clear(); vy.clear();
+    auto add = [&](int x, int y){ vx.push_back(x); vy.push_back(y); };
     if (size < 1) size = 1;
     switch (shape) {
         case 0: add(0,0); add(0,-1); break;                       // front

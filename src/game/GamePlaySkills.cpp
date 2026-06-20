@@ -96,26 +96,60 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
         return;
     }
 
-    // 3) instant pattern: damage every monster on a rotated pattern tile.
-    //    The effect VISUAL can be pushed `effectDist` tiles forward of the player
-    //    (damage stays on the pattern tiles); effectDist == 0 keeps the old look.
+    // 3a) DAMAGE: hit every monster/enemy on a rotated damage tile
     bool hit = false;
-    bool aoe = s.patX.size() > 4;
-    Vec2i efwd = dirToDelta((Direction)dir_);
-    int eoffX = efwd.x * s.effectDist, eoffY = efwd.y * s.effectDist;
-    if (aoe) spawnFx(3, (destX_+eoffX)*(float)TS, (destY_+eoffY)*(float)TS, dir_, s.effectAsset, 0.5f, TS*2.6f, s.effectLoops);
     for (size_t i = 0; i < s.patX.size(); ++i) {
         Vec2i r = rotateToFacing(s.patX[i], s.patY[i], dir_);
         int tx = destX_ + r.x, ty = destY_ + r.y;
-        if (!aoe) spawnFx(0, (tx+eoffX)*(float)TS, (ty+eoffY)*(float)TS, dir_, s.effectAsset, 0.2f, 0, s.effectLoops);
         if (s.powerPct <= 0) continue;
         if (FieldMonster* m = monsterAt(tx, ty)) { damageMonster(*m, dmg - m->def); hit = true; }
         if (NpcInst* en = hostileNpcAt(tx, ty)) { damageNpc(*en, dmg - en->def); hit = true; }
     }
     reapDead();
 
+    // 3b) EFFECT: drawn on its own tile layer (per-tile / one-big / scaled)
+    spawnSkillEffect(s);
+
     if (hit) engine_.audio().playSfx("hit", 0.8f);
     else if (slot == 0 && s.powerPct > 0) interact(); // basic attack hit nothing -> talk
+}
+
+// Place a skill's visual effect. The effect tiles are its own layer (efxX/efxY),
+// or the damage tiles when that layer is empty, each rotated to the player's
+// facing and shifted `effectDist` tiles forward. effectMode chooses ONE big
+// motion over the whole area vs. one motion per tile; effectScale sizes it.
+void GamePlay::spawnSkillEffect(const FieldSkill& s) {
+    if (!map_) return;
+    int TS = map_->tileset.tileWidth;
+    Vec2i fwd = dirToDelta((Direction)dir_);
+    int offx = fwd.x * s.effectDist, offy = fwd.y * s.effectDist;
+    const std::vector<int>& ex = !s.efxX.empty() ? s.efxX : s.patX;
+    const std::vector<int>& ey = !s.efxY.empty() ? s.efxY : s.patY;
+    float scale = s.effectScale > 0 ? s.effectScale / 100.0f : 1.0f;
+
+    if (ex.empty()) {                       // no tiles -> single effect on the player
+        spawnFx(0, (destX_+offx)*(float)TS, (destY_+offy)*(float)TS, dir_, s.effectAsset, 0.4f, 0, s.effectLoops, TS*scale);
+        return;
+    }
+    if (s.effectMode == 1) {                // ONE big motion covering the whole area
+        int minx=9999,miny=9999,maxx=-9999,maxy=-9999;
+        for (size_t i = 0; i < ex.size(); ++i) {
+            Vec2i r = rotateToFacing(ex[i], ey[i], dir_);
+            minx=std::min(minx,r.x); maxx=std::max(maxx,r.x);
+            miny=std::min(miny,r.y); maxy=std::max(maxy,r.y);
+        }
+        float cx = (minx+maxx)/2.0f, cy = (miny+maxy)/2.0f;
+        int span = std::max(maxx-minx, maxy-miny) + 1;
+        float big = span * TS * scale;
+        spawnFx(3, (destX_+offx+cx)*(float)TS, (destY_+offy+cy)*(float)TS,
+                dir_, s.effectAsset, 0.5f, big*0.5f, s.effectLoops, big);
+    } else {                                // one motion per effect tile
+        for (size_t i = 0; i < ex.size(); ++i) {
+            Vec2i r = rotateToFacing(ex[i], ey[i], dir_);
+            int tx = destX_+offx+r.x, ty = destY_+offy+r.y;
+            spawnFx(0, tx*(float)TS, ty*(float)TS, dir_, s.effectAsset, 0.25f, 0, s.effectLoops, TS*scale);
+        }
+    }
 }
 
 
