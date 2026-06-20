@@ -11,9 +11,10 @@ namespace tsukuru {
 #include <algorithm>
 #include <cmath>
 #ifdef _WIN32
-#define NOMINMAX          // keep std::min/std::max usable below (no windows.h macros)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>     // LoadLibraryA — probe the runtime before delay-loaded calls
+// Forward-declare just LoadLibraryA instead of including <windows.h>, which
+// redeclares CloseWindow/ShowCursor/etc. and collides with raylib's API.
+// HMODULE is a pointer; a null return means the DLL (or its deps) didn't load.
+extern "C" __declspec(dllimport) void* __stdcall LoadLibraryA(const char* lpLibFileName);
 #endif
 namespace tsukuru {
 
