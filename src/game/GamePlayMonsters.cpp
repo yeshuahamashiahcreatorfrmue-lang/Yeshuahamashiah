@@ -156,8 +156,18 @@ void GamePlay::updateMonsters(float dt) {
                 } else phase_ = Phase::GameOver;
                 return;
             }
+        } else if (m.atkCd <= 0) {
+            // not next to the player — swat an adjacent ally NPC instead
+            for (auto& a : npcs_) {
+                if (a.faction != NpcFaction::Ally || !a.alive()) continue;
+                if (std::max(std::abs(a.x - m.x), std::abs(a.y - m.y)) > 1) continue;
+                m.atkCd = 1.1f; damageNpc(a, std::max(1, m.atk - a.def)); break;
+            }
         }
     }
+    // an ally may have been killed by a monster this frame
+    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
+                [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
 }
 
 // ----------------------------- monster rendering -----------------------------

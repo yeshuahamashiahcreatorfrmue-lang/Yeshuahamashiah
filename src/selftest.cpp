@@ -136,6 +136,10 @@ static void testProjectIO() {
     m->tilemap.setBlocked(2, 2, true);
     Event ev; ev.id = 1; ev.x = 4; ev.y = 4; ev.type = EventType::Message; ev.text = "Hello!";
     m->events.push_back(ev);
+    Event npc; npc.id = 2; npc.x = 6; npc.y = 6; npc.graphicAsset = 0;
+    npc.faction = NpcFaction::Enemy; npc.behavior = NpcBehavior::Chase;
+    npc.drawPct = 200; npc.npcHp = 80; npc.npcAtk = 14; npc.npcDef = 3;
+    m->events.push_back(npc);
     p->startActor = 1;
     CHECK(p->save(), "project saves to disk");
 
@@ -148,7 +152,13 @@ static void testProjectIO() {
     if (lm) {
         CHECK(lm->name == "Town", "map name persisted");
         CHECK(lm->tilemap.tile(0, 2, 2) == 5 && lm->tilemap.blocked(2, 2), "map tiles persisted");
-        CHECK(lm->events.size() == 1 && lm->events[0].text == "Hello!", "events persisted");
+        CHECK(lm->events.size() == 2 && lm->events[0].text == "Hello!", "events persisted");
+        const Event* en = nullptr;
+        for (auto& e : lm->events) if (e.id == 2) en = &e;
+        CHECK(en && en->faction == NpcFaction::Enemy && en->behavior == NpcBehavior::Chase,
+              "NPC faction/behavior persisted");
+        CHECK(en && en->drawPct == 200 && en->npcHp == 80 && en->npcAtk == 14 && en->npcDef == 3,
+              "NPC draw size & combat stats persisted");
     }
     fs::remove_all(tmp, ec);
 }
@@ -178,6 +188,7 @@ static void testCharacterBuilder() {
     // 2) "+새 캐릭터" + fill ALL six motion tabs from the registered images.
     CharacterDef cd; cd.id = 1; cd.name = "테스트영웅";
     cd.maxHp = 250; cd.maxGp = 80; cd.atk = 40; cd.def = 12; cd.spd = 9;   // 캐릭터 데이터
+    cd.drawPct = 175;                                                       // 1.75칸 크기
     for (int m = 0; m < MO_COUNT; ++m) {
         cd.motions[m].frames = { imgIds[m*2], imgIds[m*2 + 1] };   // = clicking 2 library images
         cd.motions[m].fps    = 6 + m;
@@ -210,6 +221,7 @@ static void testCharacterBuilder() {
             && c->motions[MO_Walk].dirFrames(2).size() == 2,   // right empty -> falls back to 아래
           "directional lookup + empty-direction fallback to 아래");
     CHECK(p2.playerCharId == 1, "character is set as the driving player");
+    CHECK(c && c->drawPct == 175, "character draw size (칸) persisted");
     bool skillOk = c && c->skills.size() == 1 && c->skills[0].slot == 1 &&
                    c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
                    c->skills[0].projectile && c->skills[0].name == "캐릭터파이어";

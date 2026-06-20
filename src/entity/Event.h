@@ -24,6 +24,24 @@ enum class TriggerType {
     Autorun       // triggers automatically when conditions met
 };
 
+// Which side an NPC (an event with a sprite) belongs to. Drives whether it
+// fights the player, fights for the player, or simply lives on the map.
+enum class NpcFaction {
+    Neutral = 0,  // 중립: harmless townsfolk/critters — only dialogue/atmosphere
+    Ally    = 1,  // 아군: fights enemies/monsters near it, never hurts the player
+    Enemy   = 2   // 적군: chases & attacks the player, killable in the field
+};
+
+// How an NPC moves when it has nothing more urgent to do. Combat factions
+// override this with chase/attack when a target is in range.
+enum class NpcBehavior {
+    Idle   = 0,   // 대기: stand still (faces the player when adjacent)
+    Wander = 1,   // 배회: random roaming
+    Patrol = 2,   // 순찰: pace back and forth along an axis
+    Chase  = 3,   // 추격/동행: enemies hunt the player; allies follow the player
+    Flee   = 4    // 도망: back away from the player when close
+};
+
 struct Event {
     int         id = -1;
     int         x = 0, y = 0;
@@ -45,7 +63,16 @@ struct Event {
     int  conditionSwitch = -1;
     bool conditionValue  = true;
     bool once = false; // run only one time (sets a hidden flag)
-    bool wander = false; // NPC roams the map autonomously
+    bool wander = false; // legacy roam flag (kept in sync with behavior==Wander)
+
+    // --- NPC presentation & behaviour (only used when graphicAsset >= 0) ---
+    NpcFaction  faction  = NpcFaction::Neutral;
+    NpcBehavior behavior = NpcBehavior::Idle;
+    int  drawPct = 100;  // on-map sprite size as a % of one tile (100 = 1칸, 200 = 2칸)
+    // Combat stats for Ally/Enemy NPCs (ignored for Neutral):
+    int  npcHp  = 20;    // 체력
+    int  npcAtk = 8;     // 공격력
+    int  npcDef = 2;     // 방어력
 
     nlohmann::json toJson() const;
     static Event fromJson(const nlohmann::json& j);

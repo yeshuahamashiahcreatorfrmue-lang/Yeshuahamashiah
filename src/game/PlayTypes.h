@@ -3,6 +3,7 @@
 // grouped here by purpose so GamePlay.h stays a pure controller declaration.
 #include <string>
 #include "raylib.h"
+#include "entity/Event.h"   // NpcFaction / NpcBehavior
 
 namespace tsukuru {
 
@@ -28,17 +29,32 @@ struct FieldMonster {
     bool alive() const { return hp > 0; }
 };
 
-// A live NPC instance (from a map event) that can wander autonomously.
+// A live NPC instance (from a map event). Drives autonomous movement and, for
+// Ally/Enemy factions, lightweight field combat.
 struct NpcInst {
     int eventId = -1;
     int spriteAsset = -1;
-    bool wander = false;
     int x = 0, y = 0, destX = 0, destY = 0;
     float px = 0, py = 0;
     bool moving = false;
     int dir = 0;
     float moveCd = 0;
     int frame = 0; float animTime = 0;
+
+    // behaviour / faction (copied from the source Event)
+    NpcFaction  faction  = NpcFaction::Neutral;
+    NpcBehavior behavior = NpcBehavior::Idle;
+    int  drawPct = 100;
+    int  homeX = 0, homeY = 0;   // spawn tile — patrol anchor / leash centre
+    int  patrolDir = -1;         // 0=down 1=left 2=right 3=up, flips at obstacles
+
+    // combat (Ally/Enemy only; maxHp == 0 means non-combatant)
+    int   hp = 0, maxHp = 0, atk = 0, def = 0;
+    float atkCd = 0;
+    float hurtFlash = 0;
+    int   switchOnDeath = -1;    // event.switchId flipped when this NPC dies
+    bool  combatant() const { return maxHp > 0; }
+    bool  alive() const { return maxHp <= 0 || hp > 0; }
 };
 
 // --- combat projectiles / effects -------------------------------------------

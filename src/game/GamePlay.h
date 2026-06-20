@@ -79,6 +79,10 @@ private:
     void updateNpcs(float dt);
     void drawNpcs();
     NpcInst* npcAt(int x, int y);
+    NpcInst* hostileNpcAt(int x, int y);    // a living Enemy-faction NPC the player can hit
+    bool damageNpc(NpcInst& n, int dmg);    // returns true if it died
+    void onNpcKilled(NpcInst& n);
+    void npcDecide(NpcInst& n, float dt);   // pick the next move/facing for one NPC
     void runAutoruns();
 
     // --- custom-character motion playback (GamePlayRender.cpp) ---
@@ -89,7 +93,7 @@ private:
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
-    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4);
+    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float scale = 1.0f);
     void drawWeather(float dt);
     void drawMinimap();
     void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling

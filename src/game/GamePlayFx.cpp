@@ -34,10 +34,17 @@ void GamePlay::updateProjectiles(float dt) {
             spawnFx(1, m->px, m->py, pr.dir, -1, 0.2f);
             engine_.audio().playSfx("hit", 0.8f);
             pr.life = 0;
+        } else if (NpcInst* en = hostileNpcAt(tx, ty)) {
+            damageNpc(*en, pr.dmg);
+            spawnFx(1, en->px, en->py, pr.dir, -1, 0.2f);
+            engine_.audio().playSfx("hit", 0.8f);
+            pr.life = 0;
         }
     }
     monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
                     [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
+                    [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
     projectiles_.erase(std::remove_if(projectiles_.begin(), projectiles_.end(),
                     [](const Projectile& p){ return p.life <= 0; }), projectiles_.end());
 }

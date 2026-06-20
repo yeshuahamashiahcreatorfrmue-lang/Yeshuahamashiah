@@ -52,7 +52,10 @@ json Event::toJson() const {
         {"switchId", switchId}, {"switchValue", switchValue},
         {"conditionSwitch", conditionSwitch}, {"conditionValue", conditionValue},
         {"once", once},
-        {"wander", wander}
+        {"wander", behavior == NpcBehavior::Wander},
+        {"faction", (int)faction}, {"behavior", (int)behavior},
+        {"drawPct", drawPct},
+        {"npcHp", npcHp}, {"npcAtk", npcAtk}, {"npcDef", npcDef}
     };
 }
 
@@ -76,6 +79,14 @@ Event Event::fromJson(const json& j) {
     e.conditionValue  = j.value("conditionValue", true);
     e.once            = j.value("once", false);
     e.wander          = j.value("wander", false);
+    e.faction         = (NpcFaction)j.value("faction", 0);
+    // behavior: if absent, fall back to the legacy wander flag (Wander/Idle).
+    if (j.contains("behavior")) e.behavior = (NpcBehavior)j.value("behavior", 0);
+    else                        e.behavior = e.wander ? NpcBehavior::Wander : NpcBehavior::Idle;
+    e.drawPct         = j.value("drawPct", 100);
+    e.npcHp           = j.value("npcHp", 20);
+    e.npcAtk          = j.value("npcAtk", 8);
+    e.npcDef          = j.value("npcDef", 2);
     return e;
 }
 

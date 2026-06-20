@@ -132,7 +132,7 @@ void GamePlay::visibleRange(int& x0,int& y0,int& x1,int& y1) const {
 }
 
 // ----------------------------- rendering helpers -----------------------------
-void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint, int frames) {
+void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint, int frames, float scale) {
     int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
     if (frames < 1) frames = 1;
     if (assetId >= 0) {
@@ -140,7 +140,11 @@ void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py
         float fw = tex.width / (float)frames, fh = tex.height / 4.0f;
         if (frame >= frames) frame %= frames;
         Rectangle src = { frame * fw, dir * fh, fw, fh };
-        Rectangle dst = { px, py, (float)TS, (float)TS };
+        // Scaled sprites are centred horizontally and stand on the tile's base,
+        // so a 2칸 character towers over its tile instead of floating. scale==1
+        // reduces to the original exact TS×TS fill.
+        float sz = TS * scale;
+        Rectangle dst = { px + (TS - sz) / 2.0f, py + (TS - sz), sz, sz };
         DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
     } else {
         DrawRectangle((int)px+6, (int)py+6, TS-12, TS-12, Color{ 80, 140, 220, 255 });
@@ -209,7 +213,8 @@ void GamePlay::drawField() {
     int frameAsset = motionFrameAsset();
     if (frameAsset >= 0) {
         const Texture2D& ftex = engine_.assetTexture(frameAsset);
-        float sz = TS * 1.25f;
+        const CharacterDef* pcd = customChar();
+        float sz = TS * (pcd ? pcd->drawPct / 100.0f : 1.25f);
         Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };   // each facing uses its own frames
         Rectangle dst = { pxX_ + (TS - sz)/2, pxY_ + (TS - sz)/2 + 2, sz, sz };
         DrawTexturePro(ftex, src, dst, {0,0}, 0, ptint);

@@ -149,10 +149,40 @@ void Editor::drawEventsTab() {
         }
     }
     y += 32;
-    // NPC wander toggle (only meaningful when the event has a sprite)
-    if (ui::button({ panel.x + 12, y, 296, 24 }, ev->wander ? "NPC 배회: 켜짐" : "NPC 배회: 꺼짐", ev->wander))
-        ev->wander = !ev->wander;
-    y += 30;
+    // ---- NPC settings (only meaningful when the event carries a sprite) ----
+    if (ev->graphicAsset >= 0) {
+        DrawTextU("─ NPC 설정 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+        const char* facNames[] = { "중립", "아군", "적군" };
+        Color facCol[] = { ui::kTextDim, Color{120,200,255,255}, Color{255,130,130,255} };
+        if (ui::button({ panel.x + 12, y, 296, 24 },
+                       TextFormat("진영: %s", facNames[(int)ev->faction]))) {
+            ev->faction = (NpcFaction)(((int)ev->faction + 1) % 3);
+        }
+        DrawRectangle((int)panel.x + 290, (int)y + 6, 12, 12, facCol[(int)ev->faction]);
+        y += 28;
+        const char* behNames[] = { "대기", "배회", "순찰", "추격", "도망" };
+        if (ui::button({ panel.x + 12, y, 296, 24 },
+                       TextFormat("행동: %s", behNames[(int)ev->behavior]))) {
+            ev->behavior = (NpcBehavior)(((int)ev->behavior + 1) % 5);
+        }
+        y += 28;
+        ui::intStepper({ panel.x + 12, y, 296, 24 }, "크기(칸%, 100=1칸)", ev->drawPct, 25, 25, 400);
+        y += 28;
+        if (ev->faction != NpcFaction::Neutral) {
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "체력",   ev->npcHp,  5, 1, 9999); y += 26;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "공격력", ev->npcAtk, 1, 0, 999);  y += 26;
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "방어력", ev->npcDef, 1, 0, 999);  y += 26;
+            DrawTextU(ev->faction == NpcFaction::Enemy
+                          ? "적군: 추격 시 플레이어를 공격합니다."
+                          : "아군: 주변 적/몬스터와 싸웁니다.",
+                      (int)panel.x + 12, (int)y, 11, ui::kTextDim);
+            y += 18;
+        } else {
+            DrawTextU("중립: 전투 없음 (대화·분위기용).", (int)panel.x + 12, (int)y, 11, ui::kTextDim);
+            y += 18;
+        }
+    }
+    y += 8;
     DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
     y += 22;
     if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트 삭제", false)) {

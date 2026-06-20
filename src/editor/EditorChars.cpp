@@ -801,7 +801,7 @@ void Editor::drawCharDataEditor() {
 
     // ===================== LEFT: 능력치 =====================
     float lx = 24, ly = kToolbarH + 50, lw = 320;
-    ui::panel({ lx - 8, ly - 6, lw + 16, 360 }, ui::kPanel);
+    ui::panel({ lx - 8, ly - 6, lw + 16, 396 }, ui::kPanel);
     ui::label("능력치", (int)lx, (int)ly, 18, ui::kAccent); ly += 28;
     ui::label("이름:", (int)lx, (int)ly, 13, ui::kTextDim); ly += 18;
     Rectangle nf = { lx, ly, lw, 26 };
@@ -811,7 +811,8 @@ void Editor::drawCharDataEditor() {
     ui::intStepper({ lx, ly, lw, 26 }, "기력 (GP)",     cd.maxGp,  5, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "공격력",        cd.atk,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
-    ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 36;
+    ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "크기(칸%, 100=1칸)", cd.drawPct, 25, 25, 400); ly += 36;
     DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
     DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
     bool isP = (p.playerCharId == cd.id);
