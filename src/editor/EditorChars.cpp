@@ -10,10 +10,17 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 
 namespace fs = std::filesystem;
 namespace tsukuru {
+
+// Image extensions the engine can register (mirrors EditorAssetIO's importer).
+static bool charsIsImageExt(const std::string& e) {
+    return e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".bmp" || e == ".gif" ||
+           e == ".tga" || e == ".psd" || e == ".hdr" || e == ".qoi";
+}
 
 int Editor::generateCharacter() {
     Project& p = engine_.project();
@@ -154,6 +161,7 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
 }
 
 void Editor::drawCharsTab() {
+    if (charBrowse_) { drawImageBrowser(); return; }   // modal: import your own image files
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
@@ -168,7 +176,9 @@ void Editor::drawCharsTab() {
         if (ui::button({ 178.0f + s*92, kToolbarH + 38, 88, 26 }, fxBtn[s])) generateEffect(s);
     ui::intStepper({ 560, kToolbarH + 38, 150, 26 }, "시트걷기", p.playerFrames, 1, 4, 7);
     ui::intStepper({ 718, kToolbarH + 38, 150, 26 }, "시트공격", p.playerAtkFrames, 1, 0, 4);
-    handleAssetDrop(); // drop new images/sheets to register them
+    // import your own images without depending on drag&drop
+    if (ui::button({ 876, kToolbarH + 38, 168, 26 }, "+ 내 이미지 불러오기", true)) { charBrowse_ = true; browseScroll_ = 0; return; }
+    handleAssetDrop(); // drag&drop new images/sheets to register them
 
     auto imgs = p.assets.byType(AssetType::Image);
 
@@ -256,17 +266,27 @@ void Editor::drawCharsTab() {
             for (int i = 0; i < add; ++i) clip.frames.push_back(fr[i]);
             p.save(); setStatus(TextFormat("프레임 %d개 생성 추가", add));
         }
-        // motion preview (right edge)
-        Rectangle pv = { bx + bw - 72, ey - 4, 56, 56 };
-        DrawRectangleRec(pv, Color{ 20, 22, 30, 255 });
+        // motion preview (right edge) — large, always-cycling so you can SEE the
+        // motion play even for one-shot (non-loop) motions like 공격/궁극기.
+        const float PVS = 116;
+        Rectangle pv = { bx + bw - PVS - 8, ey - 6, PVS, PVS };
+        DrawTextU("재생 미리보기", (int)pv.x, (int)pv.y - 16, 13, ui::kAccent);
+        DrawRectangleRec(pv, Color{ 16, 18, 26, 255 });
+        DrawRectangleLinesEx(pv, 2, ui::kPanelHi);
         if (!clip.frames.empty()) {
-            int n = (int)clip.frames.size(); int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;
+            int n = (int)clip.frames.size();
+            int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;   // always cycles in preview
             const Texture2D& t = engine_.assetTexture(clip.frames[fi]);
-            float sc = std::min(52.0f / std::max(1, t.width), 52.0f / std::max(1, t.height));
+            float sc = std::min((PVS-16) / std::max(1, t.width), (PVS-16) / std::max(1, t.height));
             DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
-                           { pv.x + (56 - t.width*sc)/2, pv.y + (56 - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+                           { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+            DrawTextU(TextFormat("%d / %d", fi+1, n), (int)pv.x + 5, (int)pv.y + 4, 14, ui::kGood);
+            DrawTextU(TextFormat("%dfps · %s", clip.fps, clip.loop ? "반복" : "1회"),
+                      (int)pv.x, (int)(pv.y + PVS + 2), 12, ui::kTextDim);
+        } else {
+            DrawTextU("프레임 없음", (int)pv.x + 14, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
+            DrawTextU("아래 라이브러리 클릭", (int)pv.x, (int)(pv.y + PVS + 2), 12, ui::kTextDim);
         }
-        DrawTextU("미리보기", (int)pv.x - 2, (int)(pv.y + 58), 11, ui::kTextDim);
 
         // ---- [5] 프레임: 선택 후 이동/복제/삭제 + 썸네일 ----
         float py3 = ey2 + 30;
@@ -298,7 +318,8 @@ void Editor::drawCharsTab() {
 
     // ============ image library (frame source) ============
     float gy2 = by + bh + 8;
-    ui::label(building ? "이미지 라이브러리 (클릭 = 현재 모션에 프레임 추가)" : "이미지 라이브러리",
+    ui::label(building ? TextFormat("이미지 라이브러리 — 클릭하면 '%s' 모션에 프레임으로 추가됩니다", kMotionNames[charMotionTab_])
+                       : "이미지 라이브러리",
              20, (int)gy2, 16, ui::kAccent);
     if (building) {
         if (ui::button({ 430, gy2 - 4, 120, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_))
@@ -375,7 +396,94 @@ void Editor::drawCharsTab() {
     }
     EndScissorMode();
     if (imgs.empty())
-        ui::label("(이미지 없음 - 시트 캐릭터 생성 또는 이미지를 드롭하세요)", 20, (int)gy2 + 30, 16, ui::kTextDim);
+        ui::label("(이미지 없음 — 위 '+ 내 이미지 불러오기'로 가져오거나 '+ 시트 캐릭터'로 생성하세요)",
+                  20, (int)gy2 + 30, 16, ui::kTextDim);
+}
+
+// Built-in image file browser: lets the user import their own image files into
+// the project without relying on OS drag&drop. Folders navigate; image files are
+// copied into the project and registered so they appear in the library.
+void Editor::drawImageBrowser() {
+    Project& p = engine_.project();
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 20, 22, 30, 255 });
+    handleAssetDrop();   // dropping files still works here too
+
+    if (browseDir_.empty() || !fs::exists(browseDir_)) {
+        const char* h = getenv("HOME"); const char* u = getenv("USERPROFILE");
+        browseDir_ = h ? h : (u ? u : ".");
+    }
+
+    ui::label("내 이미지 불러오기", 20, (int)kToolbarH + 10, 22, ui::kAccent);
+    DrawTextU("폴더를 눌러 이동, 이미지 파일을 누르면 라이브러리에 추가됩니다.",
+              290, (int)kToolbarH + 16, 13, ui::kTextDim);
+    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 빌더로 돌아가기")) { charBrowse_ = false; return; }
+
+    float ny = kToolbarH + 46;
+    if (ui::button({ 20, ny, 70, 26 }, ".. 상위")) {
+        fs::path pp(browseDir_); auto par = pp.parent_path();
+        if (!par.empty() && par != pp) browseDir_ = par.string();
+        browseScroll_ = 0;
+    }
+    float qx = 98;
+    auto quick = [&](const char* lbl, const fs::path& dir) {
+        std::error_code ec;
+        if (!fs::exists(dir, ec)) return;
+        if (ui::button({ qx, ny, 100, 26 }, lbl)) { browseDir_ = dir.string(); browseScroll_ = 0; }
+        qx += 106;
+    };
+    if (const char* h = getenv("HOME"))        { quick("홈", h); quick("바탕화면", fs::path(h) / "Desktop"); }
+    if (const char* u = getenv("USERPROFILE")) { quick("홈", u); quick("바탕화면", fs::path(u) / "Desktop"); }
+    quick("프로젝트", fs::path(p.dir) / "assets");
+    DrawTextU(browseDir_.c_str(), 20, (int)ny + 32, 13, ui::kAccentHi);
+
+    // gather sub-folders and image files
+    std::vector<std::string> dirs, files;
+    std::error_code ec;
+    for (auto& de : fs::directory_iterator(browseDir_, fs::directory_options::skip_permission_denied, ec)) {
+        std::string name = de.path().filename().string();
+        if (name.empty() || name[0] == '.') continue;
+        std::error_code e2;
+        if (de.is_directory(e2)) { dirs.push_back(name); continue; }
+        std::string ext = de.path().extension().string();
+        for (auto& c : ext) c = (char)tolower((unsigned char)c);
+        if (charsIsImageExt(ext)) files.push_back(name);
+    }
+    std::sort(dirs.begin(), dirs.end());
+    std::sort(files.begin(), files.end());
+
+    // scrollable list of folders (then image files)
+    float listY = ny + 56;
+    Rectangle listRegion = { 0, listY, area.width, (float)GetScreenHeight() - listY };
+    float rowH = 28;
+    int total = (int)dirs.size() + (int)files.size();
+    int maxScroll = std::max(0, (int)(total * rowH + 8 - listRegion.height));
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0 && ui::mouseIn(listRegion)) browseScroll_ -= (int)(wheel * 48);
+    browseScroll_ = std::max(0, std::min(browseScroll_, maxScroll));
+
+    if (total == 0)
+        DrawTextU("(이 폴더에 이미지가 없습니다 — 다른 폴더로 이동하세요)", 24, (int)listY + 8, 15, ui::kTextDim);
+
+    BeginScissorMode(0, (int)listY, (int)area.width, GetScreenHeight() - (int)listY);
+    float ry = listY - browseScroll_;
+    for (auto& d : dirs) {
+        if (ry + rowH > listY && ry < GetScreenHeight() &&
+            ui::button({ 20, ry, area.width - 40, rowH - 4 }, "[폴더]  " + d))
+            { browseDir_ = (fs::path(browseDir_) / d).string(); browseScroll_ = 0; }
+        ry += rowH;
+    }
+    for (auto& f : files) {
+        if (ry + rowH > listY && ry < GetScreenHeight() &&
+            ui::button({ 20, ry, area.width - 40, rowH - 4 }, "[그림]  " + f)) {
+            std::string full = (fs::path(browseDir_) / f).string();
+            int id = p.assets.registerAsset(p.dir, full, AssetType::Image);
+            if (id >= 0) { p.save(); setStatus("라이브러리에 추가됨: " + f); }
+            else setStatus("불러오기 실패: " + f);
+        }
+        ry += rowH;
+    }
+    EndScissorMode();
 }
 
 

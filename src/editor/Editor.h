@@ -28,6 +28,7 @@ private:
     void drawMapTab();
     void drawEventsTab();
     void drawCharsTab();
+    void drawImageBrowser();           // built-in file browser to import images (no drag&drop needed)
     void drawAssetsTab();
     void drawDatabaseTab();
     void drawSkillsTab();
@@ -81,6 +82,9 @@ private:
     MotionClip charUndo_;             // 1-level undo snapshot of the active motion
     bool charUndoSet_ = false;        // undo snapshot available
     int  charLibScroll_ = 0;          // library grid scroll offset (px)
+    bool charBrowse_ = false;         // image file-browser/import modal is open
+    std::string browseDir_;           // current folder shown in the file browser
+    int  browseScroll_ = 0;           // file browser scroll offset (px)
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to
