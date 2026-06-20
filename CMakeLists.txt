@@ -80,6 +80,18 @@ if(BUILD_ENGINE)
     set(BUILD_GAMES OFF CACHE INTERNAL "")
     FetchContent_MakeAvailable(raylib)
 
+    # raylib's default config disables JPG/BMP/TGA/PSD/HDR decoding, so those
+    # images registered but never rendered ("이미지가 안 올라간다"). Enable every
+    # common image format we advertise in the importer (PNG/GIF/QOI are already on).
+    target_compile_definitions(raylib PRIVATE
+        SUPPORT_FILEFORMAT_JPG=1
+        SUPPORT_FILEFORMAT_BMP=1
+        SUPPORT_FILEFORMAT_TGA=1
+        SUPPORT_FILEFORMAT_PSD=1
+        SUPPORT_FILEFORMAT_HDR=1
+        SUPPORT_FILEFORMAT_PIC=1
+        SUPPORT_FILEFORMAT_PNM=1)
+
     file(GLOB_RECURSE ENGINE_SOURCES
         ${CMAKE_SOURCE_DIR}/src/main.cpp
         ${CMAKE_SOURCE_DIR}/src/core/*.cpp
