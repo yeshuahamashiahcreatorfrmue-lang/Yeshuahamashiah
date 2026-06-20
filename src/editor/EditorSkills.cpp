@@ -40,10 +40,25 @@ float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesP
             else { s.patX.push_back(ox); s.patY.push_back(oy); }
         }
     }
+    // effect-spawn position preview: a ring `effectDist` tiles forward (up).
+    Color efxCol = { 255, 170, 60, 255 };
+    if (s.effectDist > 0) {
+        int edy = HALF - s.effectDist;          // forward = up in the canonical grid
+        if (edy >= 0) {
+            Rectangle ec = { gx + HALF*cs, gy + edy*cs, cs-2, cs-2 };
+            DrawRectangleLinesEx(ec, 3, efxCol);
+            DrawCircle((int)(ec.x + cs/2), (int)(ec.y + cs/2), 5, Fade(efxCol, 0.9f));
+        }
+    }
     float gridBottom = gy + GRID*cs + 6;
     DrawTextU(usesPattern ? TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size())
                           : "발사체 모드: 범위 패턴 미사용 · 오른쪽 '사거리'만 적용",
               (int)gx, (int)gridBottom, 12, usesPattern ? ui::kTextDim : ui::kAccentHi);
+    if (s.effectDist > 0) {
+        DrawCircle((int)gx + 5, (int)gridBottom + 22, 5, efxCol);
+        DrawTextU(TextFormat("이펙트 발생 위치: 정면 %d칸 앞", s.effectDist),
+                  (int)gx + 14, (int)gridBottom + 16, 12, efxCol);
+    }
     return gridBottom;
 }
 
@@ -52,6 +67,7 @@ float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesP
 // is advanced past the block.
 void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     Project& p = engine_.project();
+    float fxTop = dy;                            // anchor for the side preview box
     if (ui::button({ dx, dy, 260, 24 }, std::string("이펙트: ") + assetName(s.effectAsset), s.effectAsset>=0))
         cycleAsset(s.effectAsset, AssetType::Image);
     dy += 26;
@@ -73,6 +89,7 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
         dy += 27;
     }
     ui::intStepper({ dx, dy, 260, 24 }, "반복(회) 1·3·7…", s.effectLoops, 1, 1, 20); dy += 28;
+    ui::intStepper({ dx, dy, 260, 24 }, "이펙트 거리(정면 칸)", s.effectDist, 1, 0, 12); dy += 28;
     if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + assetName(s.soundAsset), s.soundAsset>=0))
         cycleAsset(s.soundAsset, AssetType::Audio);
     dy += 26;
@@ -84,6 +101,36 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     for (int i = 0; i < 5; ++i)
         if (ui::button({ dx + 78 + i*38, dy, 36, 22 }, sndName[i])) s.soundAsset = generateSound(i);
     dy += 34;
+
+    // ---- live effect preview (right of the column): plays the strip in real time ----
+    float pvx = dx + 272, pvw = 104, pvh = 104;
+    if (pvx + pvw + 8 < GetScreenWidth()) {
+        DrawTextU("이펙트 미리보기", (int)pvx, (int)fxTop, 13, ui::kAccent);
+        Rectangle box = { pvx, fxTop + 20, pvw, pvh };
+        ui::panel(box, ui::kPanelHi);
+        if (s.effectAsset >= 0) {
+            const Texture2D& tex = engine_.assetTexture(s.effectAsset);
+            const AssetEntry* ae = p.assets.find(s.effectAsset);
+            int frames = (ae && ae->frames > 1) ? ae->frames : 1;
+            float fps  = (ae && ae->fps  > 0) ? (float)ae->fps : 12.0f;
+            int loops  = std::max(1, s.effectLoops);
+            int total  = frames * loops;
+            int fr = total > 0 ? ((int)(GetTime() * fps) % total) % frames : 0;
+            float fw = tex.width / (float)frames, fh = (float)tex.height;
+            if (fw > 0 && fh > 0) {
+                float sc = std::min((pvw - 12) / fw, (pvh - 12) / fh);
+                Rectangle src = { fr*fw, 0, fw, fh };
+                Rectangle dst = { box.x + (pvw - fw*sc)/2, box.y + (pvh - fh*sc)/2, fw*sc, fh*sc };
+                DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
+            }
+            DrawTextU(TextFormat("%d프레임 · %d회 · %dfps", frames, loops, (int)fps),
+                      (int)pvx, (int)(box.y + pvh + 4), 11, ui::kTextDim);
+        } else {
+            DrawTextU("(이펙트 없음)", (int)pvx + 12, (int)(box.y + pvh/2 - 6), 12, ui::kTextDim);
+        }
+        DrawTextU(TextFormat("사운드: %s", assetName(s.soundAsset).c_str()),
+                  (int)pvx, (int)(fxTop + 20 + pvh + 22), 11, ui::kTextDim);
+    }
 }
 
 // Fill a skill's hit pattern from a shape preset (canonical facing = up).

@@ -731,7 +731,7 @@ void Editor::drawCharSkillEditor() {
 
     // ---- parameters + one-click effect/sound creation ----
     float dx = gx + GRID*cs + 28, dy = kToolbarH + 50, dw = area.width - dx - 16;
-    ui::panel({ dx - 8, dy - 6, dw + 12, 590 }, ui::kPanel);
+    ui::panel({ dx - 8, dy - 6, dw + 12, 620 }, ui::kPanel);
     ui::label("스킬 설정", (int)dx, (int)dy, 18, ui::kAccent); dy += 28;
     ui::label("이름:", (int)dx, (int)dy, 13, ui::kTextDim); dy += 18;
     Rectangle nf = { dx, dy, std::min(280.0f, dw), 26 };
