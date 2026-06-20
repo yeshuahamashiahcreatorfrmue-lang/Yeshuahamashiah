@@ -15,7 +15,7 @@ namespace tsukuru {
 
 // Fill a skill's hit pattern from a shape preset (canonical facing = up).
 // shape: 0 정면, 1 직선, 2 십자, 3 부채꼴, 4 원형, 5 주변(3x3).
-static void applyShape(FieldSkill& s, int shape, int size) {
+void Editor::applyShape(FieldSkill& s, int shape, int size) {
     s.patX.clear(); s.patY.clear();
     auto add = [&](int x, int y){ s.patX.push_back(x); s.patY.push_back(y); };
     if (size < 1) size = 1;

@@ -182,6 +182,11 @@ static void testCharacterBuilder() {
         cd.motions[m].fps    = 6 + m;
         cd.motions[m].loop   = (m == MO_Walk);
     }
+    // the character's OWN skill (range/power/effect/sound), authored in the panel
+    FieldSkill cs; cs.slot = 1; cs.name = "캐릭터파이어"; cs.projectile = true;
+    cs.range = 9; cs.powerPct = 250; cs.mpCost = 7; cs.cooldown = 1.2f;
+    cs.patX = {0, 0}; cs.patY = {0, -1};
+    cd.skills.push_back(cs);
     p->database.characters.push_back(cd);
     p->playerCharId = cd.id;                                       // "플레이어로 설정"
     CHECK(p->save(), "save new character + registered images");
@@ -196,6 +201,10 @@ static void testCharacterBuilder() {
     CHECK(motionsOk, "all 6 motions (걷기/공격/스킬1/스킬2/궁극기/죽음) kept their image frames");
     CHECK(c && c->motions[MO_Walk].loop && !c->motions[MO_Attack].loop, "per-motion loop flags persisted");
     CHECK(p2.playerCharId == 1, "character is set as the driving player");
+    bool skillOk = c && c->skills.size() == 1 && c->skills[0].slot == 1 &&
+                   c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
+                   c->skills[0].projectile && c->skills[0].name == "캐릭터파이어";
+    CHECK(skillOk, "character's own skill (range/power/projectile) persisted");
     bool framesResolve = (c != nullptr);
     if (c) for (int m = 0; m < MO_COUNT; ++m) for (int fid : c->motions[m].frames)
         if (!p2.assets.find(fid)) framesResolve = false;

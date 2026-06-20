@@ -18,6 +18,14 @@ void GamePlay::loadSkills() {
     const Database& db = engine_.project().database;
     if (!db.fieldSkills.empty()) skills_ = db.fieldSkills;
     else skills_ = Database::defaultFieldSkills();
+    // The driving custom character's own skills override the global slot binding,
+    // so skills authored in the character panel actually drive that character.
+    const CharacterDef* cd = customChar();
+    if (cd) for (const FieldSkill& cs : cd->skills) {
+        bool replaced = false;
+        for (auto& s : skills_) if (s.slot == cs.slot) { s = cs; replaced = true; break; }
+        if (!replaced) skills_.push_back(cs);
+    }
 }
 
 // Rotate a canonical "facing-up" tile offset to the player's current facing.

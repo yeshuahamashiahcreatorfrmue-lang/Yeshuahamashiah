@@ -29,6 +29,8 @@ private:
     void drawEventsTab();
     void drawCharsTab();
     void drawImageBrowser();           // built-in file browser to import images (no drag&drop needed)
+    void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
+    void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
     void drawAssetsTab();
     void drawDatabaseTab();
     void drawSkillsTab();
@@ -85,6 +87,7 @@ private:
     bool charBrowse_ = false;         // image file-browser/import modal is open
     std::string browseDir_;           // current folder shown in the file browser
     int  browseScroll_ = 0;           // file browser scroll offset (px)
+    bool charSkillEdit_ = false;      // per-character skill editor modal is open
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to

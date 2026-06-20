@@ -22,6 +22,17 @@ static bool charsIsImageExt(const std::string& e) {
            e == ".tga" || e == ".psd" || e == ".hdr" || e == ".qoi";
 }
 
+// The cast-key slot a skill-capable motion maps to (-1 = not a skill motion).
+static int castSlotForMotion(int m) {
+    switch (m) {
+        case MO_Attack: return 0;   // Z
+        case MO_Skill1: return 1;   // X
+        case MO_Skill2: return 2;   // C
+        case MO_Ult:    return 3;   // V
+        default:        return -1;  // 걷기 / 죽음 — no skill
+    }
+}
+
 int Editor::generateCharacter() {
     Project& p = engine_.project();
     static const Color shirts[] = {
@@ -161,7 +172,8 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
 }
 
 void Editor::drawCharsTab() {
-    if (charBrowse_) { drawImageBrowser(); return; }   // modal: import your own image files
+    if (charBrowse_) { drawImageBrowser(); return; }     // modal: import your own image files
+    if (charSkillEdit_) { drawCharSkillEditor(); return; } // modal: this character's skill behaviour
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
@@ -254,6 +266,16 @@ void Editor::drawCharsTab() {
         if (ui::button({ bx + 182, ey, 78, 24 }, clip.loop ? "반복: 켜짐" : "반복: 꺼짐", clip.loop)) { clip.loop = !clip.loop; p.save(); }
         float dur = clip.frames.empty() ? 0 : (float)clip.frames.size() / std::max(1, clip.fps);
         DrawTextU(TextFormat("길이 %.2f초", dur), (int)bx + 268, (int)ey + 5, 12, ui::kText);
+        // skill-capable motions (공격/스킬1/스킬2/궁극기) get a per-character skill editor
+        int castSlot = castSlotForMotion(charMotionTab_);
+        if (castSlot >= 0) {
+            static const char* slotKey[4] = { "Z", "X", "C", "V" };
+            bool hasSkill = false;
+            for (auto& sk : cd.skills) if (sk.slot == castSlot) { hasSkill = true; break; }
+            if (ui::button({ bx + 360, ey, 256, 24 },
+                           TextFormat("[%s] 스킬 동작 편집 (사거리/위력/효과/사운드)", slotKey[castSlot]), hasSkill))
+                { charSkillEdit_ = true; return; }
+        }
         float ey2 = ey + 30;
         auto snap = [&]() { charUndo_ = clip; charUndoSet_ = true; };   // 1-level undo snapshot
         if (ui::button({ bx + 50, ey2, 56, 22 }, "비우기", false)) { snap(); clip.frames.clear(); charFrameSel_ = -1; p.save(); }
@@ -487,6 +509,122 @@ void Editor::drawImageBrowser() {
         ry += rowH;
     }
     EndScissorMode();
+}
+
+// Per-character skill behaviour editor (range / power / effect tiles / sound) for
+// the slot the current motion maps to. Edits this character's own skill, which
+// overrides the global field skill for that slot when the character drives play.
+void Editor::drawCharSkillEditor() {
+    Project& p = engine_.project();
+    Database& db = p.database;
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
+
+    if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charSkillEdit_ = false; return; }
+    CharacterDef& cd = db.characters[charDefSel_];
+    int slot = castSlotForMotion(charMotionTab_);
+    if (slot < 0) { charSkillEdit_ = false; return; }
+
+    // find this character's skill for the slot, or create it (seeded from the
+    // matching global skill if one exists, else a simple front-tile preset).
+    FieldSkill* sp = nullptr;
+    for (auto& s : cd.skills) if (s.slot == slot) { sp = &s; break; }
+    if (!sp) {
+        FieldSkill ns;
+        const FieldSkill* g = db.fieldSkillForSlot(slot);
+        if (g) ns = *g; else { ns.name = kMotionNames[charMotionTab_]; applyShape(ns, 0, 1); }
+        ns.slot = slot; ns.id = (int)cd.skills.size() + 1;
+        cd.skills.push_back(ns); sp = &cd.skills.back();
+    }
+    FieldSkill& s = *sp;
+
+    static const char* slotKey[4] = { "Z", "X", "C", "V" };
+    ui::label(TextFormat("스킬 동작 편집 — %s / %s 모션 (단축키 %s)",
+              cd.name.c_str(), kMotionNames[charMotionTab_], slotKey[slot]),
+              20, (int)kToolbarH + 10, 20, ui::kAccent);
+    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 저장하고 닫기")) { p.save(); charSkillEdit_ = false; return; }
+    if (ui::button({ area.width - 348, kToolbarH + 8, 160, 28 }, "이 스킬 비우기")) {   // revert to global slot skill
+        for (size_t k = 0; k < cd.skills.size(); ++k) if (cd.skills[k].slot == slot) { cd.skills.erase(cd.skills.begin()+k); break; }
+        p.save(); charSkillEdit_ = false; return;
+    }
+
+    // ---- effect-area tile grid + shape presets ----
+    float gx = 24, gy = kToolbarH + 50;
+    bool usesPattern = !s.projectile;
+    ui::label("효과 적용 범위 (플레이어 기준, 위=정면)", (int)gx, (int)gy, 16, ui::kAccent); gy += 24;
+    ui::label("범위 프리셋:", (int)gx, (int)gy, 13, ui::kTextDim); gy += 18;
+    static const char* shapeName[6] = { "정면","직선","십자","부채꼴","원형","주변" };
+    for (int i = 0; i < 6; ++i)
+        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i]) && usesPattern) applyShape(s, i, skillPatSize_);
+    gy += 28;
+    ui::intStepper({ gx, gy, 200, 24 }, "범위/사거리", skillPatSize_, 1, 1, 4); gy += 28;
+
+    const int GRID = 9, HALF = GRID/2; float cs = 30;
+    DrawTriangle({ gx + HALF*cs + cs/2, gy }, { gx + HALF*cs + cs/2 - 7, gy + 11 },
+                 { gx + HALF*cs + cs/2 + 7, gy + 11 }, ui::kGood);
+    DrawTextU("정면", (int)(gx + HALF*cs + cs/2 + 12), (int)gy, 12, ui::kGood);
+    gy += 14;
+    for (int ry = 0; ry < GRID; ++ry) for (int rx = 0; rx < GRID; ++rx) {
+        int ox = rx - HALF, oy = ry - HALF;
+        Rectangle cell = { gx + rx*cs, gy + ry*cs, cs-2, cs-2 };
+        bool isPlayer = (ox == 0 && oy == 0);
+        bool on = false;
+        for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) { on = true; break; }
+        Color c = isPlayer ? ui::kAccent : (on ? Color{210,120,90,255} : ui::kPanelHi);
+        if (!usesPattern) c = Fade(c, 0.35f);
+        DrawRectangleRec(cell, c);
+        DrawRectangleLinesEx(cell, 1, Fade(BLACK,0.5f));
+        if (isPlayer) DrawTextU("P", (int)cell.x+9, (int)cell.y+6, 16, BLACK);
+        if (usesPattern && !isPlayer && ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (on) { for (size_t k = 0; k < s.patX.size(); ++k) if (s.patX[k]==ox && s.patY[k]==oy) {
+                          s.patX.erase(s.patX.begin()+k); s.patY.erase(s.patY.begin()+k); break; } }
+            else { s.patX.push_back(ox); s.patY.push_back(oy); }
+        }
+    }
+    float gridBottom = gy + GRID*cs + 6;
+    DrawTextU(usesPattern ? TextFormat("칸 클릭=수동 편집 · 적용 타일 %d개 (시전 시 방향 회전)", (int)s.patX.size())
+                          : "발사체 모드: 범위 패턴 미사용 · 오른쪽 '사거리'만 적용",
+              (int)gx, (int)gridBottom, 12, usesPattern ? ui::kTextDim : ui::kAccentHi);
+
+    // ---- parameters + one-click effect/sound creation ----
+    float dx = gx + GRID*cs + 28, dy = kToolbarH + 50, dw = area.width - dx - 16;
+    ui::panel({ dx - 8, dy - 6, dw + 12, 430 }, ui::kPanel);
+    ui::label("스킬 설정", (int)dx, (int)dy, 18, ui::kAccent); dy += 28;
+    ui::label("이름:", (int)dx, (int)dy, 13, ui::kTextDim); dy += 18;
+    Rectangle nf = { dx, dy, std::min(280.0f, dw), 26 };
+    if (ui::mouseIn(nf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) skillNameFocus_ = true;
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(nf)) skillNameFocus_ = false;
+    ui::textField(nf, s.name, skillNameFocus_, 24); dy += 32;
+    DrawTextU(TextFormat("단축키: %s (모션에 고정)", slotKey[slot]), (int)dx, (int)dy, 13, ui::kTextDim); dy += 24;
+    if (ui::button({ dx, dy, 260, 26 }, s.projectile ? "유형: 발사체(전방 직선)" : "유형: 범위(타일 패턴)"))
+        s.projectile = !s.projectile;
+    dy += 30;
+    ui::intStepper({ dx, dy, 260, 24 }, "사거리(발사체)", s.range, 1, 1, 20); dy += 27;
+    ui::intStepper({ dx, dy, 260, 24 }, "순간이동 칸", s.blink, 1, 0, 10); dy += 27;
+    ui::intStepper({ dx, dy, 260, 24 }, "위력(%ATK)", s.powerPct, 10, 0, 1000); dy += 27;
+    ui::intStepper({ dx, dy, 260, 24 }, "MP 소모", s.mpCost, 1, 0, 99); dy += 27;
+    int cdTenths = (int)(s.cooldown * 10 + 0.5f);
+    if (ui::intStepper({ dx, dy, 260, 24 }, "쿨다운(0.1초)", cdTenths, 1, 1, 200)) s.cooldown = cdTenths / 10.0f;
+    dy += 32;
+    auto name = [&](int id){ const AssetEntry* e = p.assets.find(id); return e ? e->name : std::string("없음"); };
+    auto cycle = [&](int& cur, AssetType t){
+        auto list = p.assets.byType(t);
+        int idx = -1; for (int i=0;i<(int)list.size();++i) if (list[i]->id==cur) idx=i;
+        idx++; cur = (idx >= (int)list.size()) ? -1 : list[idx]->id;
+    };
+    if (ui::button({ dx, dy, 260, 24 }, std::string("이펙트: ") + name(s.effectAsset), s.effectAsset>=0))
+        cycle(s.effectAsset, AssetType::Image);
+    dy += 26;
+    DrawTextU("이펙트 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
+    static const char* fxName[4] = { "베기","볼트","대시","폭발" };
+    for (int i = 0; i < 4; ++i) if (ui::button({ dx + 78 + i*46, dy, 44, 22 }, fxName[i])) s.effectAsset = generateEffect(i);
+    dy += 30;
+    if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + name(s.soundAsset), s.soundAsset>=0))
+        cycle(s.soundAsset, AssetType::Audio);
+    dy += 26;
+    DrawTextU("효과음 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
+    static const char* sndName[5] = { "베기","마법","폭발","대시","회복" };
+    for (int i = 0; i < 5; ++i) if (ui::button({ dx + 78 + i*38, dy, 36, 22 }, sndName[i])) s.soundAsset = generateSound(i);
 }
 
 

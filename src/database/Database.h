@@ -75,6 +75,8 @@ struct CharacterDef {
     int id = -1;
     std::string name = "캐릭터";
     MotionClip motions[MO_COUNT]; // walk/attack/skill1/skill2/ultimate/death
+    std::vector<FieldSkill> skills; // this character's own skills (by slot); override
+                                    // the global field skills when it drives the player
 };
 
 struct ActorDef {

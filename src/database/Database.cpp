@@ -4,6 +4,28 @@ using nlohmann::json;
 
 namespace tsukuru {
 
+// ---- FieldSkill <-> json (shared by global field skills and per-character skills) ----
+static json skillToJson(const FieldSkill& s) {
+    return {{"id", s.id}, {"name", s.name}, {"slot", s.slot},
+            {"projectile", s.projectile}, {"blink", s.blink}, {"range", s.range},
+            {"mpCost", s.mpCost}, {"cooldown", s.cooldown}, {"powerPct", s.powerPct},
+            {"patX", s.patX}, {"patY", s.patY},
+            {"effectAsset", s.effectAsset}, {"soundAsset", s.soundAsset}};
+}
+static FieldSkill skillFromJson(const json& s) {
+    FieldSkill fs;
+    fs.id = s.value("id", -1); fs.name = s.value("name", "스킬");
+    fs.slot = s.value("slot", -1); fs.projectile = s.value("projectile", false);
+    fs.blink = s.value("blink", 0); fs.range = s.value("range", 6);
+    fs.mpCost = s.value("mpCost", 0); fs.cooldown = s.value("cooldown", 0.5f);
+    fs.powerPct = s.value("powerPct", 100);
+    fs.patX = s.value("patX", std::vector<int>{});
+    fs.patY = s.value("patY", std::vector<int>{});
+    fs.effectAsset = s.value("effectAsset", -1);
+    fs.soundAsset = s.value("soundAsset", -1);
+    return fs;
+}
+
 // ---- effect enum <-> string ----
 static const char* effName(ItemEffect e) {
     switch (e) {
@@ -97,18 +119,15 @@ json Database::toJson() const {
             {"spd", e.spd}, {"expReward", e.expReward}, {"goldReward", e.goldReward}});
 
     j["fieldSkills"] = json::array();
-    for (const auto& s : fieldSkills)
-        j["fieldSkills"].push_back({{"id", s.id}, {"name", s.name}, {"slot", s.slot},
-            {"projectile", s.projectile}, {"blink", s.blink}, {"range", s.range},
-            {"mpCost", s.mpCost}, {"cooldown", s.cooldown}, {"powerPct", s.powerPct},
-            {"patX", s.patX}, {"patY", s.patY},
-            {"effectAsset", s.effectAsset}, {"soundAsset", s.soundAsset}});
+    for (const auto& s : fieldSkills) j["fieldSkills"].push_back(skillToJson(s));
 
     j["characters"] = json::array();
     for (const auto& c : characters) {
         json mo = json::array();
         for (const auto& m : c.motions) mo.push_back({{"frames", m.frames}, {"fps", m.fps}, {"loop", m.loop}});
-        j["characters"].push_back({{"id", c.id}, {"name", c.name}, {"motions", mo}});
+        json sk = json::array();
+        for (const auto& s : c.skills) sk.push_back(skillToJson(s));
+        j["characters"].push_back({{"id", c.id}, {"name", c.name}, {"motions", mo}, {"skills", sk}});
     }
     return j;
 }
@@ -158,19 +177,7 @@ void Database::fromJson(const json& j) {
         en.expReward = e.value("expReward", 10); en.goldReward = e.value("goldReward", 5);
         enemies.push_back(en);
     }
-    for (const auto& s : j.value("fieldSkills", json::array())) {
-        FieldSkill fs;
-        fs.id = s.value("id", -1); fs.name = s.value("name", "스킬");
-        fs.slot = s.value("slot", -1); fs.projectile = s.value("projectile", false);
-        fs.blink = s.value("blink", 0); fs.range = s.value("range", 6);
-        fs.mpCost = s.value("mpCost", 0); fs.cooldown = s.value("cooldown", 0.5f);
-        fs.powerPct = s.value("powerPct", 100);
-        fs.patX = s.value("patX", std::vector<int>{});
-        fs.patY = s.value("patY", std::vector<int>{});
-        fs.effectAsset = s.value("effectAsset", -1);
-        fs.soundAsset = s.value("soundAsset", -1);
-        fieldSkills.push_back(fs);
-    }
+    for (const auto& s : j.value("fieldSkills", json::array())) fieldSkills.push_back(skillFromJson(s));
     characters.clear();
     for (const auto& c : j.value("characters", json::array())) {
         CharacterDef cd;
@@ -181,6 +188,7 @@ void Database::fromJson(const json& j) {
             cd.motions[i].fps = mo[i].value("fps", 8);
             cd.motions[i].loop = mo[i].value("loop", i == MO_Walk); // walk loops by default
         }
+        for (const auto& s : c.value("skills", json::array())) cd.skills.push_back(skillFromJson(s));
         characters.push_back(cd);
     }
 }
