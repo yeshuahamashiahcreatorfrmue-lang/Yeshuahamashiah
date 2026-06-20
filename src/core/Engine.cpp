@@ -15,7 +15,13 @@ Engine::Engine() = default;
 Engine::~Engine() = default;
 
 const Texture2D& Engine::assetTexture(int assetId) {
-    return textures_.get(project_->assetFullPath(assetId));
+    auto it = assetPathCache_.find(assetId);
+    if (it == assetPathCache_.end()) {
+        std::string path = project_->assetFullPath(assetId);
+        if (path.empty()) return textures_.get(path);   // don't cache unresolved ids
+        it = assetPathCache_.emplace(assetId, std::move(path)).first;
+    }
+    return textures_.get(it->second);
 }
 
 void Engine::setMode(Mode m) {

@@ -4,6 +4,7 @@
 // (render/TextureCache) loads the actual GPU textures from these paths.
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 
 namespace tsukuru {
@@ -44,7 +45,10 @@ public:
     void fromJson(const nlohmann::json& j);
 
 private:
+    void rebuildIndex();        // resync idIndex_ after bulk changes (load / remove)
+
     std::vector<AssetEntry> assets_;
+    std::unordered_map<int, size_t> idIndex_;   // asset id -> index in assets_ (O(1) find)
     int nextId_ = 1;
 };
 

@@ -6,6 +6,7 @@
 #include "core/Text.h"
 #include "database/Database.h"
 #include <set>
+#include <unordered_set>
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -169,8 +170,13 @@ void GamePlay::drawField() {
     const Texture2D& ts = engine_.assetTexture(map_->tileset.assetId);
     const Tileset& set = map_->tileset;
 
-    // animated tiles: cycle base id <-> id+1
+    // animated tiles: cycle base id <-> id+1. Hoist the membership test out of the
+    // per-tile inner loop into an O(1) hash set built once per frame (only when the
+    // animation is on its "+1" phase and there are animated tiles to begin with).
     int phase = (int)(GetTime() * 2.5) % 2;
+    std::unordered_set<int> animSet;
+    if (phase == 1 && !map_->animTiles.empty())
+        animSet.insert(map_->animTiles.begin(), map_->animTiles.end());
 
     int vx0, vy0, vx1, vy1; visibleRange(vx0, vy0, vx1, vy1); // cull to viewport
     BeginMode2D(cam_);
@@ -179,8 +185,7 @@ void GamePlay::drawField() {
             for (int x = vx0; x <= vx1; ++x) {
                 int t = map_->tilemap.tile(layer, x, y);
                 if (t < 0) continue;
-                if (phase == 1)
-                    for (int a : map_->animTiles) if (a == t) { t = t + 1; break; }
+                if (!animSet.empty() && animSet.count(t)) t = t + 1;
                 int sx, sy; set.srcOf(t, sx, sy);
                 Rectangle src = { (float)sx, (float)sy, (float)set.tileWidth, (float)set.tileHeight };
                 Rectangle dst = { (float)x*TS, (float)y*TS, (float)TS, (float)TS };

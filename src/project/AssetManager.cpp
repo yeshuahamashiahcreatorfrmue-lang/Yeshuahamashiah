@@ -41,6 +41,7 @@ int AssetManager::registerAsset(const std::string& projectDir,
     e.type    = type;
     e.name    = displayName.empty() ? dest.stem().string() : displayName;
     e.relPath = (fs::path("assets") / dest.filename()).generic_string();
+    idIndex_[e.id] = assets_.size();
     assets_.push_back(e);
     return e.id;
 }
@@ -51,26 +52,34 @@ int AssetManager::addExisting(AssetType type, const std::string& name, const std
     e.type    = type;
     e.name    = name;
     e.relPath = relPath;
+    idIndex_[e.id] = assets_.size();
     assets_.push_back(e);
     return e.id;
 }
 
 void AssetManager::setAnim(int id, int frames, int fps) {
-    for (auto& a : assets_) if (a.id == id) {
-        a.frames = frames < 1 ? 1 : frames;
-        a.fps = fps < 1 ? 1 : fps;
-        return;
-    }
+    auto it = idIndex_.find(id);
+    if (it == idIndex_.end()) return;
+    AssetEntry& a = assets_[it->second];
+    a.frames = frames < 1 ? 1 : frames;
+    a.fps = fps < 1 ? 1 : fps;
 }
 
 void AssetManager::remove(int id) {
     assets_.erase(std::remove_if(assets_.begin(), assets_.end(),
                   [id](const AssetEntry& a){ return a.id == id; }), assets_.end());
+    rebuildIndex();   // erase shifts indices
 }
 
 const AssetEntry* AssetManager::find(int id) const {
-    for (const auto& a : assets_) if (a.id == id) return &a;
-    return nullptr;
+    auto it = idIndex_.find(id);
+    return it == idIndex_.end() ? nullptr : &assets_[it->second];
+}
+
+void AssetManager::rebuildIndex() {
+    idIndex_.clear();
+    idIndex_.reserve(assets_.size());
+    for (size_t i = 0; i < assets_.size(); ++i) idIndex_[assets_[i].id] = i;
 }
 
 std::vector<const AssetEntry*> AssetManager::byType(AssetType type) const {
@@ -104,6 +113,7 @@ void AssetManager::fromJson(const json& j) {
             assets_.push_back(e);
         }
     }
+    rebuildIndex();
 }
 
 } // namespace tsukuru

@@ -6,6 +6,7 @@
 //   Play    -> walk the world, talk to events, fight battles
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include "project/Project.h"
 #include "game/GameState.h"
 #include "render/TextureCache.h"
@@ -53,6 +54,10 @@ private:
     void draw();
 
     std::shared_ptr<Project> project_;
+    // asset id -> resolved full path. relPath is immutable per id within a loaded
+    // project (ids are never reused), so this stays valid for the whole session and
+    // spares the per-frame fs::path build + lookup in the render loop.
+    std::unordered_map<int, std::string> assetPathCache_;
     GameState                state_;
     TextureCache             textures_;
     Audio                    audio_;

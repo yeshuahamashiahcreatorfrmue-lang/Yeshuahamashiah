@@ -19,7 +19,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 if(MSVC)
     add_compile_options($<$<CONFIG:Release>:/O2> /W3 /utf-8)
 else()
-    add_compile_options($<$<CONFIG:Release>:-O2> -Wall -Wextra -Wno-unused-parameter
+    add_compile_options($<$<CONFIG:Release>:-O3> -Wall -Wextra -Wno-unused-parameter
                         -finput-charset=UTF-8 -fexec-charset=UTF-8)
 endif()
 

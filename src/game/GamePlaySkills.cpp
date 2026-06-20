@@ -149,12 +149,12 @@ void GamePlay::drawSkillPanel() {
         if (s->mpCost > 0)
             DrawTextU(TextFormat("MP %d", s->mpCost), (int)r.x+46, (int)r.y+32, 13,
                       mp >= s->mpCost ? ui::kGood : ui::kDanger);
-        // short auto description
-        std::string d = s->projectile ? TextFormat("원거리 %d칸", s->range)
+        // short auto description (TextFormat's rotating static buffer — no heap alloc)
+        const char* d = s->projectile ? TextFormat("원거리 %d칸", s->range)
                       : s->blink > 0 && s->powerPct<=0 ? TextFormat("전방 %d칸 이동", s->blink)
                       : s->blink > 0 ? TextFormat("순간이동+광역 %d", (int)s->patX.size())
                       : TextFormat("범위 %d칸", (int)s->patX.size());
-        DrawTextU(d.c_str(), (int)r.x+8, (int)r.y+50, 12, ui::kTextDim);
+        DrawTextU(d, (int)r.x+8, (int)r.y+50, 12, ui::kTextDim);
 
         if (skillCd_[slot] > 0) {
             float frac = s->cooldown > 0 ? skillCd_[slot] / s->cooldown : 0;
