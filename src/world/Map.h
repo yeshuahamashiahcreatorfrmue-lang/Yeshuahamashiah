@@ -29,6 +29,12 @@ public:
     // (the tileset stores the alternate frame right after the base tile).
     std::vector<int> animTiles;
 
+    // Zone position on the All-Map Viewer grid (in map-slot units). Maps whose
+    // slots are orthogonally adjacent are walk-connected at their shared edge;
+    // unplaced/far-apart maps are independent. placed=false = not on the grid.
+    int  worldX = 0, worldY = 0;
+    bool placed = false;
+
     Map() : tilemap(20, 15) {}
 
     Event* eventAt(int x, int y);

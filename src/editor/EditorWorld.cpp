@@ -223,5 +223,112 @@ void Editor::drawWorldTab() {
              (int)dx, (int)(ly + area.height - 60), 14, ui::kTextDim);
 }
 
+// ===================== All-Map Viewer (zone grid) =====================
+// Lay maps on a grid. Orthogonally-adjacent maps connect at their shared edge,
+// so in-game walking off that edge loads the neighbour. Far-apart maps are
+// independent. Click a map (list or grid) to select; click an empty cell to drop
+// the selected map there.
+void Editor::drawWorldViewTab() {
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 20, 22, 30, 255 });
+    Project& p = engine_.project();
+    const float cell = 180.0f;
+
+    // ---- left panel: map list + actions ----
+    float lx = 12, ly = kToolbarH + 12, lw = 270;
+    ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
+    ui::label("전맵 뷰어", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
+    DrawTextU("맵 선택 후 격자 빈칸 클릭 = 배치", (int)lx + 12, (int)ly + 40, 12, ui::kTextDim);
+    DrawTextU("붙어있는 맵끼리 가장자리로 이동", (int)lx + 12, (int)ly + 56, 12, ui::kTextDim);
+    float yb = ly + 80;
+    if (worldViewSel_ >= 0 && worldViewSel_ < (int)p.maps.size()) {
+        auto& sm = p.maps[worldViewSel_];
+        if (ui::button({ lx + 10, yb, lw - 20, 26 }, sm->placed ? "배치 해제(빼기)" : "선택됨 — 격자 클릭")) {
+            if (sm->placed) { sm->placed = false; p.save(); setStatus(sm->name + " 배치 해제"); }
+        }
+    }
+    yb += 32;
+    Rectangle listR = { lx + 6, yb, lw - 12, area.height - 24 - (yb - ly) - 6 };
+    BeginScissorMode((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
+    if (ui::mouseIn(listR)) worldListScroll_ -= GetMouseWheelMove() * 48;
+    float contentH = p.maps.size() * 30.0f + 4;
+    float maxS = std::max(0.0f, contentH - listR.height);
+    worldListScroll_ = std::max(0.0f, std::min(worldListScroll_, maxS));
+    float ry = listR.y - worldListScroll_;
+    for (int i = 0; i < (int)p.maps.size(); ++i) {
+        auto& m = p.maps[i];
+        if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
+            std::string lbl = (m->placed ? "[배치] " : "  ") + m->name;
+            if (ui::button({ listR.x + 4, ry, listR.width - 8, 26 }, lbl, worldViewSel_ == i))
+                worldViewSel_ = i;
+        }
+        ry += 30;
+    }
+    EndScissorMode();
+
+    // ---- right: zone grid canvas ----
+    Rectangle canvas = { lx + lw + 12, ly, area.width - (lx + lw + 12) - 12, area.height - 24 };
+    BeginScissorMode((int)canvas.x, (int)canvas.y, (int)canvas.width, (int)canvas.height);
+    DrawRectangleRec(canvas, Color{ 26, 28, 38, 255 });
+    if (!worldCamInit_) { worldCam_.zoom = 0.7f; worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 }; worldCam_.target = { cell, cell }; worldCamInit_ = true; }
+    worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 };
+    if (ui::mouseIn(canvas)) {
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0) worldCam_.zoom = std::max(0.2f, std::min(2.0f, worldCam_.zoom + wheel*0.1f));
+        if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) { Vector2 dd = GetMouseDelta(); worldCam_.target.x -= dd.x/worldCam_.zoom; worldCam_.target.y -= dd.y/worldCam_.zoom; }
+    }
+
+    BeginMode2D(worldCam_);
+    // grid lines around the visible area
+    Vector2 tl = GetScreenToWorld2D({ canvas.x, canvas.y }, worldCam_);
+    Vector2 br = GetScreenToWorld2D({ canvas.x+canvas.width, canvas.y+canvas.height }, worldCam_);
+    int gx0 = (int)std::floor(tl.x/cell)-1, gy0 = (int)std::floor(tl.y/cell)-1;
+    int gx1 = (int)std::floor(br.x/cell)+1, gy1 = (int)std::floor(br.y/cell)+1;
+    for (int gx = gx0; gx <= gx1; ++gx) DrawLine((int)(gx*cell), (int)(gy0*cell), (int)(gx*cell), (int)(gy1*cell), Fade(BLACK,0.4f));
+    for (int gy = gy0; gy <= gy1; ++gy) DrawLine((int)(gx0*cell), (int)(gy*cell), (int)(gx1*cell), (int)(gy*cell), Fade(BLACK,0.4f));
+    // connectors between adjacent placed maps (green = walkable edge)
+    for (auto& m : p.maps) {
+        if (!m->placed) continue;
+        if (p.mapAtWorld(m->worldX+1, m->worldY))   // right neighbour: green edge marker
+            DrawRectangle((int)((m->worldX+1)*cell-4), (int)(m->worldY*cell+cell/2-10), 8, 20, ui::kGood);
+        if (p.mapAtWorld(m->worldX, m->worldY+1))   // bottom neighbour
+            DrawRectangle((int)(m->worldX*cell+cell/2-10), (int)((m->worldY+1)*cell-4), 20, 8, ui::kGood);
+    }
+    // map boxes
+    for (int i = 0; i < (int)p.maps.size(); ++i) {
+        auto& m = p.maps[i];
+        if (!m->placed) continue;
+        Rectangle box = { m->worldX*cell+6, m->worldY*cell+6, cell-12, cell-12 };
+        Color fill = { (unsigned char)(60+(m->id*53)%120), (unsigned char)(70+(m->id*97)%110), (unsigned char)(90+(m->id*29)%120), 255 };
+        DrawRectangleRec(box, fill);
+        DrawRectangleLinesEx(box, worldViewSel_==i ? 3 : 1, worldViewSel_==i ? ui::kAccentHi : Fade(BLACK,0.6f));
+    }
+    EndMode2D();
+
+    // labels in screen space (so text stays crisp)
+    for (auto& m : p.maps) {
+        if (!m->placed) continue;
+        Vector2 sp = GetWorldToScreen2D({ m->worldX*cell+12, m->worldY*cell+12 }, worldCam_);
+        DrawTextU(m->name.c_str(), (int)sp.x, (int)sp.y, 14, WHITE);
+        DrawTextU(TextFormat("#%d  (%d,%d)", m->id, m->worldX, m->worldY), (int)sp.x, (int)sp.y+18, 11, Fade(WHITE,0.8f));
+    }
+
+    // click: select an occupied cell, or drop the selected map on an empty cell
+    if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+        Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
+        int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
+        auto occ = p.mapAtWorld(cx, cy);
+        if (occ) {
+            for (int i = 0; i < (int)p.maps.size(); ++i) if (p.maps[i] == occ) worldViewSel_ = i;
+        } else if (worldViewSel_ >= 0 && worldViewSel_ < (int)p.maps.size()) {
+            auto& sm = p.maps[worldViewSel_];
+            sm->worldX = cx; sm->worldY = cy; sm->placed = true; p.save();
+            setStatus(TextFormat("%s 배치: (%d,%d)", sm->name.c_str(), cx, cy));
+        }
+    }
+    EndScissorMode();
+    DrawTextU("휠=확대/축소 · 가운데드래그=이동 · 좌클릭=배치/선택", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 13, ui::kTextDim);
+    DrawTextU(kBuildTag, 12, GetScreenHeight()-22, 13, ui::kGood);
+}
 
 } // namespace tsukuru

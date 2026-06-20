@@ -47,6 +47,11 @@ std::shared_ptr<Map> Project::map(int id) {
     return nullptr;
 }
 
+std::shared_ptr<Map> Project::mapAtWorld(int wx, int wy) {
+    for (auto& m : maps) if (m->placed && m->worldX == wx && m->worldY == wy) return m;
+    return nullptr;
+}
+
 std::shared_ptr<Map> Project::addMap(const std::string& mapName, int w, int h) {
     auto m = std::make_shared<Map>();
     m->id = nextMapId();

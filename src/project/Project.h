@@ -37,6 +37,7 @@ public:
     bool save() const;
 
     std::shared_ptr<Map> map(int id);
+    std::shared_ptr<Map> mapAtWorld(int wx, int wy); // placed map at a zone-grid cell, or null
     std::shared_ptr<Map> addMap(const std::string& name, int w, int h);
     int nextMapId() const;
 

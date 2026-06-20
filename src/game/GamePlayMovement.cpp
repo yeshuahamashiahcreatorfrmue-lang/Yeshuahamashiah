@@ -145,10 +145,38 @@ void GamePlay::tryMove(Direction d) {
     dir_ = (int)d;
     Vec2i delta = dirToDelta(d);
     int nx = destX_ + delta.x, ny = destY_ + delta.y;
+    // walking off an edge: hop to the adjacent placed map (zone loading) if any
+    if (!map_->tilemap.inBounds(nx, ny)) { tryZoneTransition(d); return; }
     if (map_->tilemap.blocked(nx, ny)) return;
     if (monsterAt(nx, ny)) return;                    // can't walk through monsters
     if (npcAt(nx, ny)) return;                        // ...or NPCs
     destX_ = nx; destY_ = ny; moving_ = true;
+}
+
+// Walk off the map edge into the orthogonally-adjacent map placed in the
+// All-Map Viewer grid. The player re-enters at the opposite edge, keeping the
+// crossing coordinate. No neighbour there → the edge just blocks (no-op).
+void GamePlay::tryZoneTransition(Direction d) {
+    if (!map_ || !map_->placed) return;
+    Vec2i delta = dirToDelta(d);
+    auto nb = engine_.project().mapAtWorld(map_->worldX + delta.x, map_->worldY + delta.y);
+    if (!nb) return;
+    GameState& gs = engine_.state();
+    int curY = destY_, curX = destX_;
+    loadMap(nb->id);
+    int W = map_->tilemap.width(), H = map_->tilemap.height();
+    int ex = destX_, ey = destY_;
+    if (delta.x > 0)      { ex = 0;     ey = std::min(curY, H - 1); }   // went right -> enter left
+    else if (delta.x < 0) { ex = W - 1; ey = std::min(curY, H - 1); }   // went left  -> enter right
+    else if (delta.y > 0) { ey = 0;     ex = std::min(curX, W - 1); }   // went down  -> enter top
+    else                  { ey = H - 1; ex = std::min(curX, W - 1); }   // went up    -> enter bottom
+    int TS = map_->tileset.tileWidth;
+    destX_ = ex; destY_ = ey;
+    pxX_ = ex * (float)TS; pxY_ = ey * (float)TS;
+    moving_ = false; attackTimer_ = 0;
+    gs.playerX = ex; gs.playerY = ey;
+    spawnMonsters();
+    runAutoruns();
 }
 
 // ----------------------------- tile passability -----------------------------

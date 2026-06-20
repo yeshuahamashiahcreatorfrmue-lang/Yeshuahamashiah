@@ -29,7 +29,8 @@ json Map::toJson() const {
         {"darkness", darkness},
         {"weather", weather},
         {"dayNight", dayNight},
-        {"animTiles", animTiles}
+        {"animTiles", animTiles},
+        {"worldX", worldX}, {"worldY", worldY}, {"placed", placed}
     };
 }
 
@@ -48,6 +49,9 @@ void Map::fromJson(const json& j) {
     weather          = j.value("weather", 0);
     dayNight         = j.value("dayNight", false);
     animTiles        = j.value("animTiles", std::vector<int>{});
+    worldX           = j.value("worldX", 0);
+    worldY           = j.value("worldY", 0);
+    placed           = j.value("placed", false);
 }
 
 } // namespace tsukuru

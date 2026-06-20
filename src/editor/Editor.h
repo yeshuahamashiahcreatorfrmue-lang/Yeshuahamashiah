@@ -22,11 +22,12 @@ public:
     void draw();
 
 private:
-    enum class Tab { World, Map, Events, Chars, Assets, Database };
+    enum class Tab { World, WorldView, Map, Events, Chars, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
     void drawWorldTab();
+    void drawWorldViewTab();   // All-Map Viewer: lay maps on a zone grid for edge-to-edge travel
     void drawMapTab();
     void drawEventsTab();
     void drawCharsTab();
@@ -91,6 +92,9 @@ private:
     std::string mapSearch_;         // World-tab map-list filter text
     bool mapSearchFocus_ = false;
     float worldListScroll_ = 0;     // scroll offset for the (filtered) map list
+    int  worldViewSel_ = -1;        // map selected in the All-Map Viewer
+    Camera2D worldCam_{};           // pan/zoom for the zone grid
+    bool worldCamInit_ = false;
     int  newMapW_ = 30, newMapH_ = 24;
     int  newMapTier_ = 0;           // standardized size tier for a new map (0..13)
     // Character generation

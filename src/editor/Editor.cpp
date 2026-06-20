@@ -32,7 +32,8 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     }
     if (const char* t = getenv("TSUKURU_TAB")) { // debug: pick initial tab
         std::string s = t;
-        if (s == "world") tab_ = Tab::World;     else if (s == "events") tab_ = Tab::Events;
+        if (s == "world") tab_ = Tab::World;     else if (s == "worldview") tab_ = Tab::WorldView;
+        else if (s == "events") tab_ = Tab::Events;
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
@@ -105,6 +106,7 @@ void Editor::update(float dt) {
 void Editor::draw() {
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
+        case Tab::WorldView: drawWorldViewTab(); break;
         case Tab::Map:      drawMapTab();      break;
         case Tab::Events:   drawEventsTab();   break;
         case Tab::Chars:    drawCharsTab();    break;
@@ -130,6 +132,7 @@ void Editor::drawToolbar() {
         x += 80;
     };
     tabBtn("월드", Tab::World);
+    tabBtn("전맵뷰어", Tab::WorldView);
     tabBtn("맵", Tab::Map);
     tabBtn("이벤트", Tab::Events);
     tabBtn("캐릭터", Tab::Chars);

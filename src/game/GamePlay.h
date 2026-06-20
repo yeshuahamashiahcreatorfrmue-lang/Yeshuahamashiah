@@ -41,6 +41,7 @@ private:
     // --- movement (GamePlayMovement.cpp) ---
     void updateField(float dt);
     void tryMove(Direction d);
+    void tryZoneTransition(Direction d);    // walk off an edge -> load the adjacent placed map
     bool walkable(int x, int y);            // not blocked / not occupied (any mover)
 
     // --- events / dialogue (GamePlayEvents.cpp) ---
