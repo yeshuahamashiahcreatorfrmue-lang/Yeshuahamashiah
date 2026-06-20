@@ -101,10 +101,12 @@ if(BUILD_ENGINE)
     target_include_directories(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
     # Embed Windows version-info metadata into the .exe (reduces "unknown
-    # publisher / info-less binary" AV & SmartScreen false positives).
+    # publisher / info-less binary" AV & SmartScreen false positives), and link
+    # comdlg32 for the native Open-File dialog (Windows Explorer picker).
     if(WIN32)
         enable_language(RC)
         target_sources(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src/win/TsukuruEngine.rc)
+        target_link_libraries(TsukuruEngine PRIVATE comdlg32)
     endif()
 
     if(APPLE)

@@ -3,6 +3,7 @@
 #include "editor/Prefabs.h"
 #include "editor/EditorInternal.h"
 #include "core/Engine.h"
+#include "core/Platform.h"
 #include "render/UI.h"
 #include "core/Text.h"
 #include "gen/AssetGen.h"
@@ -166,7 +167,6 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
 }
 
 void Editor::drawCharsTab() {
-    if (charBrowse_) { drawImageBrowser(); return; }        // modal: import image files
     if (charSkillEdit_) { drawCharSkillEditor(); return; }   // modal: this character's skill
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
     DrawRectangleRec({ 0, kToolbarH, W, H - kToolbarH }, Color{ 24, 26, 34, 255 });
@@ -353,7 +353,7 @@ void Editor::drawCharsTab() {
     {
         float x = rightX + 10, w = rightW - 20;
         ui::label("이미지 소스", (int)x, (int)panelTop + 8, 15, ui::kAccent);
-        if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { charBrowse_ = true; browseScroll_ = 0; return; }
+        if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { pickAndImportImages(); }
         float ry = panelTop + 66;
         if (ui::button({ x, ry, w/2 - 2, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_)) charLibFilter_ = !charLibFilter_;
         if (ui::button({ x + w/2 + 2, ry, w/2 - 2, 24 }, charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_)) charSliceMode_ = !charSliceMode_;
@@ -407,7 +407,8 @@ void Editor::drawCharsTab() {
                 }
                 p.save();
             }
-            if (building && ui::button({ cx + 4, cy + cardH - 16, cell - 8, 14 }, "자동구성")) {
+            float bhalf = (cell - 10) / 2;
+            if (building && ui::button({ cx + 4, cy + cardH - 16, bhalf, 14 }, "자동구성")) {
                 CharacterDef& c = db.characters[charDefSel_];
                 std::vector<int> fr = sliceSheetRow0(a->id);
                 int wlk = std::min((int)fr.size(), 4);
@@ -417,6 +418,8 @@ void Editor::drawCharsTab() {
                 charFrameSel_ = -1; p.save();
                 setStatus(TextFormat("시트 자동구성: 걷기%d+공격%d", wlk, (int)fr.size() - wlk));
             }
+            if (ui::button({ cx + 6 + bhalf, cy + cardH - 16, bhalf, 14 }, "배경제거"))
+                makeTransparentBg(a->id);   // make the solid/white background transparent
         }
         EndScissorMode();
         if (imgs.empty())
@@ -424,91 +427,6 @@ void Editor::drawCharsTab() {
     }
 }
 
-// Built-in image file browser: lets the user import their own image files into
-// the project without relying on OS drag&drop. Folders navigate; image files are
-// copied into the project and registered so they appear in the library.
-void Editor::drawImageBrowser() {
-    Project& p = engine_.project();
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
-    DrawRectangleRec(area, Color{ 20, 22, 30, 255 });
-    handleAssetDrop();   // dropping files still works here too
-
-    if (browseDir_.empty() || !fs::exists(browseDir_)) {
-        const char* h = getenv("HOME"); const char* u = getenv("USERPROFILE");
-        browseDir_ = h ? h : (u ? u : ".");
-    }
-
-    ui::label("내 이미지 불러오기", 20, (int)kToolbarH + 10, 22, ui::kAccent);
-    DrawTextU("폴더를 눌러 이동, 이미지 파일을 누르면 등록됩니다. PNG·JPG·BMP·GIF·TGA 등 모두 가능 · 움짤(GIF)은 자동으로 여러 프레임이 됩니다.",
-              290, (int)kToolbarH + 16, 13, ui::kTextDim);
-    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 빌더로 돌아가기")) { charBrowse_ = false; return; }
-
-    float ny = kToolbarH + 46;
-    if (ui::button({ 20, ny, 70, 26 }, ".. 상위")) {
-        fs::path pp(browseDir_); auto par = pp.parent_path();
-        if (!par.empty() && par != pp) browseDir_ = par.string();
-        browseScroll_ = 0;
-    }
-    float qx = 98;
-    auto quick = [&](const char* lbl, const fs::path& dir) {
-        std::error_code ec;
-        if (!fs::exists(dir, ec)) return;
-        if (ui::button({ qx, ny, 100, 26 }, lbl)) { browseDir_ = dir.string(); browseScroll_ = 0; }
-        qx += 106;
-    };
-    if (const char* h = getenv("HOME"))        { quick("홈", h); quick("바탕화면", fs::path(h) / "Desktop"); }
-    if (const char* u = getenv("USERPROFILE")) { quick("홈", u); quick("바탕화면", fs::path(u) / "Desktop"); }
-    quick("프로젝트", fs::path(p.dir) / "assets");
-    DrawTextU(browseDir_.c_str(), 20, (int)ny + 32, 13, ui::kAccentHi);
-
-    // gather sub-folders and image files
-    std::vector<std::string> dirs, files;
-    std::error_code ec;
-    for (auto& de : fs::directory_iterator(browseDir_, fs::directory_options::skip_permission_denied, ec)) {
-        std::string name = de.path().filename().string();
-        if (name.empty() || name[0] == '.') continue;
-        std::error_code e2;
-        if (de.is_directory(e2)) { dirs.push_back(name); continue; }
-        std::string ext = de.path().extension().string();
-        for (auto& c : ext) c = (char)tolower((unsigned char)c);
-        if (isImageExt(ext)) files.push_back(name);
-    }
-    std::sort(dirs.begin(), dirs.end());
-    std::sort(files.begin(), files.end());
-
-    // scrollable list of folders (then image files)
-    float listY = ny + 56;
-    Rectangle listRegion = { 0, listY, area.width, (float)GetScreenHeight() - listY };
-    float rowH = 28;
-    int total = (int)dirs.size() + (int)files.size();
-    int maxScroll = std::max(0, (int)(total * rowH + 8 - listRegion.height));
-    float wheel = GetMouseWheelMove();
-    if (wheel != 0 && ui::mouseIn(listRegion)) browseScroll_ -= (int)(wheel * 48);
-    browseScroll_ = std::max(0, std::min(browseScroll_, maxScroll));
-
-    if (total == 0)
-        DrawTextU("(이 폴더에 이미지가 없습니다 — 다른 폴더로 이동하세요)", 24, (int)listY + 8, 15, ui::kTextDim);
-
-    BeginScissorMode(0, (int)listY, (int)area.width, GetScreenHeight() - (int)listY);
-    float ry = listY - browseScroll_;
-    for (auto& d : dirs) {
-        if (ry + rowH > listY && ry < GetScreenHeight() &&
-            ui::button({ 20, ry, area.width - 40, rowH - 4 }, "[폴더]  " + d))
-            { browseDir_ = (fs::path(browseDir_) / d).string(); browseScroll_ = 0; }
-        ry += rowH;
-    }
-    for (auto& f : files) {
-        if (ry + rowH > listY && ry < GetScreenHeight() &&
-            ui::button({ 20, ry, area.width - 40, rowH - 4 }, "[그림]  " + f)) {
-            std::string full = (fs::path(browseDir_) / f).string();
-            int id = importImageFile(full);     // GIF-aware; all image formats
-            if (id >= 0) p.save();              // setStatus handled by importImageFile
-            else setStatus("불러오기 실패: " + f);
-        }
-        ry += rowH;
-    }
-    EndScissorMode();
-}
 
 // Per-character skill behaviour editor (range / power / effect tiles / sound) for
 // the slot the current motion maps to. Edits this character's own skill, which

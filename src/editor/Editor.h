@@ -28,7 +28,8 @@ private:
     void drawMapTab();
     void drawEventsTab();
     void drawCharsTab();
-    void drawImageBrowser();           // built-in file browser to import images (no drag&drop needed)
+    void pickAndImportImages();        // native OS file picker -> import selected images
+    int  makeTransparentBg(int assetId); // remove a solid/white background -> new transparent asset
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
     void drawAssetsTab();
@@ -87,9 +88,6 @@ private:
     MotionClip charUndo_;             // 1-level undo snapshot of the active motion
     bool charUndoSet_ = false;        // undo snapshot available
     int  charLibScroll_ = 0;          // library grid scroll offset (px)
-    bool charBrowse_ = false;         // image file-browser/import modal is open
-    std::string browseDir_;           // current folder shown in the file browser
-    int  browseScroll_ = 0;           // file browser scroll offset (px)
     bool charSkillEdit_ = false;      // per-character skill editor modal is open
     int  charListScroll_ = 0;         // character list scroll (left column)
     int  charFrameScroll_ = 0;        // frame timeline scroll (center column)

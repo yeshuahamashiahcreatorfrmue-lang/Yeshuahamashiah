@@ -3,11 +3,13 @@
 #include "editor/Prefabs.h"
 #include "editor/EditorInternal.h"
 #include "core/Engine.h"
+#include "core/Platform.h"
 #include "render/UI.h"
 #include "core/Text.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -86,6 +88,64 @@ void Editor::handleAssetDrop() {
     }
     UnloadDroppedFiles(dropped);
     p.save();
+}
+
+// Open the native OS file picker (Windows Explorer) and import every selected
+// image. Source files are copied with a Unicode-safe copy into the project under
+// ASCII names, so Korean/Unicode source paths and filenames work correctly.
+void Editor::pickAndImportImages() {
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("불러오기 취소됨."); return; }
+    Project& p = engine_.project();
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int added = 0;
+    for (const std::string& src : files) {
+        std::string ext = fs::path(src).extension().string();
+        for (auto& c : ext) c = (char)tolower((unsigned char)c);
+        if (!isImageExt(ext)) continue;
+        int n = 1; fs::path dest;
+        do { dest = fs::path(p.dir) / "assets" / ("import_" + std::to_string(n++) + ext); }
+        while (fs::exists(dest));
+        if (!plat::copyFileUtf8(src, dest.string())) continue;   // Unicode-safe copy
+        if (importImageFile(dest.string()) >= 0) added++;        // GIF-aware, ASCII path
+    }
+    if (added > 0) { p.save(); setStatus(TextFormat("이미지 %d개 불러옴", added)); }
+    else setStatus("불러온 이미지가 없습니다.");
+}
+
+// Make a solid/single-colour (e.g. white) background transparent. The top-left
+// corner pixel is taken as the background colour; pixels within a tolerance of it
+// become transparent. Saves a NEW asset (non-destructive); animated strips keep
+// their frame metadata.
+int Editor::makeTransparentBg(int assetId) {
+    Project& p = engine_.project();
+    const AssetEntry* e = p.assets.find(assetId);
+    if (!e) return -1;
+    Image img = LoadImage(p.assetFullPath(assetId).c_str());
+    if (!img.data) { setStatus("배경 제거 실패: 이미지를 열 수 없음"); return -1; }
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int N = img.width * img.height;
+    if (N <= 0) { UnloadImage(img); return -1; }
+    Color* px = (Color*)img.data;
+    Color bg = px[0];                                   // top-left = background
+    const int tol = 44;
+    for (int i = 0; i < N; ++i) {
+        if (px[i].a == 0) continue;
+        int d = std::abs(px[i].r - bg.r) + std::abs(px[i].g - bg.g) + std::abs(px[i].b - bg.b);
+        if (d <= tol) px[i] = Color{ 0, 0, 0, 0 };
+    }
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir) / "assets" / ("nobg_" + std::to_string(assetId) + "_" + std::to_string(n++) + ".png"); }
+    while (fs::exists(dest));
+    ExportImage(img, dest.string().c_str());
+    UnloadImage(img);
+    std::string rel = (fs::path("assets") / dest.filename()).generic_string();
+    int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+    if (e->frames > 1) p.assets.setAnim(id, e->frames, e->fps);   // preserve strip frames
+    p.save();
+    setStatus("배경 제거된 이미지 생성: " + dest.stem().string());
+    return id;
 }
 
 // ============================ draw ============================
