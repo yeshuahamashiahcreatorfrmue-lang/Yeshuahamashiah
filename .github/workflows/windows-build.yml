@@ -96,7 +96,7 @@ jobs:
           if (Test-Path "$dir\shot_softgl.png") { Copy-Item "$dir\shot_softgl.png" $out }
           if (Test-Path "$dir\play_softgl.png") { Copy-Item "$dir\play_softgl.png" $out }
           Copy-Item "README.md" $out -ErrorAction SilentlyContinue
-          Copy-Item "dist\*" $out -Force -ErrorAction SilentlyContinue
+          Copy-Item "packaging\*" $out -Force -ErrorAction SilentlyContinue
           Get-ChildItem $out -Recurse | Select-Object FullName
 
       - name: Upload Windows package
