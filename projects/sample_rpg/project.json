@@ -208,9 +208,105 @@
         "name": "hero_m5",
         "path": "assets/hero_m5.png",
         "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 27,
+        "name": "knight_m0",
+        "path": "assets/knight_m0.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 28,
+        "name": "knight_m1",
+        "path": "assets/knight_m1.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 29,
+        "name": "knight_m2",
+        "path": "assets/knight_m2.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 30,
+        "name": "knight_m3",
+        "path": "assets/knight_m3.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 31,
+        "name": "knight_m4",
+        "path": "assets/knight_m4.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 32,
+        "name": "knight_m5",
+        "path": "assets/knight_m5.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 33,
+        "name": "ranger_m0",
+        "path": "assets/ranger_m0.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 34,
+        "name": "ranger_m1",
+        "path": "assets/ranger_m1.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 35,
+        "name": "ranger_m2",
+        "path": "assets/ranger_m2.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 36,
+        "name": "ranger_m3",
+        "path": "assets/ranger_m3.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 37,
+        "name": "ranger_m4",
+        "path": "assets/ranger_m4.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 38,
+        "name": "ranger_m5",
+        "path": "assets/ranger_m5.png",
+        "type": "image"
       }
     ],
-    "nextId": 27
+    "nextId": 39
   },
   "maps": [
     1,

@@ -9,6 +9,7 @@
 #include "database/Database.h"
 #include <string>
 #include <vector>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -181,6 +182,15 @@ int main(int argc,char**argv){
       for (int i=0;i<6;i++){ Image f=ImageFromImage(hero,{(float)i*32,0,32,32});
           ExportImage(f,(ad+"/hero_m"+std::to_string(i)+".png").c_str()); UnloadImage(f); }
       UnloadImage(hero); }
+    // two more multi-motion characters (red knight, green ranger) — sliced frames
+    auto sliceChar=[&](const char* tag, Color shirt, Color skin){
+        Image sh = gen::characterSheet(shirt, skin, 2);
+        for (int i=0;i<6;i++){ Image f=ImageFromImage(sh,{(float)i*32,0,32,32});
+            ExportImage(f,(ad+"/"+tag+"_m"+std::to_string(i)+".png").c_str()); UnloadImage(f); }
+        UnloadImage(sh);
+    };
+    sliceChar("knight", {200,70,70,255},  {235,195,150,255});
+    sliceChar("ranger", {90,170,90,255},  {238,202,168,255});
     saveImg(gen::characterSheet({200,120,80,255},{240,200,160,255}),  ad+"/villager1.png");
     saveImg(gen::characterSheet({120,170,110,255},{238,202,168,255}), ad+"/villager2.png");
     saveImg(gen::characterSheet({170,170,180,255},{235,205,175,255}), ad+"/elder.png");
@@ -222,9 +232,11 @@ int main(int argc,char**argv){
     int SN_magic=p->assets.addExisting(AssetType::Audio,"snd_magic","assets/snd_magic.wav");
     int SN_boom =p->assets.addExisting(AssetType::Audio,"snd_boom","assets/snd_boom.wav");
     int SN_dash =p->assets.addExisting(AssetType::Audio,"snd_dash","assets/snd_dash.wav");
-    // individual hero frames for the custom multi-motion character demo
-    int HM[6]; for(int i=0;i<6;i++) HM[i]=p->assets.addExisting(AssetType::Image,
-        "hero_m"+std::to_string(i),"assets/hero_m"+std::to_string(i)+".png");
+    // individual frames for the 3 custom multi-motion characters (builder demos)
+    auto regFrames=[&](const char* tag){ std::array<int,6> a{}; for(int i=0;i<6;i++)
+        a[i]=p->assets.addExisting(AssetType::Image, std::string(tag)+"_m"+std::to_string(i),
+              "assets/"+std::string(tag)+"_m"+std::to_string(i)+".png"); return a; };
+    std::array<int,6> HM=regFrames("hero"), KM=regFrames("knight"), RM=regFrames("ranger");
 
     // database
     Database& db = p->database;
@@ -263,17 +275,22 @@ int main(int argc,char**argv){
     // G 관통창: 전방 3칸 직선 범위
     db.fieldSkills.push_back(mkSkill(6,"관통창",5,false,0,1,5,1.6f,150,{0,0,0},{-1,-2,-3},FX_bolt,SN_magic));
 
-    // ---- demo custom multi-motion character (image-sequence builder example) ----
-    // Each motion is a flipbook of the sliced hero frames (m0..m3 walk, m4..m5 attack).
-    { CharacterDef hc; hc.id=1; hc.name="용사(모션)";
-      hc.motions[MO_Walk].frames   = {HM[0],HM[1],HM[2],HM[3]}; hc.motions[MO_Walk].fps=8;
-      hc.motions[MO_Attack].frames = {HM[4],HM[5]};             hc.motions[MO_Attack].fps=12;
-      hc.motions[MO_Skill1].frames = {HM[5],HM[4]};             hc.motions[MO_Skill1].fps=12;
-      hc.motions[MO_Skill2].frames = {HM[4],HM[5],HM[4]};       hc.motions[MO_Skill2].fps=14;
-      hc.motions[MO_Ult].frames    = {HM[4],HM[5],HM[4],HM[5]}; hc.motions[MO_Ult].fps=12;
-      hc.motions[MO_Death].frames  = {HM[0]};                   hc.motions[MO_Death].fps=4;
-      db.characters.push_back(hc); }
-    p->playerCharId = 1;     // drive the player with the custom motion character
+    // ---- 3 demo custom multi-motion characters (built like the in-editor panel) ----
+    // m0..m3 = walk, m4..m5 = attack poses; each motion is an image flipbook.
+    auto mkChar=[&](int id,const char*nm,const std::array<int,6>&M,int wfps,int afps){
+        CharacterDef c; c.id=id; c.name=nm;
+        c.motions[MO_Walk]={{M[0],M[1],M[2],M[3]},wfps};
+        c.motions[MO_Attack]={{M[4],M[5]},afps};
+        c.motions[MO_Skill1]={{M[5],M[4],M[5]},afps};
+        c.motions[MO_Skill2]={{M[4],M[5],M[4],M[5]},afps+2};
+        c.motions[MO_Ult]={{M[4],M[5],M[4],M[5],M[4]},afps};
+        c.motions[MO_Death]={{M[3],M[0]},4};
+        db.characters.push_back(c);
+    };
+    mkChar(1,"용사(파랑)",HM,8,12);
+    mkChar(2,"기사(빨강)",KM,6,10);   // slower, heavier
+    mkChar(3,"궁수(초록)",RM,11,16);  // faster, snappier
+    p->playerCharId = 1;     // drive the player with the first custom character
 
     auto m = p->addMap("윌로우브룩 마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;

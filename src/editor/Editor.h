@@ -36,6 +36,7 @@ private:
     int  generateCharacter();          // make + register a new character sheet
     int  generateEffect(int style);    // make + register a skill-effect sheet
     int  generateSound(int style);     // make + register a skill sound effect
+    std::vector<int> sliceAsset(int assetId, int n); // split an image into n frame assets
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
@@ -69,6 +70,9 @@ private:
     int  charDefSel_ = -1;            // selected custom character index
     int  charMotionTab_ = 0;          // selected motion tab (0..5)
     bool charDefNameFocus_ = false;
+    int  charFrameSel_ = -1;          // selected frame within the current motion
+    bool charSliceMode_ = false;      // library click adds N sliced frames instead of 1
+    int  charSliceN_ = 4;             // number of columns to slice into
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to
