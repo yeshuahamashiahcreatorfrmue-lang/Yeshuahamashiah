@@ -82,6 +82,9 @@ private:
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;
+    std::string mapSearch_;         // World-tab map-list filter text
+    bool mapSearchFocus_ = false;
+    float worldListScroll_ = 0;     // scroll offset for the (filtered) map list
     int  newMapW_ = 30, newMapH_ = 24;
     int  newMapTier_ = 0;           // standardized size tier for a new map (0..13)
     // Character generation

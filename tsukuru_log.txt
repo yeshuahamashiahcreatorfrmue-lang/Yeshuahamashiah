@@ -50,8 +50,8 @@ STAGE: run engine (InitWindow + main loop)
 [INFO ] TIMER: Target time per frame: 16.667 milliseconds
 [INFO ] FILEIO: [assets/korean.ttf] File loaded successfully
 [INFO ] TEXTURE: [ID 3] Texture loaded successfully (1024x1024 | GRAY_ALPHA | 1 mipmaps)
-[INFO ] FONT: Data loaded successfully (36 pixel size | 500 glyphs)
-[INFO ] UI font loaded: assets/korean.ttf (500 glyphs)
+[INFO ] FONT: Data loaded successfully (36 pixel size | 548 glyphs)
+[INFO ] UI font loaded: assets/korean.ttf (548 glyphs)
 [WARN ] AUDIO: Failed to initialize playback device
 [INFO ] FILEIO: [projects/sample_rpg/assets/tileset.png] File loaded successfully
 [INFO ] IMAGE: Data loaded successfully (256x192 | R8G8B8A8 | 1 mipmaps)

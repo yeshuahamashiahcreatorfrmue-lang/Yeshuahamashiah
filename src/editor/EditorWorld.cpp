@@ -24,36 +24,65 @@ void Editor::drawWorldTab() {
     ui::label("맵 목록", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
     DrawTextU(TextFormat("%d개", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
 
-    float y = ly + 46;
-    for (int i = 0; i < (int)p.maps.size(); ++i) {
-        auto& m = p.maps[i];
-        bool isStart = (m->id == p.startMap);
-        bool isActive = (m->id == activeMapId_);
-        Rectangle r = { lx + 10, y, lw - 20, 28 };
-        std::string label = (isStart ? "* " : "  ") + m->name + "  (#" + std::to_string(m->id) + ")";
-        if (ui::button(r, label, worldSelected_ == i || isActive)) {
-            worldSelected_ = i; activeMapId_ = m->id; mapNameFocus_ = false;
-        }
-        y += 32;
-    }
+    // search box: filter the list by name (or #id)
+    Rectangle sf = { lx + 10, ly + 40, lw - 20, 26 };
+    if (ui::mouseIn(sf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) mapSearchFocus_ = true;
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(sf)) mapSearchFocus_ = false;
+    ui::textField(sf, mapSearch_, mapSearchFocus_, 40);
+    if (mapSearch_.empty() && !mapSearchFocus_)
+        DrawTextU("검색…", (int)sf.x + 8, (int)sf.y + 6, 14, ui::kTextDim);
 
-    // new map controls — standardized world size (7 tiers, up to 420x420)
-    y += 8;
-    ui::label("새 맵 크기 (규격)", (int)lx + 10, (int)y, 14, ui::kTextDim); y += 20;
-    if (ui::button({ lx + 10, y, lw - 20, 26 }, kSizeTierNames[newMapTier_]))
+    // new-map controls (kept above the scrolling list so they never scroll away)
+    float ncy = ly + 74;
+    if (ui::button({ lx + 10, ncy, (lw-24)/2, 26 }, kSizeTierNames[newMapTier_], false, 13))
         newMapTier_ = (newMapTier_ + 1) % kSizeTierCount;
-    y += 34;
-    if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ 새 맵")) {
+    if (ui::button({ lx + 10 + (lw-24)/2 + 4, ncy, (lw-24)/2, 26 }, "+ 새 맵")) {
         int side = kSizeTiers[newMapTier_];
         auto nm = p.addMap("Map" + std::to_string(p.nextMapId()), side, side);
-        // copy tileset from current map so it is paintable immediately
-        if (auto cur = activeMap()) nm->tileset = cur->tileset;
+        if (auto cur = activeMap()) nm->tileset = cur->tileset;   // paintable immediately
         activeMapId_ = nm->id;
         worldSelected_ = (int)p.maps.size() - 1;
         p.save();
         setStatus(nm->name + " 생성됨");
         tab_ = Tab::Map;
     }
+
+    // case-insensitive substring match on the (lower-cased) name + "#id"
+    std::string q = mapSearch_; for (auto& c : q) c = (char)tolower((unsigned char)c);
+    auto matches = [&](const std::shared_ptr<Map>& m, int id){
+        if (q.empty()) return true;
+        std::string hay = m->name + " #" + std::to_string(id);
+        for (auto& c : hay) c = (char)tolower((unsigned char)c);
+        return hay.find(q) != std::string::npos;
+    };
+    std::vector<int> shown;
+    for (int i = 0; i < (int)p.maps.size(); ++i) if (matches(p.maps[i], p.maps[i]->id)) shown.push_back(i);
+
+    // scrollable filtered list
+    Rectangle listR = { lx + 6, ly + 108, lw - 12, area.height - 24 - (ly + 108 - ly) - 6 };
+    float rowH = 32, contentH = shown.size() * rowH + 4;
+    BeginScissorMode((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
+    if (ui::mouseIn(listR)) worldListScroll_ -= GetMouseWheelMove() * 48;
+    float maxScroll = std::max(0.0f, contentH - listR.height);
+    if (worldListScroll_ < 0) worldListScroll_ = 0;
+    if (worldListScroll_ > maxScroll) worldListScroll_ = maxScroll;
+    float y = listR.y - worldListScroll_;
+    for (int idx : shown) {
+        auto& m = p.maps[idx];
+        if (y + rowH >= listR.y && y <= listR.y + listR.height) {
+            bool isStart = (m->id == p.startMap);
+            bool isActive = (m->id == activeMapId_);
+            Rectangle r = { listR.x + 4, y, listR.width - 8, 28 };
+            std::string label = (isStart ? "* " : "  ") + m->name + "  (#" + std::to_string(m->id) + ")";
+            if (ui::button(r, label, worldSelected_ == idx || isActive)) {
+                worldSelected_ = idx; activeMapId_ = m->id; mapNameFocus_ = false;
+            }
+        }
+        y += rowH;
+    }
+    EndScissorMode();
+    if (shown.empty())
+        DrawTextU("검색 결과 없음", (int)listR.x + 10, (int)listR.y + 8, 15, ui::kTextDim);
 
     // ---- right: selected map details ----
     if (worldSelected_ < 0 || worldSelected_ >= (int)p.maps.size())

@@ -13,7 +13,7 @@
       "conditionValue": true,
       "drawPct": 100,
       "faction": 0,
-      "graphicAsset": 40,
+      "graphicAsset": 48,
       "id": 1,
       "itemId": -1,
       "npcAtk": 8,
@@ -4878,7 +4878,7 @@
   "tileset": {
     "assetId": 39,
     "columns": 8,
-    "rows": 16,
+    "rows": 19,
     "tileHeight": 32,
     "tileWidth": 32
   },

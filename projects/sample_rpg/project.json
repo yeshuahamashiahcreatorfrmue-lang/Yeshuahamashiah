@@ -317,12 +317,108 @@
         "fps": 8,
         "frames": 1,
         "id": 40,
-        "name": "concept_npc",
-        "path": "assets/concept_npc.png",
+        "name": "npc_villager",
+        "path": "assets/npc_villager.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 41,
+        "name": "npc_merchant",
+        "path": "assets/npc_merchant.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 42,
+        "name": "npc_guard",
+        "path": "assets/npc_guard.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 43,
+        "name": "npc_noble",
+        "path": "assets/npc_noble.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 44,
+        "name": "npc_mage",
+        "path": "assets/npc_mage.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 45,
+        "name": "npc_shadow",
+        "path": "assets/npc_shadow.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 46,
+        "name": "npc_desert",
+        "path": "assets/npc_desert.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 47,
+        "name": "npc_beggar",
+        "path": "assets/npc_beggar.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 48,
+        "name": "npc_worker",
+        "path": "assets/npc_worker.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 49,
+        "name": "npc_knight",
+        "path": "assets/npc_knight.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 50,
+        "name": "npc_ghost",
+        "path": "assets/npc_ghost.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 51,
+        "name": "npc_priest",
+        "path": "assets/npc_priest.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 52,
+        "name": "npc_foe",
+        "path": "assets/npc_foe.png",
         "type": "image"
       }
     ],
-    "nextId": 41
+    "nextId": 53
   },
   "maps": [
     1,
@@ -352,7 +448,16 @@
     25,
     26,
     27,
-    28
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37
   ],
   "name": "윌로우브룩",
   "playerAtkFrames": 2,
