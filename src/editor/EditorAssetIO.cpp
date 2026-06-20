@@ -128,6 +128,18 @@ static bool autoRemoveBg(Image& img) {
     return true;
 }
 
+// AI subject cut-out: ask the neural model (U^2-Net) for a foreground matte and
+// crop to it. Phone-grade "lift subject" — works on photos/busy backgrounds the
+// colour-based remover can't handle. Returns false (caller falls back) when the
+// model isn't loaded or declines. Only meaningful for single images, not strips.
+bool Editor::aiCutout(Image& img) {
+    if (!seg_.ready() || !img.data || img.width < 2 || img.height < 2) return false;
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    if (!seg_.cutout(img)) return false;
+    cropToOpaque(img);
+    return true;
+}
+
 // Import one image file into the project. An animated GIF is unpacked into a
 // horizontal sprite-strip; a static image gets its single-colour background and
 // outer margin auto-removed, then saved as PNG. Returns the asset id.
@@ -166,14 +178,16 @@ int Editor::importImageFile(const std::string& path) {
     fs::create_directories(fs::path(p.dir) / "assets");
     Image img = LoadImage(path.c_str());
     if (img.data) {
-        bool trimmed = autoRemoveBg(img);
+        bool ai = aiCutout(img);                 // phone-grade subject lift (if model present)
+        bool trimmed = ai || autoRemoveBg(img);  // else classic colour-based removal
         int n = 1; fs::path dest;
         do { dest = fs::path(p.dir)/"assets"/("import_"+std::to_string(n++)+".png"); } while (fs::exists(dest));
         ExportImage(img, dest.string().c_str());
         UnloadImage(img);
         std::string rel = (fs::path("assets")/dest.filename()).generic_string();
         int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
-        setStatus(trimmed ? "이미지 등록 (배경·여백 자동 제거)" : "이미지 등록됨");
+        setStatus(ai ? "이미지 등록 (AI 배경 제거)"
+                     : trimmed ? "이미지 등록 (배경·여백 자동 제거)" : "이미지 등록됨");
         return id;
     }
     int id = p.assets.registerAsset(p.dir, path, AssetType::Image);   // undecodable -> keep as-is
@@ -244,11 +258,17 @@ int Editor::makeTransparentBg(int assetId) {
     if (!img.data) { setStatus("배경 제거 실패: 이미지를 열 수 없음"); return -1; }
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     if (img.width <= 0 || img.height <= 0) { UnloadImage(img); return -1; }
-    Color* px = (Color*)img.data;
-    Color bg; float conf;                                    // robust background detection
-    if (!detectBg(px, img.width, img.height, bg, conf)) bg = px[0];
-    floodFillBorder(px, img.width, img.height, bg, 40, 72);  // border-connected, thin AA edge
-    if (e->frames <= 1) cropToOpaque(img);                   // don't crop strips (keeps frame grid)
+    // Single images: try the AI subject cut-out first (handles photos / busy
+    // backgrounds). Animated strips can't be AI-segmented as one scene, so they
+    // always use the colour-based border removal that preserves the frame grid.
+    bool ai = (e->frames <= 1) && aiCutout(img);
+    if (!ai) {
+        Color* px = (Color*)img.data;
+        Color bg; float conf;                                    // robust background detection
+        if (!detectBg(px, img.width, img.height, bg, conf)) bg = px[0];
+        floodFillBorder(px, img.width, img.height, bg, 40, 72);  // border-connected, thin AA edge
+        if (e->frames <= 1) cropToOpaque(img);                   // don't crop strips (keeps frame grid)
+    }
     fs::create_directories(fs::path(p.dir) / "assets");
     int n = 1; fs::path dest;
     do { dest = fs::path(p.dir) / "assets" / ("nobg_" + std::to_string(assetId) + "_" + std::to_string(n++) + ".png"); }
@@ -259,7 +279,7 @@ int Editor::makeTransparentBg(int assetId) {
     int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
     if (e->frames > 1) p.assets.setAnim(id, e->frames, e->fps);   // preserve strip frames
     p.save();
-    setStatus("배경(테두리) 제거 이미지 생성: " + dest.stem().string());
+    setStatus((ai ? "AI 배경 제거 이미지 생성: " : "배경(테두리) 제거 이미지 생성: ") + dest.stem().string());
     return id;
 }
 

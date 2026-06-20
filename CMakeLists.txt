@@ -112,6 +112,32 @@ if(BUILD_ENGINE)
     target_link_libraries(TsukuruEngine PRIVATE tsukuru_core raylib)
     target_include_directories(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+    # ----- AI subject segmentation (optional, phone-grade "lift subject") -----
+    # If ONNX Runtime is available, compile the neural U^2-Net cut-out path
+    # (src/render/Segmenter.cpp) for real; otherwise it builds as a no-op stub and
+    # the engine falls back to the classic colour-based background removal. Point
+    # ONNXRUNTIME_ROOT at a folder containing include/ and lib/.
+    set(ONNXRUNTIME_ROOT "" CACHE PATH "ONNX Runtime root (with include/ and lib/) — enables AI cut-out")
+    if(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h")
+        message(STATUS "AI cut-out: ONNX Runtime found at ${ONNXRUNTIME_ROOT}")
+        target_compile_definitions(TsukuruEngine PRIVATE TSUKURU_ONNX=1)
+        target_include_directories(TsukuruEngine PRIVATE "${ONNXRUNTIME_ROOT}/include")
+        if(WIN32)
+            target_link_libraries(TsukuruEngine PRIVATE "${ONNXRUNTIME_ROOT}/lib/onnxruntime.lib")
+            # Ship onnxruntime.dll next to the exe so the AI model loads at runtime.
+            file(GLOB _ort_dlls "${ONNXRUNTIME_ROOT}/lib/*.dll")
+            foreach(_dll ${_ort_dlls})
+                add_custom_command(TARGET TsukuruEngine POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_dll}" $<TARGET_FILE_DIR:TsukuruEngine>)
+            endforeach()
+        else()
+            target_link_libraries(TsukuruEngine PRIVATE "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+        endif()
+    else()
+        message(STATUS "AI cut-out: ONNX Runtime not set (classic background removal only)")
+    endif()
+
     # Embed Windows version-info metadata into the .exe (reduces "unknown
     # publisher / info-less binary" AV & SmartScreen false positives), and link
     # comdlg32 for the native Open-File dialog (Windows Explorer picker).

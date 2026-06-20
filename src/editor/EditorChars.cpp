@@ -214,7 +214,9 @@ void Editor::drawCharsTab() {
     handleAssetDrop();   // drag&drop still works anywhere on this tab
 
     ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
-    DrawTextU("빌드 0620g-배경판정강화  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
+    DrawTextU(seg_.ready() ? "빌드 0620h-AI배경제거 (모델 ON)  (이 글자가 보이면 최신 빌드입니다)"
+                           : "빌드 0620h-AI배경제거 (모델 미탑재)  (이 글자가 보이면 최신 빌드입니다)",
+              168, (int)kToolbarH + 14, 13, ui::kGood);
 
     // ---- 3-column layout: [캐릭터] [모션·프레임·재생] [이미지 소스] ----
     float pad = 10;

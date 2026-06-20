@@ -7,6 +7,7 @@
 #include "raylib.h"
 #include "world/Map.h"
 #include "database/Database.h"
+#include "render/Segmenter.h"
 
 namespace tsukuru {
 
@@ -40,6 +41,7 @@ private:
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
+    bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
     static bool isImageExt(const std::string& ext);  // any raylib-loadable image extension
     static bool isAudioExt(const std::string& ext);
     int  generateCharacter();          // make + register a new character sheet
@@ -50,6 +52,7 @@ private:
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
+    Segmenter seg_;          // AI subject/background separation (loads u2netp.onnx if present)
     Tab  tab_ = Tab::Map;
     Tool tool_ = Tool::Pencil;
     int  activeLayer_ = 0;

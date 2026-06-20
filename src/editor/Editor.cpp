@@ -19,6 +19,17 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     cam_.offset = { kPaletteW + 20, kToolbarH + 20 };
     auto m = activeMap();
     if (m) activeMapId_ = m->id;
+    // Load the AI cut-out model if it shipped next to the exe. Tries a couple of
+    // common locations; silently no-ops (classic removal) if absent or unbuilt.
+    {
+        std::string appDir = GetApplicationDirectory();
+        const char* names[] = { "u2netp.onnx", "assets/u2netp.onnx" };
+        for (const char* n : names) {
+            std::string p = appDir + n;
+            if (FileExists(p.c_str()) && seg_.load(p)) break;
+            if (FileExists(n) && seg_.load(n)) break;   // fallback: current working dir
+        }
+    }
     if (const char* t = getenv("TSUKURU_TAB")) { // debug: pick initial tab
         std::string s = t;
         if (s == "world") tab_ = Tab::World;     else if (s == "events") tab_ = Tab::Events;

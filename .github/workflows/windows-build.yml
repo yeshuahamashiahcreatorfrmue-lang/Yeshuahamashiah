@@ -15,9 +15,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (CMake, OpenGL 2.1)
+      - name: Download ONNX Runtime + AI model (phone-grade subject cut-out)
         shell: pwsh
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DOPENGL_VERSION=2.1'
+        run: |
+          $ortVer = "1.17.3"
+          $ortUrl = "https://github.com/microsoft/onnxruntime/releases/download/v$ortVer/onnxruntime-win-x64-$ortVer.zip"
+          Invoke-WebRequest -Uri $ortUrl -OutFile ort.zip
+          Expand-Archive ort.zip -DestinationPath ort -Force
+          $root = (Get-ChildItem ort -Directory | Select-Object -First 1).FullName
+          echo "ORT_ROOT=$root" >> $env:GITHUB_ENV
+          Write-Host "ONNX Runtime at: $root"
+          # U^2-Net (u2netp) foreground-matte model (~4.6 MB).
+          $modelUrl = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
+          Invoke-WebRequest -Uri $modelUrl -OutFile u2netp.onnx
+          Write-Host "Model size: $((Get-Item u2netp.onnx).Length) bytes"
+
+      - name: Configure (CMake, OpenGL 2.1, AI cut-out)
+        shell: pwsh
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DOPENGL_VERSION=2.1' "-DONNXRUNTIME_ROOT=$env:ORT_ROOT"
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -31,6 +46,8 @@ jobs:
           echo "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
           echo "dir=$($exe.DirectoryName)" >> $env:GITHUB_OUTPUT
           Write-Host "Found: $($exe.FullName)"
+          # Ship the AI model next to the exe so the engine loads it at startup.
+          Copy-Item u2netp.onnx $exe.DirectoryName -Force
           Get-ChildItem $exe.DirectoryName
 
       - name: Smoke test WITHOUT software GL (expected to fail on GPU-less runner)
@@ -105,6 +122,10 @@ jobs:
           Copy-Item "$dir\TsukuruEngine.exe" $out
           Copy-Item "$dir\opengl32.dll" $out
           Copy-Item "$dir\libgallium_wgl.dll" $out
+          # AI subject cut-out runtime + model (bundled so it works out of the box).
+          Copy-Item "$dir\onnxruntime.dll" $out -ErrorAction SilentlyContinue
+          Get-ChildItem "$dir" -Filter "onnxruntime*.dll" | ForEach-Object { Copy-Item $_.FullName $out -Force }
+          Copy-Item "$dir\u2netp.onnx" $out -ErrorAction SilentlyContinue
           Copy-Item "$dir\assets" $out -Recurse -Force
           Copy-Item "$dir\projects" $out -Recurse -Force
           if (Test-Path "$dir\shot_softgl.png") { Copy-Item "$dir\shot_softgl.png" $out }
