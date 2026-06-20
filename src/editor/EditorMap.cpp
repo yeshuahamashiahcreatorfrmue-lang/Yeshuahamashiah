@@ -122,6 +122,8 @@ void Editor::drawMapCanvas(Rectangle area) {
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     if (!m) { EndScissorMode(); return; }
     int TS = m->tileset.tileWidth;
+    // input region excludes the right scrollbar + bottom scrollbar/zoom-bar strip
+    Rectangle ia = { area.x, area.y, area.width - 14, area.height - 46 };
 
     uiBeginWorld(cam_);
     const Texture2D& tex = engine_.assetTexture(m->tileset.assetId);
@@ -177,9 +179,13 @@ void Editor::drawMapCanvas(Rectangle area) {
     }
     uiEndWorld();
 
+    // large-map navigation: draggable scrollbars + map-zoom control (screen space)
+    drawMapScrollbars(area);
+    drawMapZoomBar(area);
+
     // NPC placement mode: click adds/selects an NPC event (no tile painting)
     if (npcMode_) {
-        if (ui::mouseIn(area) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+        if (ui::mouseIn(ia) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
             Vector2 world = GetScreenToWorld2D(GetMousePosition(), cam_);
             int tx = (int)std::floor(world.x / TS), ty = (int)std::floor(world.y / TS);
             if (m->tilemap.inBounds(tx, ty)) {
@@ -203,7 +209,7 @@ void Editor::drawMapCanvas(Rectangle area) {
     }
 
     // painting
-    if (ui::mouseIn(area) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+    if (ui::mouseIn(ia) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
         Vector2 world = GetScreenToWorld2D(GetMousePosition(), cam_);
         int tx = (int)std::floor(world.x / TS), ty = (int)std::floor(world.y / TS);
         bool inMap = m->tilemap.inBounds(tx, ty);
@@ -270,5 +276,62 @@ void Editor::drawMapCanvas(Rectangle area) {
     EndScissorMode();
 }
 
+// Map-only zoom control (independent of the global UI scale): − / % / + plus a
+// "전체보기" that fits the whole map (so even 1742×1742 is fully visible) and 100%.
+void Editor::drawMapZoomBar(Rectangle canvas) {
+    auto m = activeMap();
+    if (!m) return;
+    int TS = m->tileset.tileWidth > 0 ? m->tileset.tileWidth : 32;
+    float y = canvas.y + canvas.height - 28, x = canvas.x + 8;
+    DrawRectangle((int)x - 4, (int)y - 4, 360, 30, Fade(BLACK, 0.6f));
+    DrawTextU("맵 배율", (int)x, (int)y + 5, 13, ui::kText);
+    if (ui::button({ x + 58, y, 26, 22 }, "-"))   cam_.zoom = std::max(0.02f, cam_.zoom * 0.8f);
+    DrawTextU(TextFormat("%d%%", (int)(cam_.zoom * 100 + 0.5f)), (int)x + 90, (int)y + 5, 13, ui::kAccentHi);
+    if (ui::button({ x + 148, y, 26, 22 }, "+"))  cam_.zoom = std::min(4.0f, cam_.zoom * 1.25f);
+    if (ui::button({ x + 180, y, 80, 22 }, "전체보기")) {            // fit the whole map
+        float mw = (float)m->tilemap.width() * TS, mh = (float)m->tilemap.height() * TS;
+        float z = std::min((canvas.width - 40) / mw, (canvas.height - 90) / mh);
+        cam_.zoom = std::max(0.02f, std::min(4.0f, z));
+        cam_.target = { mw / 2, mh / 2 };
+    }
+    if (ui::button({ x + 264, y, 56, 22 }, "100%")) cam_.zoom = 1.0f;
+}
+
+// Draggable horizontal/vertical scrollbars for panning large maps with the mouse.
+void Editor::drawMapScrollbars(Rectangle canvas) {
+    auto m = activeMap();
+    if (!m) return;
+    int TS = m->tileset.tileWidth > 0 ? m->tileset.tileWidth : 32;
+    float mw = (float)m->tilemap.width() * TS, mh = (float)m->tilemap.height() * TS;
+    float visW = canvas.width / cam_.zoom, visH = canvas.height / cam_.zoom;
+    Rectangle hTrack = { canvas.x, canvas.y + canvas.height - 44, canvas.width - 16, 9 };
+    Rectangle vTrack = { canvas.x + canvas.width - 11, canvas.y, 9, canvas.height - 48 };
+    Vector2 mp = GetMousePosition();
+    auto bar = [&](Rectangle track, bool horiz, int axis) {
+        float total = horiz ? mw : mh, vis = horiz ? visW : visH;
+        float tl = horiz ? track.width : track.height;
+        if (total <= 1 || tl <= 1) return;
+        float frac = std::min(1.0f, vis / total);
+        float thumbLen = std::max(24.0f, tl * frac);
+        float camMin = (horiz ? cam_.target.x : cam_.target.y) - vis / 2;
+        float denom = (total > vis) ? (total - vis) : 1.0f;
+        float sf = std::min(1.0f, std::max(0.0f, camMin / denom));
+        float pos = (tl - thumbLen) * sf;
+        DrawRectangleRec(track, Fade(BLACK, 0.45f));
+        Rectangle thumb = horiz ? Rectangle{ track.x + pos, track.y, thumbLen, track.height }
+                                : Rectangle{ track.x, track.y + pos, track.width, thumbLen };
+        DrawRectangleRec(thumb, scrollDragAxis_ == axis ? ui::kAccentHi : ui::kAccent);
+        if (CheckCollisionPointRec(mp, track) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) scrollDragAxis_ = axis;
+        if (scrollDragAxis_ == axis && IsMouseButtonDown(MOUSE_LEFT_BUTTON) && total > vis) {
+            float m0 = (horiz ? (mp.x - track.x) : (mp.y - track.y)) - thumbLen / 2;
+            float nf = std::min(1.0f, std::max(0.0f, m0 / std::max(1.0f, tl - thumbLen)));
+            float nMin = nf * (total - vis);
+            if (horiz) cam_.target.x = nMin + vis / 2; else cam_.target.y = nMin + vis / 2;
+        }
+    };
+    bar(hTrack, true, 1);
+    bar(vTrack, false, 2);
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) scrollDragAxis_ = 0;
+}
 
 } // namespace tsukuru

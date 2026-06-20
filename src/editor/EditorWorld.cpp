@@ -14,6 +14,7 @@ namespace fs = std::filesystem;
 namespace tsukuru {
 
 void Editor::drawWorldTab() {
+    if (worldPreviewFull_) { drawWorldPreviewOverlay(); return; }  // blocks the tab while open
     Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
@@ -86,10 +87,10 @@ void Editor::drawWorldTab() {
     if (shown.empty())
         DrawTextU("검색 결과 없음", (int)listR.x + 10, (int)listR.y + 8, 15, ui::kTextDim);
 
-    // selected-map preview pinned to the bottom of the left panel (always visible)
+    // selected-map preview pinned to the bottom of the left panel (click = fullscreen)
     {
         float pvY = listR.y + listR.height + 6;
-        DrawTextU("미리보기", (int)lx + 12, (int)pvY, 15, ui::kAccent);
+        DrawTextU("미리보기 (클릭=전체화면)", (int)lx + 12, (int)pvY, 14, ui::kAccent);
         Rectangle pvBox = { lx + 8, pvY + 20, lw - 16, previewH - 28 };
         DrawRectangleRec(pvBox, Color{ 18, 20, 28, 255 });
         int selIdx = (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) ? worldSelected_ : -1;
@@ -101,8 +102,10 @@ void Editor::drawWorldTab() {
                 float bx = pvBox.x + (pvBox.width - pw) / 2, by = pvBox.y + (pvBox.height - ph) / 2;
                 DrawTexturePro(th->texture, { 0,0,tw,-tht }, { bx,by,pw,ph }, {0,0}, 0, WHITE);
             }
+            if (ui::mouseIn(pvBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+                worldPreviewFull_ = true;             // open the fullscreen overlay
         }
-        DrawRectangleLinesEx(pvBox, 1, Fade(BLACK, 0.6f));
+        DrawRectangleLinesEx(pvBox, 1, ui::mouseIn(pvBox) ? ui::kAccentHi : Fade(BLACK, 0.6f));
     }
 
     // ---- right panel ----
@@ -336,19 +339,27 @@ void Editor::drawWorldViewTab() {
         DrawTextU(TextFormat("#%d  (%d,%d)", m->id, m->worldX, m->worldY), (int)sp.x, (int)sp.y+18, 11, Fade(WHITE,0.8f));
     }
 
-    // left-click: select an occupied cell; on an empty cell place the selected
-    // map (first time) or stamp a sequentially-numbered copy of it (copy-paste).
-    if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
-        Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
-        int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
-        auto occ = p.mapAtWorld(cx, cy);
-        if (occ) {
+    // drag ghost: while dragging a map, highlight the target cell
+    Vector2 mw = GetScreenToWorld2D(GetMousePosition(), worldCam_);
+    int mcx = (int)std::floor(mw.x/cell), mcy = (int)std::floor(mw.y/cell);
+    if (wvDragging_) {
+        uiBeginWorld(worldCam_);
+        DrawRectangleLinesEx({ mcx*cell+4, mcy*cell+4, cell-8, cell-8 }, 4, ui::kAccentHi);
+        uiEndWorld();
+    }
+
+    // left mouse: PRESS on a map = select + arm drag; PRESS on empty = place/duplicate.
+    bool overCanvas = ui::mouseIn(canvas) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON);
+    if (overCanvas && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        auto occ = p.mapAtWorld(mcx, mcy);
+        if (occ) {                                    // arm a drag on the pressed map
             for (int i = 0; i < (int)p.maps.size(); ++i) if (p.maps[i] == occ) worldViewSel_ = i;
+            wvDragId_ = occ->id; wvDragStart_ = GetMousePosition(); wvDragging_ = false;
         } else if (worldViewSel_ >= 0 && worldViewSel_ < (int)p.maps.size()) {
             auto sm = p.maps[worldViewSel_];
-            if (!sm->placed) {                       // first instance: place the map itself
-                sm->worldX = cx; sm->worldY = cy; sm->placed = true; p.save();
-                setStatus(TextFormat("%s 배치: (%d,%d)", sm->name.c_str(), cx, cy));
+            if (!sm->placed) {                        // first instance: place the map itself
+                sm->worldX = mcx; sm->worldY = mcy; sm->placed = true; p.save();
+                setStatus(TextFormat("%s 배치: (%d,%d)", sm->name.c_str(), mcx, mcy));
             } else {                                  // already placed: drop a numbered copy
                 auto nm = std::make_shared<Map>(*sm);
                 nm->id = p.nextMapId();
@@ -359,13 +370,33 @@ void Editor::drawWorldViewTab() {
                 std::string cand; int n = 2;
                 do { cand = stem + " (" + std::to_string(n) + ")"; ++n; } while (taken(cand));
                 nm->name = cand;
-                nm->worldX = cx; nm->worldY = cy; nm->placed = true;
-                nm->viewerCopy = true;                // right-click deletes it fully later
-                p.maps.push_back(nm);
-                p.save();                             // thumbnail builds next frame (update())
-                setStatus(TextFormat("%s 복제 배치: (%d,%d)", nm->name.c_str(), cx, cy));
+                nm->worldX = mcx; nm->worldY = mcy; nm->placed = true; nm->viewerCopy = true;
+                p.maps.push_back(nm); p.save();
+                setStatus(TextFormat("%s 복제 배치: (%d,%d)", nm->name.c_str(), mcx, mcy));
             }
         }
+    }
+    // arm -> drag once the cursor moves past a small threshold
+    if (wvDragId_ >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        float dx = GetMousePosition().x - wvDragStart_.x, dy = GetMousePosition().y - wvDragStart_.y;
+        if (dx*dx + dy*dy > 36) wvDragging_ = true;
+    }
+    // release: drop the dragged map on the target cell (move), or swap with the map there
+    if (wvDragId_ >= 0 && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        if (wvDragging_) {
+            auto src = p.map(wvDragId_);
+            auto dstOcc = p.mapAtWorld(mcx, mcy);
+            if (src && (!dstOcc || dstOcc == src)) {
+                src->worldX = mcx; src->worldY = mcy; p.save();
+                setStatus(TextFormat("%s 이동: (%d,%d)", src->name.c_str(), mcx, mcy));
+            } else if (src && dstOcc) {
+                int ox = src->worldX, oy = src->worldY;
+                src->worldX = dstOcc->worldX; src->worldY = dstOcc->worldY;
+                dstOcc->worldX = ox; dstOcc->worldY = oy; p.save();
+                setStatus("맵 위치 교환");
+            }
+        }
+        wvDragId_ = -1; wvDragging_ = false;
     }
     // right-click: remove the map under the cursor. A viewer-made copy is deleted
     // outright (map + .json + thumbnail) so repeated add/remove leaves no residue;
@@ -390,21 +421,21 @@ void Editor::drawWorldViewTab() {
         }
     }
     EndScissorMode();
-    DrawTextU("좌클릭=배치/복제 · 우클릭=제거 · 휠=확대/축소 · 가운데드래그=이동", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 13, ui::kTextDim);
+    DrawTextU("맵 드래그=이동/교환 · 좌클릭=배치/복제 · 우클릭=제거 · 휠=확대/축소 · 가운데드래그=화면이동", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 12, ui::kTextDim);
     DrawTextU(kBuildTag, 12, screenH()-22, 13, ui::kGood);
 }
 
 // ---- map thumbnails (rendered once into cached RenderTextures) ----
 // Built in Editor::update() (outside the engine's frame render texture, so the
 // nested BeginTextureMode is valid) and drawn on the World / All-Map Viewer tabs.
-void Editor::buildMapThumb(Map& m) {
+RenderTexture2D Editor::makeMapThumb(Map& m, float maxW, float maxH) {
     int mw = m.tilemap.width(), mh = m.tilemap.height();
-    if (mw <= 0 || mh <= 0) return;
     int TS = m.tileset.tileWidth > 0 ? m.tileset.tileWidth : 32;
-    const float MAXW = 220, MAXH = 165;
-    float sc = std::min(MAXW / (mw*TS), MAXH / (mh*TS));
+    if (mw <= 0 || mh <= 0) return RenderTexture2D{};
+    float sc = std::min(maxW / (mw*TS), maxH / (mh*TS));
     int tw = std::max(1, (int)(mw*TS*sc)), th = std::max(1, (int)(mh*TS*sc));
     RenderTexture2D rt = LoadRenderTexture(tw, th);
+    SetTextureFilter(rt.texture, TEXTURE_FILTER_BILINEAR);
     BeginTextureMode(rt);
     ClearBackground(Color{ 24, 26, 34, 255 });
     const Tileset& set = m.tileset;
@@ -421,9 +452,37 @@ void Editor::buildMapThumb(Map& m) {
                 }
     }
     EndTextureMode();
+    return rt;
+}
+
+void Editor::buildMapThumb(Map& m) {
+    if (m.tilemap.width() <= 0 || m.tilemap.height() <= 0) return;
+    RenderTexture2D rt = makeMapThumb(m, 220, 165);
+    if (!rt.id) return;
     auto it = mapThumbs_.find(m.id);
     if (it != mapThumbs_.end()) UnloadRenderTexture(it->second);
     mapThumbs_[m.id] = rt;
+}
+
+// Fullscreen map preview overlay (opened by clicking the World-tab thumbnail).
+void Editor::drawWorldPreviewOverlay() {
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 248 });
+    DrawTextU("맵 전체 미리보기  (X 또는 ESC 로 닫기)", 20, 12, 18, ui::kAccent);
+    if (worldBigThumb_.id && worldBigId_ >= 0) {
+        float tw = (float)worldBigThumb_.texture.width, th = (float)worldBigThumb_.texture.height;
+        float maxW = sw - 60.0f, maxH = sh - 100.0f;
+        float s = std::min(maxW / tw, maxH / th);
+        float pw = tw * s, ph = th * s;
+        float bx = (sw - pw) / 2, by = 52 + (sh - 52 - ph) / 2;
+        DrawRectangle((int)bx-3, (int)by-3, (int)pw+6, (int)ph+6, Color{ 20, 22, 30, 255 });
+        DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, { bx,by,pw,ph }, {0,0}, 0, WHITE);
+        DrawRectangleLinesEx({ bx-3,by-3,pw+6,ph+6 }, 1, Fade(BLACK, 0.6f));
+    } else {
+        DrawTextU("미리보기 생성 중…", sw/2 - 70, sh/2, 18, ui::kTextDim);
+    }
+    if (ui::button({ (float)sw - 52, 8, 42, 32 }, "X") || IsKeyPressed(KEY_ESCAPE))
+        worldPreviewFull_ = false;
 }
 
 const RenderTexture2D* Editor::mapThumb(int mapId) {
@@ -455,7 +514,18 @@ void Editor::ensureThumbsForTab() {
         if (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) {
             auto& m = p.maps[worldSelected_];
             if (!mapThumb(m->id)) buildMapThumb(*m);
+            // hi-res texture for the fullscreen preview (rebuild when selection changes)
+            if (worldPreviewFull_ && worldBigId_ != m->id) {
+                if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
+                worldBigThumb_ = makeMapThumb(*m, 1280, 860);
+                worldBigId_ = m->id;
+            }
         }
+    }
+    // release the big preview texture when the overlay is closed / off the tab
+    if ((!worldPreviewFull_ || tab_ != Tab::World) && worldBigId_ >= 0) {
+        if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
+        worldBigThumb_ = RenderTexture2D{}; worldBigId_ = -1;
     }
 }
 

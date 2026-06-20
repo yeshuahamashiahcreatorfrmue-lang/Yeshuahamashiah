@@ -33,6 +33,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     if (const char* t = getenv("TSUKURU_TAB")) { // debug: pick initial tab
         std::string s = t;
         if (s == "world") tab_ = Tab::World;     else if (s == "worldview") tab_ = Tab::WorldView;
+        else if (s == "map") tab_ = Tab::Map;
         else if (s == "events") tab_ = Tab::Events;
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
@@ -91,16 +92,29 @@ void Editor::update(float dt) {
         if (IsKeyDown(KEY_UP))    cam_.target.y -= panSpeed;
     }
     float wheel = GetMouseWheelMove();
-    if (wheel != 0 && tab_ != Tab::Database) {
-        cam_.zoom += wheel * 0.15f;
-        if (cam_.zoom < 0.3f) cam_.zoom = 0.3f;
-        if (cam_.zoom > 4.0f) cam_.zoom = 4.0f;
+    // Map camera zoom (multiplicative so huge maps zoom out smoothly; tiny minimum
+    // lets a 1742×1742 map fit on screen). World/WorldView use their own cameras;
+    // Ctrl+wheel stays reserved for the global UI scale.
+    if (wheel != 0 && tab_ == Tab::Map && !IsKeyDown(KEY_LEFT_CONTROL) && !IsKeyDown(KEY_RIGHT_CONTROL)) {
+        cam_.zoom *= (1.0f + wheel * 0.15f);
+        if (cam_.zoom < 0.02f) cam_.zoom = 0.02f;
+        if (cam_.zoom > 4.0f)  cam_.zoom = 4.0f;
     }
-    // Middle-drag pan
+    // Middle-drag pan (website-style grab-scroll)
     if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
         Vector2 d = GetMouseDelta();
         cam_.target.x -= d.x / cam_.zoom;
         cam_.target.y -= d.y / cam_.zoom;
+    }
+    // keep the map roughly in view so it can't be lost by over-panning
+    if (tab_ == Tab::Map) {
+        if (auto m = activeMap()) {
+            int TS = m->tileset.tileWidth > 0 ? m->tileset.tileWidth : 32;
+            float mw = (float)m->tilemap.width()*TS, mh = (float)m->tilemap.height()*TS;
+            float marg = 300.0f / cam_.zoom;
+            cam_.target.x = std::min(std::max(cam_.target.x, -marg), mw + marg);
+            cam_.target.y = std::min(std::max(cam_.target.y, -marg), mh + marg);
+        }
     }
 
     if (tab_ == Tab::Assets) handleAssetDrop();

@@ -29,7 +29,11 @@ private:
     void drawToolbar();
     void drawWorldTab();
     void drawWorldViewTab();   // All-Map Viewer: lay maps on a zone grid for edge-to-edge travel
+    void drawWorldPreviewOverlay();   // fullscreen map preview (click thumbnail to open, X/ESC to close)
+    void drawMapZoomBar(Rectangle canvas);   // map-only zoom control (− / % / + / 전체보기)
+    void drawMapScrollbars(Rectangle canvas);// draggable H/V scrollbars for large maps
     // map thumbnails (rendered to cached textures in update(), drawn on World/WorldView)
+    RenderTexture2D makeMapThumb(Map& m, float maxW, float maxH); // render a map into a fit texture
     void buildMapThumb(Map& m);
     const RenderTexture2D* mapThumb(int mapId);
     void dropMapThumb(int mapId);   // unload+erase one cached thumbnail (on map removal)
@@ -111,6 +115,15 @@ private:
     int  worldViewSel_ = -1;        // map selected in the All-Map Viewer
     Camera2D worldCam_{};           // pan/zoom for the zone grid
     bool worldCamInit_ = false;
+    // All-Map Viewer: drag a placed map to a new cell (move) / onto another (swap)
+    int  wvDragId_ = -1;            // map id being dragged (-1 = none)
+    bool wvDragging_ = false;       // passed the click->drag threshold
+    Vector2 wvDragStart_{};         // press point (screen) used to detect a drag
+    // World tab: fullscreen map preview overlay
+    bool worldPreviewFull_ = false;
+    RenderTexture2D worldBigThumb_{}; // hi-res preview texture (built on demand)
+    int  worldBigId_ = -1;            // map id the big preview was built for
+    int  scrollDragAxis_ = 0;         // map-canvas scrollbar drag: 1=horizontal, 2=vertical
     std::unordered_map<int, RenderTexture2D> mapThumbs_;  // map id -> cached thumbnail
     Tab  prevTab_ = Tab::Map;       // detect tab changes to refresh thumbnails
     int  newMapW_ = 30, newMapH_ = 24;

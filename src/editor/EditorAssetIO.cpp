@@ -110,6 +110,18 @@ static void cropToOpaque(Image& img) {
         ImageCrop(&img, { (float)minx, (float)miny, (float)(maxx-minx+1), (float)(maxy-miny+1) });
 }
 
+// Shrink an imported sprite/effect image so the project stays small. The neural
+// cut-out keeps full-resolution photos; sprites never need that, so cap the
+// largest side at maxDim (preserving aspect). PNG re-encode then compresses the
+// smaller pixel count. No-op when already small. (NOT used for tilesets/sheets.)
+static void shrinkForAsset(Image& img, int maxDim = 384) {
+    if (!img.data) return;
+    int big = img.width > img.height ? img.width : img.height;
+    if (big <= maxDim || big <= 0) return;
+    float s = (float)maxDim / (float)big;
+    ImageResize(&img, std::max(1, (int)(img.width * s)), std::max(1, (int)(img.height * s)));
+}
+
 // Auto background removal on import. Detects whether the image sits on a single
 // colour background (border histogram) — even without an obvious frame — and if
 // so removes the border-connected background and crops. Busy/photographic
@@ -181,6 +193,7 @@ int Editor::importImageFile(const std::string& path) {
     if (img.data) {
         bool ai = aiCutout(img);                 // phone-grade subject lift (if model present)
         bool trimmed = ai || autoRemoveBg(img);  // else classic colour-based removal
+        shrinkForAsset(img);                     // cap size -> small PNG (용량 축약)
         int n = 1; fs::path dest;
         do { dest = fs::path(p.dir)/"assets"/("import_"+std::to_string(n++)+".png"); } while (fs::exists(dest));
         ExportImage(img, dest.string().c_str());
@@ -310,6 +323,7 @@ void Editor::pickAndImportEffect() {
             if (!im.data) continue;
             ImageFormat(&im, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
             if (!aiCutout(im)) autoRemoveBg(im);            // transparent bg per frame
+            shrinkForAsset(im, 256);                        // keep each effect frame small
             frames.push_back(im);
             cw = std::max(cw, im.width); ch = std::max(ch, im.height);
         }
