@@ -30,6 +30,7 @@ private:
     void drawCharsTab();
     void pickAndImportImages();        // native OS file picker -> import selected images
     int  makeTransparentBg(int assetId); // remove a solid/white background -> new transparent asset
+    void scrollbar(Rectangle region, int& scroll, float contentH); // wheel + middle-drag + draggable bar
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
     void drawAssetsTab();
@@ -80,6 +81,8 @@ private:
     int  charMotionTab_ = 0;          // selected motion tab (0..5)
     int  charDirTab_ = 0;             // edited direction: 0정면(아래)/1좌/2우/3위
     bool pendingImport_ = false;      // request the native file picker outside the draw frame
+    int* scrollDragTarget_ = nullptr; // which scroll offset the dragged scrollbar thumb controls
+    float scrollDragGrab_ = 0;        // grab offset within the thumb while dragging
     bool charDefNameFocus_ = false;
     int  charFrameSel_ = -1;          // selected frame within the current motion
     bool charSliceMode_ = false;      // library click adds N sliced frames instead of 1

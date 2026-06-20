@@ -171,6 +171,39 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
     return out;
 }
 
+// A scrollable region: mouse wheel + middle-button drag to scroll, plus a
+// draggable scrollbar thumb on the right edge. Call AFTER drawing the region's
+// content (and after EndScissorMode) so the bar sits on top. Updates `scroll`.
+void Editor::scrollbar(Rectangle r, int& scroll, float contentH) {
+    int maxS = (int)std::max(0.0f, contentH - r.height);
+    Vector2 m = GetMousePosition();
+    bool inR = CheckCollisionPointRec(m, r);
+    if (inR) {
+        float w = GetMouseWheelMove();
+        if (w != 0) scroll -= (int)(w * 48);
+        if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) scroll -= (int)GetMouseDelta().y;  // 휠 클릭 드래그
+    }
+    if (maxS <= 0) { scroll = 0; return; }
+    const float trackW = 10;
+    float tx = r.x + r.width - trackW - 2, th = r.height;
+    float thumbH = std::max(28.0f, th * r.height / contentH);
+    if (scrollDragTarget_ == &scroll) {                       // continue an active thumb drag
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            float denom = std::max(1.0f, th - thumbH);
+            scroll = (int)(((m.y - scrollDragGrab_) - r.y) / denom * maxS);
+        } else scrollDragTarget_ = nullptr;
+    }
+    scroll = std::max(0, std::min(scroll, maxS));
+    float thumbY = r.y + (th - thumbH) * (scroll / (float)maxS);
+    Rectangle thumb = { tx, thumbY, trackW, thumbH };
+    DrawRectangleRounded({ tx, r.y, trackW, th }, 0.5f, 4, Fade(BLACK, 0.30f));
+    bool hot = CheckCollisionPointRec(m, thumb) || scrollDragTarget_ == &scroll;
+    DrawRectangleRounded(thumb, 0.5f, 4, hot ? ui::kAccentHi : ui::kAccent);
+    if (CheckCollisionPointRec(m, thumb) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        scrollDragTarget_ = &scroll; scrollDragGrab_ = m.y - thumbY;
+    }
+}
+
 void Editor::drawCharsTab() {
     if (charSkillEdit_) { drawCharSkillEditor(); return; }   // modal: this character's skill
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
@@ -181,7 +214,7 @@ void Editor::drawCharsTab() {
     handleAssetDrop();   // drag&drop still works anywhere on this tab
 
     ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
-    DrawTextU("빌드 0620e-테두리만제거  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
+    DrawTextU("빌드 0620f-스크롤바+정밀제거  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
 
     // ---- 3-column layout: [캐릭터] [모션·프레임·재생] [이미지 소스] ----
     float pad = 10;
@@ -204,19 +237,17 @@ void Editor::drawCharsTab() {
         float listTop = panelTop + 32, listH = panelH - 252;
         Rectangle listReg = { leftX, listTop, leftW, listH };
         int rows = (int)db.characters.size();
-        int maxLS = std::max(0, (int)(rows * 30 + 4 - listH));
-        if (GetMouseWheelMove() != 0 && ui::mouseIn(listReg)) charListScroll_ -= (int)(GetMouseWheelMove() * 40);
-        charListScroll_ = std::max(0, std::min(charListScroll_, maxLS));
         BeginScissorMode((int)leftX, (int)listTop, (int)leftW, (int)listH);
         float ly = listTop - charListScroll_;
         for (int i = 0; i < rows; ++i) {
             if (ly + 28 > listTop && ly < listTop + listH)
-                if (ui::button({ x, ly, w, 26 }, db.characters[i].name, charDefSel_ == i)) {
+                if (ui::button({ x, ly, w - 12, 26 }, db.characters[i].name, charDefSel_ == i)) {
                     charDefSel_ = i; charDefNameFocus_ = false; charFrameSel_ = -1;
                 }
             ly += 30;
         }
         EndScissorMode();
+        scrollbar(listReg, charListScroll_, rows * 30.0f + 4);
         if (rows == 0) DrawTextU("(없음)", (int)x, (int)listTop + 6, 13, ui::kTextDim);
 
         float by = listTop + listH + 6;
@@ -347,10 +378,7 @@ void Editor::drawCharsTab() {
         float cell = 58, gridTop = tlY, gridH = panelBot - 8 - gridTop;
         int per = std::max(1, (int)(w / (cell + 8)));
         int frows = ((int)fv.size() + per - 1) / per;
-        int maxFS = std::max(0, (int)(frows * (cell + 8) + 4 - gridH));
         Rectangle gReg = { midX, gridTop, midW, gridH };
-        if (GetMouseWheelMove() != 0 && ui::mouseIn(gReg)) charFrameScroll_ -= (int)(GetMouseWheelMove() * 40);
-        charFrameScroll_ = std::max(0, std::min(charFrameScroll_, maxFS));
         BeginScissorMode((int)midX, (int)gridTop, (int)midW, (int)gridH);
         for (int i = 0; i < (int)fv.size(); ++i) {
             float fx = x + (i % per) * (cell + 8);
@@ -367,6 +395,7 @@ void Editor::drawCharsTab() {
             if (ui::mouseIn(fr) && lclick) charFrameSel_ = i;
         }
         EndScissorMode();
+        scrollbar(gReg, charFrameScroll_, frows * (cell + 8.0f) + 4);
         if (fv.empty())
             DrawTextU("→ 오른쪽 '이미지 소스'에서 이미지를 클릭해 이 방향을 채우세요.", (int)x, (int)gridTop + 8, 13, ui::kTextDim);
     }
@@ -394,10 +423,7 @@ void Editor::drawCharsTab() {
         int visN = 0;
         for (auto* a : imgs) { if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; } visN++; }
         int grows = (visN + 1) / 2;
-        int maxGS = std::max(0, (int)(grows * (cardH + 8) + 4 - gridH));
         Rectangle gReg = { rightX, gridTop, rightW, gridH };
-        if (GetMouseWheelMove() != 0 && ui::mouseIn(gReg)) charLibScroll_ -= (int)(GetMouseWheelMove() * 44);
-        charLibScroll_ = std::max(0, std::min(charLibScroll_, maxGS));
         BeginScissorMode((int)rightX, (int)gridTop, (int)rightW, (int)gridH);
         int idx = 0;
         for (auto* a : imgs) {
@@ -448,6 +474,7 @@ void Editor::drawCharsTab() {
                 makeTransparentBg(a->id);   // make the solid/white background transparent
         }
         EndScissorMode();
+        scrollbar(gReg, charLibScroll_, grows * (cardH + 8.0f) + 4);
         if (imgs.empty())
             DrawTextU("(이미지 없음 — 위 '+ 내 이미지 불러오기')", (int)x, (int)gridTop + 10, 12, ui::kTextDim);
     }
