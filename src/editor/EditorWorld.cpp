@@ -41,7 +41,7 @@ void Editor::drawWorldTab() {
     y += 8;
     ui::label("새 맵 크기 (규격)", (int)lx + 10, (int)y, 14, ui::kTextDim); y += 20;
     if (ui::button({ lx + 10, y, lw - 20, 26 }, kSizeTierNames[newMapTier_]))
-        newMapTier_ = (newMapTier_ + 1) % 7;
+        newMapTier_ = (newMapTier_ + 1) % kSizeTierCount;
     y += 34;
     if (ui::button({ lx + 10, y, lw - 20, 30 }, "+ 새 맵")) {
         int side = kSizeTiers[newMapTier_];
@@ -78,7 +78,7 @@ void Editor::drawWorldTab() {
     // standardized size tiers (cycle to resize, content preserved)
     int tier = sizeTierOf(std::max(w, h));
     if (ui::button({ dx, dy, 260, 26 }, kSizeTierNames[tier])) {
-        int nt = (tier + 1) % 7;
+        int nt = (tier + 1) % kSizeTierCount;
         int side = kSizeTiers[nt];
         m->tilemap.resizePreserve(side, side);
         setStatus(std::string("맵 크기 변경: ") + kSizeTierNames[nt]);

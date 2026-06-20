@@ -49,6 +49,7 @@ private:
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
     void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
     void pickAndImportSound();                        // file picker -> assign a skill sound
+    void pickAndImportTileset();                      // file picker -> assign the active map's tileset (no crop)
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
     void deleteAssets(const std::vector<int>& ids);  // unregister assets + scrub character motion refs
     int  duplicateAsset(int id);                      // copy an image asset to a new file+entry
@@ -82,7 +83,7 @@ private:
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;
     int  newMapW_ = 30, newMapH_ = 24;
-    int  newMapTier_ = 0;           // standardized size tier for a new map (0..6)
+    int  newMapTier_ = 0;           // standardized size tier for a new map (0..13)
     // Character generation
     int  charColor_ = 0;
     // Per-character skill editor (range pattern + effect/sound)
@@ -97,6 +98,7 @@ private:
     bool pendingImport_ = false;      // request the native file picker outside the draw frame
     bool pendingEffectImport_ = false;     // request the picker to assign a skill effect strip
     bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
+    bool pendingTilesetImport_ = false;    // request the picker to assign the map tileset
     FieldSkill* pendingEffectSkill_ = nullptr; // skill awaiting an imported effect/sound (valid 1 frame)
     int* scrollDragTarget_ = nullptr; // which scroll offset the dragged scrollbar thumb controls
     float scrollDragGrab_ = 0;        // grab offset within the thumb while dragging

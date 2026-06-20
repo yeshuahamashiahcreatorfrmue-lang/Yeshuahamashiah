@@ -53,6 +53,7 @@ void Editor::update(float dt) {
     if (pendingImport_) { pendingImport_ = false; pickAndImportImages(); }
     if (pendingEffectImport_) { pendingEffectImport_ = false; pickAndImportEffect(); }
     if (pendingSoundImport_)  { pendingSoundImport_  = false; pickAndImportSound(); }
+    if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
 
     // Global shortcuts
     bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_ || skillNameFocus_;

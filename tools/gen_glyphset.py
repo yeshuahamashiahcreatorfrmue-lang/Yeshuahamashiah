@@ -5,7 +5,7 @@
 import re, pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SCAN = [ROOT/"src", ROOT/"tools/gen_game.cpp"]
+SCAN = [ROOT/"src", ROOT/"tools/gen_game.cpp", ROOT/"tools/gen_concept_maps.cpp"]
 
 def files():
     for s in SCAN:

@@ -17,7 +17,12 @@
   ],
   "characters": [
     {
+      "atk": 12,
+      "def": 5,
+      "drawPct": 125,
       "id": 1,
+      "maxGp": 30,
+      "maxHp": 100,
       "motions": [
         {
           "fps": 8,
@@ -27,7 +32,10 @@
             23,
             24
           ],
-          "loop": true
+          "left": [],
+          "loop": true,
+          "right": [],
+          "up": []
         },
         {
           "fps": 12,
@@ -35,7 +43,10 @@
             25,
             26
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 12,
@@ -44,7 +55,10 @@
             25,
             26
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 14,
@@ -54,7 +68,10 @@
             25,
             26
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 12,
@@ -65,7 +82,10 @@
             26,
             25
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 4,
@@ -73,13 +93,23 @@
             24,
             21
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         }
       ],
-      "name": "용사(파랑)"
+      "name": "용사(파랑)",
+      "skills": [],
+      "spd": 5
     },
     {
+      "atk": 12,
+      "def": 5,
+      "drawPct": 125,
       "id": 2,
+      "maxGp": 30,
+      "maxHp": 100,
       "motions": [
         {
           "fps": 6,
@@ -89,7 +119,10 @@
             29,
             30
           ],
-          "loop": true
+          "left": [],
+          "loop": true,
+          "right": [],
+          "up": []
         },
         {
           "fps": 10,
@@ -97,7 +130,10 @@
             31,
             32
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 10,
@@ -106,7 +142,10 @@
             31,
             32
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 12,
@@ -116,7 +155,10 @@
             31,
             32
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 10,
@@ -127,7 +169,10 @@
             32,
             31
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 4,
@@ -135,13 +180,23 @@
             30,
             27
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         }
       ],
-      "name": "기사(빨강)"
+      "name": "기사(빨강)",
+      "skills": [],
+      "spd": 5
     },
     {
+      "atk": 12,
+      "def": 5,
+      "drawPct": 125,
       "id": 3,
+      "maxGp": 30,
+      "maxHp": 100,
       "motions": [
         {
           "fps": 11,
@@ -151,7 +206,10 @@
             35,
             36
           ],
-          "loop": true
+          "left": [],
+          "loop": true,
+          "right": [],
+          "up": []
         },
         {
           "fps": 16,
@@ -159,7 +217,10 @@
             37,
             38
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 16,
@@ -168,7 +229,10 @@
             37,
             38
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 18,
@@ -178,7 +242,10 @@
             37,
             38
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 16,
@@ -189,7 +256,10 @@
             38,
             37
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         },
         {
           "fps": 4,
@@ -197,10 +267,15 @@
             36,
             33
           ],
-          "loop": false
+          "left": [],
+          "loop": false,
+          "right": [],
+          "up": []
         }
       ],
-      "name": "궁수(초록)"
+      "name": "궁수(초록)",
+      "skills": [],
+      "spd": 5
     }
   ],
   "enemies": [
@@ -278,6 +353,12 @@
       "blink": 0,
       "cooldown": 0.3199999928474426,
       "effectAsset": 13,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 1,
       "mpCost": 0,
       "name": "베기",
@@ -299,6 +380,12 @@
       "blink": 0,
       "cooldown": 0.8999999761581421,
       "effectAsset": 14,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 2,
       "mpCost": 4,
       "name": "화염탄",
@@ -314,6 +401,12 @@
       "blink": 4,
       "cooldown": 1.399999976158142,
       "effectAsset": 15,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 3,
       "mpCost": 0,
       "name": "회피",
@@ -329,6 +422,12 @@
       "blink": 5,
       "cooldown": 8.0,
       "effectAsset": 16,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 4,
       "mpCost": 16,
       "name": "폭렬",
@@ -396,6 +495,12 @@
       "blink": 0,
       "cooldown": 1.2000000476837158,
       "effectAsset": 13,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 5,
       "mpCost": 3,
       "name": "십자베기",
@@ -423,6 +528,12 @@
       "blink": 0,
       "cooldown": 1.600000023841858,
       "effectAsset": 14,
+      "effectDist": 0,
+      "effectLoops": 1,
+      "effectMode": 0,
+      "effectScale": 100,
+      "efxX": [],
+      "efxY": [],
       "id": 6,
       "mpCost": 5,
       "name": "관통창",

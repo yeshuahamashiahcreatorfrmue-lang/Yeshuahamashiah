@@ -42,7 +42,7 @@ void Editor::drawTilePalette(Rectangle area) {
     ui::label("타일셋", (int)area.x + 10, (int)ty, 16, ui::kTextDim);
     auto imgs = engine_.project().assets.byType(AssetType::Image);
     if (ui::button({ area.x + 10, ty + 22, area.width - 20, 26 },
-                   set.assetId >= 0 ? "타일셋 이미지 변경" : "타일셋 이미지 선택")) {
+                   set.assetId >= 0 ? "타일셋 이미지 변경(순환)" : "타일셋 이미지 선택(순환)")) {
         // cycle to next image asset
         if (!imgs.empty()) {
             int idx = -1;
@@ -50,7 +50,9 @@ void Editor::drawTilePalette(Rectangle area) {
             m->tileset.assetId = imgs[(idx + 1) % imgs.size()]->id;
         }
     }
-    ty += 54;
+    if (ui::button({ area.x + 10, ty + 50, area.width - 20, 26 }, "+ 타일셋 이미지 불러오기", true))
+        pendingTilesetImport_ = true;        // native picker -> assign as this map's tileset
+    ty += 82;
     ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "열", m->tileset.columns, 1, 1, 64); ty += 28;
     ui::intStepper({ area.x + 10, ty, area.width - 20, 24 }, "행", m->tileset.rows, 1, 1, 64); ty += 30;
 

@@ -9,16 +9,22 @@ inline constexpr float kToolbarH = 40;   // top toolbar height
 inline constexpr float kPaletteW = 220;  // left tile/stamp palette width
 inline constexpr int   kUndoLimit = 42;  // Ctrl+Z history depth
 
-// Standardized world sizes (7 tiers), square, up to 420x420.
-inline constexpr int kSizeTiers[7] = { 30, 60, 120, 180, 270, 360, 420 };
-inline const char* const kSizeTierNames[7] = {
+// Standardized world sizes (14 tiers), square, up to 1742x1742.
+inline constexpr int kSizeTierCount = 14;
+inline constexpr int kSizeTiers[kSizeTierCount] = {
+    30, 60, 120, 180, 270, 360, 420,
+    540, 720, 900, 1100, 1320, 1536, 1742
+};
+inline const char* const kSizeTierNames[kSizeTierCount] = {
     "1단계 30x30", "2단계 60x60", "3단계 120x120", "4단계 180x180",
-    "5단계 270x270", "6단계 360x360", "7단계 420x420 (최대)"
+    "5단계 270x270", "6단계 360x360", "7단계 420x420",
+    "8단계 540x540", "9단계 720x720", "10단계 900x900", "11단계 1100x1100",
+    "12단계 1320x1320", "13단계 1536x1536", "14단계 1742x1742 (최대)"
 };
 // nearest size tier index for a given side length
 inline int sizeTierOf(int side) {
     int best = 0, bestd = 1 << 30;
-    for (int i = 0; i < 7; ++i) { int d = std::abs(kSizeTiers[i] - side); if (d < bestd) { bestd = d; best = i; } }
+    for (int i = 0; i < kSizeTierCount; ++i) { int d = std::abs(kSizeTiers[i] - side); if (d < bestd) { bestd = d; best = i; } }
     return best;
 }
 

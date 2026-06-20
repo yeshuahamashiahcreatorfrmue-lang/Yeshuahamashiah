@@ -182,4 +182,9 @@ if(NOT CMAKE_CROSSCOMPILING)
     add_executable(gen_game ${CMAKE_SOURCE_DIR}/tools/gen_game.cpp)
     target_link_libraries(gen_game PRIVATE tsukuru_core raylib)
     target_include_directories(gen_game PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+    # Concept map pack: a 112-tile themed tileset + 14 themed maps.
+    add_executable(gen_concept_maps ${CMAKE_SOURCE_DIR}/tools/gen_concept_maps.cpp)
+    target_link_libraries(gen_concept_maps PRIVATE tsukuru_core raylib)
+    target_include_directories(gen_concept_maps PRIVATE ${CMAKE_SOURCE_DIR}/src)
 endif()
