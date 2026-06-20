@@ -16,12 +16,6 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
-// Image extensions the engine can register (mirrors EditorAssetIO's importer).
-static bool charsIsImageExt(const std::string& e) {
-    return e == ".png" || e == ".jpg" || e == ".jpeg" || e == ".bmp" || e == ".gif" ||
-           e == ".tga" || e == ".psd" || e == ".hdr" || e == ".qoi";
-}
-
 // The cast-key slot a skill-capable motion maps to (-1 = not a skill motion).
 static int castSlotForMotion(int m) {
     switch (m) {
@@ -387,12 +381,14 @@ void Editor::drawCharsTab() {
                 charUndo_ = mc; charUndoSet_ = true;       // snapshot for 되돌리기
                 auto& mf = mc.frames;
                 int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
-                if (charSliceMode_) {                      // B: insert at selected frame
-                    int n = (a->frames > 1) ? a->frames : charSliceN_;
+                // Animated assets (움짤 GIF / sprite-strips) auto-expand into all
+                // their frames so one click turns a 움짤 into a whole motion.
+                int n = (a->frames > 1) ? a->frames : (charSliceMode_ ? charSliceN_ : 1);
+                if (n > 1) {
                     std::vector<int> sl = sliceAsset(a->id, n);
                     mf.insert(mf.begin() + pos, sl.begin(), sl.end());
                     if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
-                    setStatus(TextFormat("%s: %d프레임 분할 추가", kMotionNames[charMotionTab_], (int)sl.size()));
+                    setStatus(TextFormat("%s: %d프레임 추가 (움짤/시트 분할)", kMotionNames[charMotionTab_], (int)sl.size()));
                 } else {
                     mf.insert(mf.begin() + pos, a->id);
                     if (charFrameSel_ >= 0) charFrameSel_++;
@@ -440,7 +436,7 @@ void Editor::drawImageBrowser() {
     }
 
     ui::label("내 이미지 불러오기", 20, (int)kToolbarH + 10, 22, ui::kAccent);
-    DrawTextU("폴더를 눌러 이동, 이미지 파일을 누르면 라이브러리에 추가됩니다.",
+    DrawTextU("폴더를 눌러 이동, 이미지 파일을 누르면 등록됩니다. PNG·JPG·BMP·GIF·TGA 등 모두 가능 · 움짤(GIF)은 자동으로 여러 프레임이 됩니다.",
               290, (int)kToolbarH + 16, 13, ui::kTextDim);
     if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 빌더로 돌아가기")) { charBrowse_ = false; return; }
 
@@ -472,7 +468,7 @@ void Editor::drawImageBrowser() {
         if (de.is_directory(e2)) { dirs.push_back(name); continue; }
         std::string ext = de.path().extension().string();
         for (auto& c : ext) c = (char)tolower((unsigned char)c);
-        if (charsIsImageExt(ext)) files.push_back(name);
+        if (isImageExt(ext)) files.push_back(name);
     }
     std::sort(dirs.begin(), dirs.end());
     std::sort(files.begin(), files.end());
@@ -502,8 +498,8 @@ void Editor::drawImageBrowser() {
         if (ry + rowH > listY && ry < GetScreenHeight() &&
             ui::button({ 20, ry, area.width - 40, rowH - 4 }, "[그림]  " + f)) {
             std::string full = (fs::path(browseDir_) / f).string();
-            int id = p.assets.registerAsset(p.dir, full, AssetType::Image);
-            if (id >= 0) { p.save(); setStatus("라이브러리에 추가됨: " + f); }
+            int id = importImageFile(full);     // GIF-aware; all image formats
+            if (id >= 0) p.save();              // setStatus handled by importImageFile
             else setStatus("불러오기 실패: " + f);
         }
         ry += rowH;

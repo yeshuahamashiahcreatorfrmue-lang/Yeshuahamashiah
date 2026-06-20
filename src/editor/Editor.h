@@ -37,6 +37,9 @@ private:
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
+    int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
+    static bool isImageExt(const std::string& ext);  // any raylib-loadable image extension
+    static bool isAudioExt(const std::string& ext);
     int  generateCharacter();          // make + register a new character sheet
     int  generateEffect(int style);    // make + register a skill-effect sheet
     int  generateSound(int style);     // make + register a skill sound effect
