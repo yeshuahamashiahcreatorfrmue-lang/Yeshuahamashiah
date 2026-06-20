@@ -76,6 +76,7 @@ struct SkillFx {
     int dir = 0;
     int assetId = -1;
     float radius = 0;       // for aoe ring
+    int loops = 1;          // times the sprite strip replays across `dur`
 };
 
 // --- atmosphere -------------------------------------------------------------

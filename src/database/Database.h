@@ -56,6 +56,7 @@ struct FieldSkill {
     int         powerPct = 100;  // damage = ATK * powerPct/100
     std::vector<int> patX, patY; // relative tiles (canonical facing-up)
     int         effectAsset = -1;// sprite drawn on each hit tile (-1 = procedural)
+    int         effectLoops = 1; // how many times the effect's frame strip replays per cast
     int         soundAsset  = -1;// audio asset to play (-1 = built-in "attack")
 };
 

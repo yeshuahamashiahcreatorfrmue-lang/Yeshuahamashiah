@@ -12,9 +12,20 @@
 
 namespace tsukuru {
 
-void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius) {
+void GamePlay::spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius, int loops) {
     SkillFx f; f.type = type; f.px = px; f.py = py; f.dir = dir;
-    f.assetId = assetId; f.dur = dur; f.t = 0; f.radius = radius;
+    f.assetId = assetId; f.t = 0; f.radius = radius;
+    f.loops = std::max(1, loops);
+    // For an imported animated effect strip, play the whole strip at its own fps
+    // for `loops` cycles so a 7-frame motion can repeat 1/3/7… times as authored.
+    if (assetId >= 0) {
+        const AssetEntry* ae = engine_.project().assets.find(assetId);
+        if (ae && ae->frames > 1) {
+            float fps = ae->fps > 0 ? (float)ae->fps : 12.0f;
+            dur = ae->frames / fps * (float)f.loops;
+        }
+    }
+    f.dur = dur;
     fx_.push_back(f);
 }
 
@@ -78,7 +89,13 @@ void GamePlay::drawFx() {
             const AssetEntry* ae = engine_.project().assets.find(f.assetId);
             int frames = (ae && ae->frames > 1) ? ae->frames : 1;  // single-row anim
             float fw = tex.width / (float)frames, fh = (float)tex.height;
-            int fr = std::min(frames-1, (int)(k * frames));
+            int fr;
+            if (f.loops > 1 && frames > 1) {        // replay the strip `loops` times
+                int total = frames * f.loops;
+                fr = std::min(total - 1, (int)(k * total)) % frames;
+            } else {
+                fr = std::min(frames - 1, (int)(k * frames));
+            }
             Rectangle src = { fr*fw, 0, fw, fh };
             float sz = (f.type == 3) ? f.radius*2 : TS*1.3f;
             Rectangle dst = { f.px + TS/2 - sz/2, f.py + TS/2 - sz/2, sz, sz };

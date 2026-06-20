@@ -81,7 +81,7 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
             if (!map_->tilemap.inBounds(tx, ty) || map_->tilemap.blocked(tx, ty)) break;
             if (npcAt(tx, ty)) break;
             nx = tx; ny = ty;
-            spawnFx(2, nx*(float)TS, ny*(float)TS, dir_, s.effectAsset, 0.28f);
+            spawnFx(2, nx*(float)TS, ny*(float)TS, dir_, s.effectAsset, 0.28f, 0, s.effectLoops);
         }
         destX_ = nx; destY_ = ny;
         pxX_ = nx*(float)TS; pxY_ = ny*(float)TS; moving_ = false;
@@ -99,11 +99,11 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
     // 3) instant pattern: damage every monster on a rotated pattern tile
     bool hit = false;
     bool aoe = s.patX.size() > 4;
-    if (aoe) spawnFx(3, destX_*(float)TS, destY_*(float)TS, dir_, s.effectAsset, 0.5f, TS*2.6f);
+    if (aoe) spawnFx(3, destX_*(float)TS, destY_*(float)TS, dir_, s.effectAsset, 0.5f, TS*2.6f, s.effectLoops);
     for (size_t i = 0; i < s.patX.size(); ++i) {
         Vec2i r = rotateToFacing(s.patX[i], s.patY[i], dir_);
         int tx = destX_ + r.x, ty = destY_ + r.y;
-        if (!aoe) spawnFx(0, tx*(float)TS, ty*(float)TS, dir_, s.effectAsset, 0.2f);
+        if (!aoe) spawnFx(0, tx*(float)TS, ty*(float)TS, dir_, s.effectAsset, 0.2f, 0, s.effectLoops);
         if (s.powerPct <= 0) continue;
         if (FieldMonster* m = monsterAt(tx, ty)) { damageMonster(*m, dmg - m->def); hit = true; }
         if (NpcInst* en = hostileNpcAt(tx, ty)) { damageNpc(*en, dmg - en->def); hit = true; }

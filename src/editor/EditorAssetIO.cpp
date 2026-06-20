@@ -246,6 +246,54 @@ void Editor::pickAndImportImages() {
     else if (added == 0) setStatus("불러온 이미지가 없습니다.");
 }
 
+// Import a single external image and assign it as the pending skill's effect.
+// A horizontal sprite-strip's frame count is auto-detected (width is a whole
+// multiple of height → that many square frames), so a 7-cell strip becomes a
+// 7-frame animation that the panel's 반복(회) setting can then replay 1/3/7… times.
+void Editor::pickAndImportEffect() {
+    FieldSkill* s = pendingEffectSkill_;
+    pendingEffectSkill_ = nullptr;
+    if (!s) return;
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("이펙트 불러오기 취소됨."); return; }
+    Project& p = engine_.project();
+    std::error_code ec;
+    const std::string& src = files.front();          // one strip per effect
+    std::string ext = fs::path(src).extension().string();
+    for (auto& c : ext) c = (char)tolower((unsigned char)c);
+    if (!isImageExt(ext)) { setStatus("이미지 파일이 아닙니다."); return; }
+    try {
+        fs::create_directories(fs::path(p.dir) / "assets", ec);
+        fs::path tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + ext);
+        int k = 1;
+        while (fs::exists(tmp, ec)) tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + std::to_string(k++) + ext);
+        if (!plat::copyFileUtf8(src, tmp.string())) { setStatus("이펙트 복사 실패."); return; }
+        int id = importImageFile(tmp.string());
+        fs::remove(tmp, ec);
+        if (id < 0) { setStatus("이펙트 불러오기 실패."); return; }
+        // auto-detect a horizontal strip: a GIF is already multi-frame; a static
+        // strip with width == N×height is sliced into N square frames.
+        const AssetEntry* ae = p.assets.find(id);
+        if (ae && ae->frames <= 1) {
+            Image img = LoadImage(p.assetFullPath(id).c_str());
+            if (img.data) {
+                if (img.height > 0 && img.width % img.height == 0) {
+                    int n = img.width / img.height;
+                    if (n >= 2 && n <= 32) p.assets.setAnim(id, n, 12);
+                }
+                UnloadImage(img);
+            }
+        }
+        s->effectAsset = id;
+        s->effectLoops = std::max(1, s->effectLoops);
+        const AssetEntry* fin = p.assets.find(id);
+        p.save();
+        setStatus(TextFormat("이펙트 적용됨 (%d프레임)", fin ? fin->frames : 1));
+    } catch (const std::exception& e) {
+        setStatus(std::string("이펙트 불러오기 실패: ") + e.what());
+    }
+}
+
 // Make the BORDER background transparent (magic-wand flood-fill from the edges),
 // so interior same-colour pixels are kept. The top-left corner is the background
 // colour. Saves a NEW asset (non-destructive). Single images are cropped to the

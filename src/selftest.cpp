@@ -201,6 +201,7 @@ static void testCharacterBuilder() {
     FieldSkill cs; cs.slot = 1; cs.name = "캐릭터파이어"; cs.projectile = true;
     cs.range = 9; cs.powerPct = 250; cs.mpCost = 7; cs.cooldown = 1.2f;
     cs.patX = {0, 0}; cs.patY = {0, -1};
+    cs.effectAsset = imgIds[0]; cs.effectLoops = 7;   // 7프레임 이펙트를 7회 반복
     cd.skills.push_back(cs);
     p->database.characters.push_back(cd);
     p->playerCharId = cd.id;                                       // "플레이어로 설정"
@@ -226,6 +227,8 @@ static void testCharacterBuilder() {
                    c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
                    c->skills[0].projectile && c->skills[0].name == "캐릭터파이어";
     CHECK(skillOk, "character's own skill (range/power/projectile) persisted");
+    CHECK(c && c->skills[0].effectLoops == 7 && c->skills[0].effectAsset == imgIds[0],
+          "skill effect image + 반복(회) count persisted");
     bool framesResolve = (c != nullptr);
     if (c) for (int m = 0; m < MO_COUNT; ++m) for (int fid : c->motions[m].frames)
         if (!p2.assets.find(fid)) framesResolve = false;

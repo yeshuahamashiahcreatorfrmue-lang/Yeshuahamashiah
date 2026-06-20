@@ -118,7 +118,7 @@ void Editor::drawSkillsTab() {
     // ---- right: parameters + one-click effect/sound creation ----
     float dx = gx + GRID*cs + 28, dy = ly + 8, dw = area.width - dx - 16;
     if (dw < 250) { dx = gx; dy = gridBottom + 30; dw = 320; } // wrap on narrow screens
-    ui::panel({ dx - 8, dy - 6, dw + 12, 468 }, ui::kPanel);
+    ui::panel({ dx - 8, dy - 6, dw + 12, 568 }, ui::kPanel);
     ui::label("스킬 설정", (int)dx, (int)dy, 18, ui::kAccent); dy += 28;
 
     ui::label("이름:", (int)dx, (int)dy, 13, ui::kTextDim); dy += 18;
@@ -156,7 +156,21 @@ void Editor::drawSkillsTab() {
     static const char* fxName[4] = { "베기","볼트","대시","폭발" };
     for (int i = 0; i < 4; ++i)
         if (ui::button({ dx + 78 + i*46, dy, 44, 22 }, fxName[i])) s.effectAsset = generateEffect(i);
-    dy += 30;
+    dy += 28;
+    // effect: import an external image strip + set its frame count / loops
+    if (ui::button({ dx, dy, 260, 22 }, "이펙트 불러오기 (외부 이미지·움짤)"))
+        { pendingEffectSkill_ = &s; pendingEffectImport_ = true; }
+    dy += 26;
+    if (s.effectAsset >= 0) {
+        const AssetEntry* ae = p.assets.find(s.effectAsset);
+        int fr = ae ? ae->frames : 1, fpsv = ae ? ae->fps : 12;
+        if (ui::intStepper({ dx, dy, 126, 24 }, "프레임", fr, 1, 1, 32))
+            p.assets.setAnim(s.effectAsset, fr, fpsv);
+        if (ui::intStepper({ dx + 134, dy, 126, 24 }, "속도fps", fpsv, 1, 1, 60))
+            p.assets.setAnim(s.effectAsset, fr, fpsv);
+        dy += 27;
+    }
+    ui::intStepper({ dx, dy, 260, 24 }, "반복(회) 1·3·7…", s.effectLoops, 1, 1, 20); dy += 28;
     // sound: assign existing + generate new
     if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + name(s.soundAsset), s.soundAsset>=0))
         cycle(s.soundAsset, AssetType::Audio);

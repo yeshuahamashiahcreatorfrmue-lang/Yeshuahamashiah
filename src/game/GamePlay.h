@@ -68,7 +68,7 @@ private:
     static Vec2i rotateToFacing(int ox, int oy, int dir); // canonical up -> facing
 
     // --- projectiles & visual effects (GamePlayFx.cpp) ---
-    void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0);
+    void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0, int loops = 1);
     void updateProjectiles(float dt);
     void updateFx(float dt);
     void drawProjectiles();
