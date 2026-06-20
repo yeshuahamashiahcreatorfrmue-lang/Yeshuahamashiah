@@ -121,6 +121,38 @@ std::vector<int> Editor::sliceAsset(int assetId, int n) {
     return out;
 }
 
+// Slice the top row of a sprite sheet into square-cell frames. Detects the cell
+// size (single row of square frames, or a common 4-direction sheet) and exports
+// each cell of row 0 as a frame asset; returns the new ids (left to right).
+std::vector<int> Editor::sliceSheetRow0(int assetId) {
+    std::vector<int> out;
+    Project& p = engine_.project();
+    const AssetEntry* e = p.assets.find(assetId);
+    if (!e) return out;
+    Image img = LoadImage(p.assetFullPath(assetId).c_str());
+    if (!img.data) return out;
+    int cell = img.height;                                  // assume one row of square frames
+    if (img.height > 0 && img.width % img.height != 0 &&    // not a single square row →
+        img.height % 4 == 0 && img.width % (img.height/4) == 0)
+        cell = img.height / 4;                              // common 4-direction sheet
+    int cols = (cell > 0) ? std::max(1, img.width / cell) : 1;
+    if (cell < 1) { UnloadImage(img); return out; }
+    fs::create_directories(fs::path(p.dir) / "assets");
+    std::string base = fs::path(e->relPath).stem().string();
+    for (int i = 0; i < cols; ++i) {
+        Image f = ImageFromImage(img, { (float)(i*cell), 0, (float)cell, (float)cell });
+        int k = 1; fs::path dest;
+        do { dest = fs::path(p.dir)/"assets"/(base+"_r0c"+std::to_string(i)+(k>1?("_"+std::to_string(k)):std::string())+".png"); k++; }
+        while (fs::exists(dest));
+        ExportImage(f, dest.string().c_str());
+        UnloadImage(f);
+        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+        out.push_back(p.assets.addExisting(AssetType::Image, dest.stem().string(), rel));
+    }
+    UnloadImage(img);
+    return out;
+}
+
 void Editor::drawCharsTab() {
     Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
@@ -210,10 +242,20 @@ void Editor::drawCharsTab() {
         float dur = clip.frames.empty() ? 0 : (float)clip.frames.size() / std::max(1, clip.fps);
         DrawTextU(TextFormat("길이 %.2f초", dur), (int)bx + 268, (int)ey + 5, 12, ui::kText);
         float ey2 = ey + 30;
-        if (ui::button({ bx + 50, ey2, 60, 22 }, "비우기", false)) { clip.frames.clear(); charFrameSel_ = -1; p.save(); }
-        if (ui::button({ bx + 114, ey2, 60, 22 }, "복사"))        { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨"); }
-        if (ui::button({ bx + 178, ey2, 78, 22 }, "붙여넣기", false) && charClipSet_) { clip.frames = charClip_.frames; clip.fps = charClip_.fps; p.save(); setStatus("모션 붙여넣기"); }
-        if (ui::button({ bx + 260, ey2, 60, 22 }, "뒤집기", false)) { std::reverse(clip.frames.begin(), clip.frames.end()); p.save(); }
+        auto snap = [&]() { charUndo_ = clip; charUndoSet_ = true; };   // 1-level undo snapshot
+        if (ui::button({ bx + 50, ey2, 56, 22 }, "비우기", false)) { snap(); clip.frames.clear(); charFrameSel_ = -1; p.save(); }
+        if (ui::button({ bx + 110, ey2, 50, 22 }, "복사"))        { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨"); }
+        if (ui::button({ bx + 164, ey2, 66, 22 }, "붙여넣기", false) && charClipSet_) { snap(); clip.frames = charClip_.frames; clip.fps = charClip_.fps; p.save(); setStatus("모션 붙여넣기"); }
+        if (ui::button({ bx + 234, ey2, 56, 22 }, "뒤집기", false)) { snap(); std::reverse(clip.frames.begin(), clip.frames.end()); p.save(); }
+        if (ui::button({ bx + 294, ey2, 66, 22 }, "되돌리기", false) && charUndoSet_) { std::swap(clip, charUndo_); charFrameSel_ = -1; p.save(); setStatus("되돌리기"); }
+        if (ui::button({ bx + 364, ey2, 78, 22 }, "프레임 생성")) {     // 즉석 포즈 4프레임 생성
+            snap();
+            int sid = generateCharacter();
+            std::vector<int> fr = sliceSheetRow0(sid);
+            int add = std::min((int)fr.size(), 4);
+            for (int i = 0; i < add; ++i) clip.frames.push_back(fr[i]);
+            p.save(); setStatus(TextFormat("프레임 %d개 생성 추가", add));
+        }
         // motion preview (right edge)
         Rectangle pv = { bx + bw - 72, ey - 4, 56, 56 };
         DrawRectangleRec(pv, Color{ 20, 22, 30, 255 });
@@ -233,7 +275,7 @@ void Editor::drawCharsTab() {
             float bX = bx + 64;
             if (ui::button({ bX, py3, 50, 22 }, "앞으로") && charFrameSel_ > 0) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_-1]); charFrameSel_--; p.save(); }
             if (ui::button({ bX+56, py3, 50, 22 }, "복제")) { clip.frames.insert(clip.frames.begin()+charFrameSel_+1, clip.frames[charFrameSel_]); charFrameSel_++; p.save(); }
-            if (ui::button({ bX+112, py3, 50, 22 }, "삭제", false)) { clip.frames.erase(clip.frames.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
+            if (ui::button({ bX+112, py3, 50, 22 }, "삭제", false)) { snap(); clip.frames.erase(clip.frames.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
             if (ui::button({ bX+168, py3, 50, 22 }, "뒤로") && charFrameSel_ < (int)clip.frames.size()-1) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_+1]); charFrameSel_++; p.save(); }
         } else {
             DrawTextU("썸네일 클릭 = 프레임 선택 후 이동/복제/삭제", (int)bx + 64, (int)py3 + 4, 12, ui::kTextDim);
@@ -266,40 +308,72 @@ void Editor::drawCharsTab() {
             charSliceMode_ = !charSliceMode_;
         if (charSliceMode_) ui::intStepper({ 716, gy2 - 4, 130, 24 }, "분할수", charSliceN_, 1, 2, 16);
     }
-    float x = 20, y = gy2 + 24, cell = 92;
+    float cell = 92;
+    // mouse-wheel scroll over the library region (E)
+    float clipY = gy2 + 22;
+    Rectangle libRegion = { 0, clipY, area.width, (float)GetScreenHeight() - clipY };
+    int perRow   = std::max(1, (int)((area.width - 36) / (cell + 10)));
+    int rowsTot  = ((int)imgs.size() + perRow - 1) / perRow;
+    float contentH = rowsTot * (cell + 42) + 8;
+    int maxScroll  = std::max(0, (int)(contentH - libRegion.height));
+    float wheel = GetMouseWheelMove();
+    if (wheel != 0 && ui::mouseIn(libRegion)) charLibScroll_ -= (int)(wheel * 48);
+    charLibScroll_ = std::max(0, std::min(charLibScroll_, maxScroll));
+
+    BeginScissorMode(0, (int)clipY, (int)area.width, GetScreenHeight() - (int)clipY);
+    float x = 20, y = gy2 + 26 - charLibScroll_;
     for (auto* a : imgs) {
         if (building && charLibFilter_) {                 // show only frame-sized images
             const Texture2D& tt = engine_.assetTexture(a->id);
             if (tt.height > 64) continue;
         }
-        ui::panel({ x, y, cell, cell + 36 }, (a->id == p.playerSprite && p.playerCharId < 0) ? ui::kPanelHi : ui::kPanel);
-        const Texture2D& tex = engine_.assetTexture(a->id);
-        float sc = std::min((cell-10) / std::max(1, tex.width), 58.0f / std::max(1, tex.height));
-        DrawTexturePro(tex, { 0,0,(float)tex.width,(float)tex.height },
-                       { x + (cell - tex.width*sc)/2, y + 5, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
-        DrawTextU(a->name.c_str(), (int)x + 5, (int)(y + cell - 26), 11, ui::kText);
-        Rectangle clickArea = { x, y, cell, cell - 18 };
-        if (building && ui::mouseIn(clickArea) && lclick) {
-            auto& mf = db.characters[charDefSel_].motions[charMotionTab_].frames;
-            if (charSliceMode_) {
-                int n = (a->frames > 1) ? a->frames : charSliceN_;
-                std::vector<int> sl = sliceAsset(a->id, n);
-                for (int id : sl) mf.push_back(id);
-                setStatus(TextFormat("%s: %d프레임 분할 추가", kMotionNames[charMotionTab_], (int)sl.size()));
-            } else {
-                mf.push_back(a->id);
-                setStatus(std::string(kMotionNames[charMotionTab_]) + " 프레임 추가: " + a->name);
+        bool vis = !(y + cell + 36 < clipY || y > GetScreenHeight());
+        if (vis) {
+            ui::panel({ x, y, cell, cell + 36 }, (a->id == p.playerSprite && p.playerCharId < 0) ? ui::kPanelHi : ui::kPanel);
+            const Texture2D& tex = engine_.assetTexture(a->id);
+            float sc = std::min((cell-10) / std::max(1, tex.width), 58.0f / std::max(1, tex.height));
+            DrawTexturePro(tex, { 0,0,(float)tex.width,(float)tex.height },
+                           { x + (cell - tex.width*sc)/2, y + 5, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
+            DrawTextU(a->name.c_str(), (int)x + 5, (int)(y + cell - 26), 11, ui::kText);
+            Rectangle clickArea = { x, y, cell, cell - 18 };
+            if (building && ui::mouseIn(clickArea) && lclick) {
+                MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
+                charUndo_ = mc; charUndoSet_ = true;       // snapshot for 되돌리기
+                auto& mf = mc.frames;
+                int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
+                if (charSliceMode_) {                      // B: insert at selected frame
+                    int n = (a->frames > 1) ? a->frames : charSliceN_;
+                    std::vector<int> sl = sliceAsset(a->id, n);
+                    mf.insert(mf.begin() + pos, sl.begin(), sl.end());
+                    if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
+                    setStatus(TextFormat("%s: %d프레임 분할 추가", kMotionNames[charMotionTab_], (int)sl.size()));
+                } else {
+                    mf.insert(mf.begin() + pos, a->id);
+                    if (charFrameSel_ >= 0) charFrameSel_++;
+                    setStatus(std::string(kMotionNames[charMotionTab_]) + " 프레임 추가: " + a->name);
+                }
+                p.save();
             }
-            p.save();
-        }
-        if (ui::button({ x + 5, y + cell - 14, cell - 10, 20 }, "시트P")) {
-            p.playerSprite = a->id; p.playerCharId = -1;
-            if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
-            p.save(); setStatus("시트 플레이어 설정.");
+            if (ui::button({ x + 5, y + cell - 14, cell - 10, 20 }, "시트P")) {
+                p.playerSprite = a->id; p.playerCharId = -1;
+                if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
+                p.save(); setStatus("시트 플레이어 설정.");
+            }
+            if (building && ui::button({ x + 5, y + cell + 8, cell - 10, 20 }, "자동구성")) {  // D: sheet → walk+attack
+                CharacterDef& c = db.characters[charDefSel_];
+                std::vector<int> fr = sliceSheetRow0(a->id);
+                int w = std::min((int)fr.size(), 4);
+                c.motions[MO_Walk].frames.assign(fr.begin(), fr.begin() + w);
+                c.motions[MO_Walk].loop = true;
+                c.motions[MO_Attack].frames.assign(fr.begin() + w, fr.end());
+                charFrameSel_ = -1; p.save();
+                setStatus(TextFormat("시트 자동구성: 걷기%d+공격%d", w, (int)fr.size() - w));
+            }
         }
         x += cell + 10;
         if (x + cell > area.width - 16) { x = 20; y += cell + 42; }
     }
+    EndScissorMode();
     if (imgs.empty())
         ui::label("(이미지 없음 - 시트 캐릭터 생성 또는 이미지를 드롭하세요)", 20, (int)gy2 + 30, 16, ui::kTextDim);
 }

@@ -38,6 +38,7 @@ private:
     int  generateEffect(int style);    // make + register a skill-effect sheet
     int  generateSound(int style);     // make + register a skill sound effect
     std::vector<int> sliceAsset(int assetId, int n); // split an image into n frame assets
+    std::vector<int> sliceSheetRow0(int assetId);    // slice the top row of a sheet into frames
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
@@ -77,6 +78,9 @@ private:
     MotionClip charClip_;             // motion clipboard (copy/paste)
     bool charClipSet_ = false;        // clipboard has content
     bool charLibFilter_ = false;      // library shows only character-frame images
+    MotionClip charUndo_;             // 1-level undo snapshot of the active motion
+    bool charUndoSet_ = false;        // undo snapshot available
+    int  charLibScroll_ = 0;          // library grid scroll offset (px)
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to
