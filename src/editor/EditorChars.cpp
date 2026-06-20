@@ -166,223 +166,234 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
 }
 
 void Editor::drawCharsTab() {
-    if (charBrowse_) { drawImageBrowser(); return; }     // modal: import your own image files
-    if (charSkillEdit_) { drawCharSkillEditor(); return; } // modal: this character's skill behaviour
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
-    DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
+    if (charBrowse_) { drawImageBrowser(); return; }        // modal: import image files
+    if (charSkillEdit_) { drawCharSkillEditor(); return; }   // modal: this character's skill
+    float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
+    DrawRectangleRec({ 0, kToolbarH, W, H - kToolbarH }, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
     Database& db = p.database;
     bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    handleAssetDrop();   // drag&drop still works anywhere on this tab
 
-    ui::label("캐릭터 제작", 20, (int)kToolbarH + 10, 22, ui::kAccent);
-    // quick generators + sheet-player frame config
-    if (ui::button({ 20, kToolbarH + 38, 150, 26 }, "+ 시트 캐릭터")) generateCharacter();
-    static const char* fxBtn[4] = { "이펙트:베기", "볼트", "대시", "폭발" };
-    for (int s = 0; s < 4; ++s)
-        if (ui::button({ 178.0f + s*92, kToolbarH + 38, 88, 26 }, fxBtn[s])) generateEffect(s);
-    ui::intStepper({ 560, kToolbarH + 38, 150, 26 }, "시트걷기", p.playerFrames, 1, 4, 7);
-    ui::intStepper({ 718, kToolbarH + 38, 150, 26 }, "시트공격", p.playerAtkFrames, 1, 0, 4);
-    // import your own images without depending on drag&drop
-    if (ui::button({ 876, kToolbarH + 38, 168, 26 }, "+ 내 이미지 불러오기", true)) { charBrowse_ = true; browseScroll_ = 0; return; }
-    handleAssetDrop(); // drag&drop new images/sheets to register them
+    ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
+
+    // ---- 3-column layout: [캐릭터] [모션·프레임·재생] [이미지 소스] ----
+    float pad = 10;
+    float panelTop = kToolbarH + 36, panelBot = H - 10, panelH = panelBot - panelTop;
+    float leftW = 230, rightW = std::min(380.0f, std::max(300.0f, W * 0.30f));
+    float leftX = 10, midX = leftX + leftW + pad;
+    float rightX = W - rightW - 10, midW = rightX - midX - pad;
+    ui::panel({ leftX,  panelTop, leftW,  panelH }, ui::kPanel);
+    ui::panel({ midX,   panelTop, midW,   panelH }, ui::kPanel);
+    ui::panel({ rightX, panelTop, rightW, panelH }, ui::kPanel);
 
     auto imgs = p.assets.byType(AssetType::Image);
-
-    // ============ custom multi-motion character builder ============
-    float bx = 16, by = kToolbarH + 72, bw = area.width - 32, bh = 318;
-    ui::panel({ bx, by, bw, bh }, ui::kPanel);
-    ui::label("커스텀 캐릭터 빌더", (int)bx + 12, (int)by + 8, 17, ui::kAccent);
-    DrawTextU("순서:  1. 위 '내 이미지 불러오기'로 등록   2. '+ 새' 캐릭터   3. 모션 탭 선택   "
-              "4. 아래 라이브러리 클릭 = 프레임 추가   5. '플레이어로 설정'",
-              (int)bx + 170, (int)by + 11, 12, ui::kTextDim);
-
-    // ---- [1] 캐릭터: 목록 + 새로 만들기 ----
-    float cy = by + 32;
-    DrawTextU("캐릭터", (int)bx + 12, (int)cy + 5, 12, ui::kTextDim);
-    if (ui::button({ bx + 62, cy, 64, 24 }, "+ 새")) {
-        CharacterDef cd; cd.id = (int)db.characters.size() + 1;
-        cd.name = "캐릭터" + std::to_string(cd.id); cd.motions[MO_Walk].loop = true;
-        db.characters.push_back(cd); charDefSel_ = (int)db.characters.size() - 1; charFrameSel_ = -1; p.save();
-    }
-    float clx = bx + 134;
-    for (int i = 0; i < (int)db.characters.size() && clx < bx + bw - 108; ++i) {
-        if (ui::button({ clx, cy, 102, 24 }, db.characters[i].name, charDefSel_ == i)) {
-            charDefSel_ = i; charDefNameFocus_ = false; charFrameSel_ = -1;
-        }
-        clx += 108;
-    }
-
     if (charDefSel_ < 0 && !db.characters.empty()) charDefSel_ = 0;
     bool building = (charDefSel_ >= 0 && charDefSel_ < (int)db.characters.size());
+
+    // ============================ LEFT: 캐릭터 ============================
+    {
+        float x = leftX + 10, w = leftW - 20;
+        ui::label("캐릭터", (int)x, (int)panelTop + 8, 15, ui::kAccent);
+        float listTop = panelTop + 32, listH = panelH - 252;
+        Rectangle listReg = { leftX, listTop, leftW, listH };
+        int rows = (int)db.characters.size();
+        int maxLS = std::max(0, (int)(rows * 30 + 4 - listH));
+        if (GetMouseWheelMove() != 0 && ui::mouseIn(listReg)) charListScroll_ -= (int)(GetMouseWheelMove() * 40);
+        charListScroll_ = std::max(0, std::min(charListScroll_, maxLS));
+        BeginScissorMode((int)leftX, (int)listTop, (int)leftW, (int)listH);
+        float ly = listTop - charListScroll_;
+        for (int i = 0; i < rows; ++i) {
+            if (ly + 28 > listTop && ly < listTop + listH)
+                if (ui::button({ x, ly, w, 26 }, db.characters[i].name, charDefSel_ == i)) {
+                    charDefSel_ = i; charDefNameFocus_ = false; charFrameSel_ = -1;
+                }
+            ly += 30;
+        }
+        EndScissorMode();
+        if (rows == 0) DrawTextU("(없음)", (int)x, (int)listTop + 6, 13, ui::kTextDim);
+
+        float by = listTop + listH + 6;
+        if (ui::button({ x, by, w, 30 }, "+ 새 캐릭터")) {
+            CharacterDef cd; cd.id = (int)db.characters.size() + 1;
+            cd.name = "캐릭터" + std::to_string(cd.id); cd.motions[MO_Walk].loop = true;
+            db.characters.push_back(cd); charDefSel_ = (int)db.characters.size() - 1;
+            charFrameSel_ = -1; charMotionTab_ = 0; p.save(); building = true;
+        }
+        by += 38;
+        DrawLine((int)x, (int)by, (int)(x + w), (int)by, ui::kPanelHi); by += 8;
+        if (building) {
+            CharacterDef& cd = db.characters[charDefSel_];
+            DrawTextU("이름", (int)x, (int)by + 5, 12, ui::kTextDim);
+            Rectangle nf = { x + 42, by, w - 42, 26 };
+            if (ui::mouseIn(nf) && lclick) charDefNameFocus_ = true;
+            else if (lclick && !ui::mouseIn(nf)) charDefNameFocus_ = false;
+            ui::textField(nf, cd.name, charDefNameFocus_, 20); by += 32;
+            bool isP = (p.playerCharId == cd.id);
+            if (ui::button({ x, by, w, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
+                p.playerCharId = cd.id; p.save();
+                setStatus(cd.motions[MO_Walk].frames.empty()
+                    ? "주의: '걷기' 모션이 비어 인게임에서 안 보일 수 있습니다."
+                    : "이 캐릭터를 플레이어로 설정.");
+            }
+            by += 32;
+            if (ui::button({ x, by, w/2 - 2, 26 }, "복제")) {
+                CharacterDef cp = cd; cp.id = (int)db.characters.size() + 1; cp.name = cd.name + " 사본";
+                db.characters.push_back(cp); charDefSel_ = (int)db.characters.size() - 1; charFrameSel_ = -1; p.save(); return;
+            }
+            if (ui::button({ x + w/2 + 2, by, w/2 - 2, 26 }, "삭제")) {
+                if (p.playerCharId == cd.id) p.playerCharId = -1;
+                db.characters.erase(db.characters.begin() + charDefSel_);
+                charDefSel_ = -1; charFrameSel_ = -1; p.save(); return;
+            }
+            by += 34;
+        }
+        DrawLine((int)x, (int)by, (int)(x + w), (int)by, ui::kPanelHi); by += 8;
+        DrawTextU("빠른 생성 도구", (int)x, (int)by + 2, 12, ui::kTextDim); by += 20;
+        if (ui::button({ x, by, w, 26 }, "+ 시트 캐릭터 자동 생성")) generateCharacter();
+        by += 30;
+        ui::intStepper({ x, by, w, 24 }, "시트 걷기수", p.playerFrames, 1, 4, 7); by += 27;
+        ui::intStepper({ x, by, w, 24 }, "시트 공격수", p.playerAtkFrames, 1, 0, 4);
+    }
+
+    // ================== CENTER: 모션 · 프레임 · 재생 ==================
     if (!building) {
-        DrawTextU("'+ 새'로 캐릭터를 만든 뒤, 모션 탭을 고르고 아래 라이브러리 이미지를 클릭해 프레임을 채우세요.",
-                 (int)bx + 12, (int)by + 84, 14, ui::kTextDim);
+        ui::label("← 왼쪽에서 '+ 새 캐릭터'를 눌러 시작하세요.", (int)midX + 14, (int)panelTop + 14, 15, ui::kTextDim);
     } else {
         CharacterDef& cd = db.characters[charDefSel_];
-
-        // ---- [2] 캐릭터 속성: 이름 / 플레이어 / 복제 / 삭제 ----
-        float ry = cy + 30;
-        DrawTextU("이름", (int)bx + 12, (int)ry + 5, 12, ui::kTextDim);
-        Rectangle nf = { bx + 50, ry, 188, 24 };
-        if (ui::mouseIn(nf) && lclick) charDefNameFocus_ = true;
-        else if (lclick && !ui::mouseIn(nf)) charDefNameFocus_ = false;
-        ui::textField(nf, cd.name, charDefNameFocus_, 20);
-        bool isP = (p.playerCharId == cd.id);
-        if (ui::button({ bx + 248, ry, 150, 24 }, isP ? "플레이어 (현재)" : "플레이어로 설정", isP)) {
-            p.playerCharId = cd.id; p.save();
-            setStatus(cd.motions[MO_Walk].frames.empty()
-                ? "주의: '걷기' 모션이 비어 인게임에서 안 보일 수 있습니다."
-                : "커스텀 캐릭터를 플레이어로 설정.");
-        }
-        if (ui::button({ bx + 404, ry, 56, 24 }, "복제", false)) {
-            CharacterDef cp = cd; cp.id = (int)db.characters.size() + 1; cp.name = cd.name + " 사본";
-            db.characters.push_back(cp); charDefSel_ = (int)db.characters.size()-1; charFrameSel_ = -1; p.save(); return;
-        }
-        if (ui::button({ bx + 466, ry, 56, 24 }, "삭제", false)) {
-            if (p.playerCharId == cd.id) p.playerCharId = -1;
-            db.characters.erase(db.characters.begin() + charDefSel_);
-            charDefSel_ = -1; charFrameSel_ = -1; p.save(); return;
-        }
-
-        // ---- [3] 모션 탭 ----
-        float ty = ry + 30;
-        DrawTextU("모션", (int)bx + 12, (int)ty + 6, 12, ui::kTextDim);
+        float x = midX + 10, w = midW - 20;
+        DrawTextU("모션 (탭 선택)", (int)x, (int)panelTop + 6, 13, ui::kTextDim);
+        float tabsY = panelTop + 26, tw = w / MO_COUNT;
         for (int m = 0; m < MO_COUNT; ++m) {
             std::string lbl = std::string(kMotionNames[m]) + "(" + std::to_string((int)cd.motions[m].frames.size()) + ")";
-            if (ui::button({ bx + 50 + m*86, ty, 82, 26 }, lbl, charMotionTab_ == m)) { charMotionTab_ = m; charFrameSel_ = -1; }
+            if (ui::button({ x + m*tw, tabsY, tw - 3, 28 }, lbl, charMotionTab_ == m)) { charMotionTab_ = m; charFrameSel_ = -1; }
         }
         MotionClip& clip = cd.motions[charMotionTab_];
         if (charFrameSel_ >= (int)clip.frames.size()) charFrameSel_ = -1;
+        auto snap = [&]() { charUndo_ = clip; charUndoSet_ = true; };
 
-        // ---- [4] 모션 편집: fps / 반복 / 길이 / 비우기·복사·붙여넣기·뒤집기 + 미리보기 ----
-        float ey = ty + 34;
-        ui::intStepper({ bx + 50, ey, 126, 24 }, "fps", clip.fps, 1, 1, 30);
-        if (ui::button({ bx + 182, ey, 78, 24 }, clip.loop ? "반복: 켜짐" : "반복: 꺼짐", clip.loop)) { clip.loop = !clip.loop; p.save(); }
+        // ---- preview box + per-motion settings ----
+        float rowY = tabsY + 36;
+        const float PVS = 150;
+        Rectangle pv = { x, rowY, PVS, PVS };
+        DrawRectangleRec(pv, Color{ 16, 18, 26, 255 });
+        DrawRectangleLinesEx(pv, 2, ui::kPanelHi);
+        DrawTextU("재생", (int)pv.x + 5, (int)pv.y + 4, 12, ui::kAccent);
+        if (!clip.frames.empty()) {
+            int n = (int)clip.frames.size();
+            int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;
+            const Texture2D& t = engine_.assetTexture(clip.frames[fi]);
+            float sc = std::min((PVS - 22) / std::max(1, t.width), (PVS - 22) / std::max(1, t.height));
+            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
+                           { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+            DrawTextU(TextFormat("%d/%d", fi+1, n), (int)pv.x + PVS - 46, (int)pv.y + 5, 14, ui::kGood);
+        } else {
+            DrawTextU("프레임 없음", (int)pv.x + 32, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
+        }
+        float sx = pv.x + PVS + 14, sw = x + w - sx, sy = rowY;
+        ui::intStepper({ sx, sy, std::min(220.0f, sw), 26 }, "fps", clip.fps, 1, 1, 30); sy += 32;
+        if (ui::button({ sx, sy, std::min(220.0f, sw), 26 }, clip.loop ? "반복 재생: 켜짐" : "반복 재생: 꺼짐", clip.loop)) { clip.loop = !clip.loop; p.save(); }
+        sy += 32;
         float dur = clip.frames.empty() ? 0 : (float)clip.frames.size() / std::max(1, clip.fps);
-        DrawTextU(TextFormat("길이 %.2f초", dur), (int)bx + 268, (int)ey + 5, 12, ui::kText);
-        // skill-capable motions (공격/스킬1/스킬2/궁극기) get a per-character skill editor
+        DrawTextU(TextFormat("길이 %.2f초 · %d프레임", dur, (int)clip.frames.size()), (int)sx, (int)sy + 3, 13, ui::kText);
+        sy += 28;
         int castSlot = castSlotForMotion(charMotionTab_);
         if (castSlot >= 0) {
             static const char* slotKey[4] = { "Z", "X", "C", "V" };
-            bool hasSkill = false;
-            for (auto& sk : cd.skills) if (sk.slot == castSlot) { hasSkill = true; break; }
-            if (ui::button({ bx + 360, ey, 256, 24 },
-                           TextFormat("[%s] 스킬 동작 편집 (사거리/위력/효과/사운드)", slotKey[castSlot]), hasSkill))
-                { charSkillEdit_ = true; return; }
-        }
-        float ey2 = ey + 30;
-        auto snap = [&]() { charUndo_ = clip; charUndoSet_ = true; };   // 1-level undo snapshot
-        if (ui::button({ bx + 50, ey2, 56, 22 }, "비우기", false)) { snap(); clip.frames.clear(); charFrameSel_ = -1; p.save(); }
-        if (ui::button({ bx + 110, ey2, 50, 22 }, "복사"))        { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨"); }
-        if (ui::button({ bx + 164, ey2, 66, 22 }, "붙여넣기", false) && charClipSet_) { snap(); clip.frames = charClip_.frames; clip.fps = charClip_.fps; p.save(); setStatus("모션 붙여넣기"); }
-        if (ui::button({ bx + 234, ey2, 56, 22 }, "뒤집기", false)) { snap(); std::reverse(clip.frames.begin(), clip.frames.end()); p.save(); }
-        if (ui::button({ bx + 294, ey2, 66, 22 }, "되돌리기", false) && charUndoSet_) { std::swap(clip, charUndo_); charFrameSel_ = -1; p.save(); setStatus("되돌리기"); }
-        if (ui::button({ bx + 364, ey2, 78, 22 }, "프레임 생성")) {     // 즉석 포즈 4프레임 생성
-            snap();
-            int sid = generateCharacter();
-            std::vector<int> fr = sliceSheetRow0(sid);
-            int add = std::min((int)fr.size(), 4);
-            for (int i = 0; i < add; ++i) clip.frames.push_back(fr[i]);
-            p.save(); setStatus(TextFormat("프레임 %d개 생성 추가", add));
-        }
-        // motion preview (right edge) — large, always-cycling so you can SEE the
-        // motion play even for one-shot (non-loop) motions like 공격/궁극기.
-        const float PVS = 116;
-        Rectangle pv = { bx + bw - PVS - 8, ey - 6, PVS, PVS };
-        DrawTextU("재생 미리보기", (int)pv.x, (int)pv.y - 16, 13, ui::kAccent);
-        DrawRectangleRec(pv, Color{ 16, 18, 26, 255 });
-        DrawRectangleLinesEx(pv, 2, ui::kPanelHi);
-        if (!clip.frames.empty()) {
-            int n = (int)clip.frames.size();
-            int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;   // always cycles in preview
-            const Texture2D& t = engine_.assetTexture(clip.frames[fi]);
-            float sc = std::min((PVS-16) / std::max(1, t.width), (PVS-16) / std::max(1, t.height));
-            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
-                           { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
-            DrawTextU(TextFormat("%d / %d", fi+1, n), (int)pv.x + 5, (int)pv.y + 4, 14, ui::kGood);
-            DrawTextU(TextFormat("%dfps · %s", clip.fps, clip.loop ? "반복" : "1회"),
-                      (int)pv.x, (int)(pv.y + PVS + 2), 12, ui::kTextDim);
-        } else {
-            DrawTextU("프레임 없음", (int)pv.x + 14, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
-            DrawTextU("아래 라이브러리 클릭", (int)pv.x, (int)(pv.y + PVS + 2), 12, ui::kTextDim);
+            bool hasSkill = false; for (auto& sk : cd.skills) if (sk.slot == castSlot) { hasSkill = true; break; }
+            if (ui::button({ sx, sy, std::min(260.0f, sw), 28 }, TextFormat("[%s] 스킬 동작 편집", slotKey[castSlot]), hasSkill)) { charSkillEdit_ = true; return; }
         }
 
-        // ---- [5] 프레임: 선택 후 이동/복제/삭제 + 썸네일 ----
-        float py3 = ey2 + 30;
-        DrawTextU("프레임", (int)bx + 12, (int)py3 + 4, 12, ui::kTextDim);
+        // ---- frame timeline ----
+        float tlY = rowY + PVS + 12;
+        DrawTextU("프레임 타임라인", (int)x, (int)tlY, 13, ui::kAccent); tlY += 22;
+        if (ui::button({ x, tlY, 74, 24 }, "전체 비우기")) { snap(); clip.frames.clear(); charFrameSel_ = -1; p.save(); }
+        if (ui::button({ x + 78, tlY, 60, 24 }, "되돌리기") && charUndoSet_) { std::swap(clip, charUndo_); charFrameSel_ = -1; p.save(); }
+        if (ui::button({ x + 142, tlY, 50, 24 }, "복사")) { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨"); }
+        if (ui::button({ x + 196, tlY, 64, 24 }, "붙여넣기") && charClipSet_) { snap(); clip.frames = charClip_.frames; clip.fps = charClip_.fps; p.save(); }
+        if (ui::button({ x + 264, tlY, 56, 24 }, "뒤집기")) { snap(); std::reverse(clip.frames.begin(), clip.frames.end()); p.save(); }
+        tlY += 28;
         if (charFrameSel_ >= 0) {
-            float bX = bx + 64;
-            if (ui::button({ bX, py3, 50, 22 }, "앞으로") && charFrameSel_ > 0) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_-1]); charFrameSel_--; p.save(); }
-            if (ui::button({ bX+56, py3, 50, 22 }, "복제")) { clip.frames.insert(clip.frames.begin()+charFrameSel_+1, clip.frames[charFrameSel_]); charFrameSel_++; p.save(); }
-            if (ui::button({ bX+112, py3, 50, 22 }, "삭제", false)) { snap(); clip.frames.erase(clip.frames.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
-            if (ui::button({ bX+168, py3, 50, 22 }, "뒤로") && charFrameSel_ < (int)clip.frames.size()-1) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_+1]); charFrameSel_++; p.save(); }
+            if (ui::button({ x, tlY, 60, 24 }, "◀ 앞으로") && charFrameSel_ > 0) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_-1]); charFrameSel_--; p.save(); }
+            if (ui::button({ x + 64, tlY, 50, 24 }, "복제")) { clip.frames.insert(clip.frames.begin()+charFrameSel_+1, clip.frames[charFrameSel_]); charFrameSel_++; p.save(); }
+            if (ui::button({ x + 118, tlY, 50, 24 }, "삭제")) { snap(); clip.frames.erase(clip.frames.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
+            if (ui::button({ x + 172, tlY, 60, 24 }, "뒤로 ▶") && charFrameSel_ < (int)clip.frames.size()-1) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_+1]); charFrameSel_++; p.save(); }
         } else {
-            DrawTextU("썸네일 클릭 = 프레임 선택 후 이동/복제/삭제", (int)bx + 64, (int)py3 + 4, 12, ui::kTextDim);
+            DrawTextU("썸네일 클릭 = 선택 후 이동 / 복제 / 삭제", (int)x, (int)tlY + 5, 12, ui::kTextDim);
         }
-        float frx0 = bx + 12, fry0 = py3 + 26;
-        int perRow = std::max(1, (int)((bx + bw - 24 - frx0) / 40));
+        tlY += 30;
+        float cell = 58, gridTop = tlY, gridH = panelBot - 8 - gridTop;
+        int per = std::max(1, (int)(w / (cell + 8)));
+        int frows = ((int)clip.frames.size() + per - 1) / per;
+        int maxFS = std::max(0, (int)(frows * (cell + 8) + 4 - gridH));
+        Rectangle gReg = { midX, gridTop, midW, gridH };
+        if (GetMouseWheelMove() != 0 && ui::mouseIn(gReg)) charFrameScroll_ -= (int)(GetMouseWheelMove() * 40);
+        charFrameScroll_ = std::max(0, std::min(charFrameScroll_, maxFS));
+        BeginScissorMode((int)midX, (int)gridTop, (int)midW, (int)gridH);
         for (int i = 0; i < (int)clip.frames.size(); ++i) {
-            Rectangle fr = { frx0 + (i % perRow)*40, fry0 + (i / perRow)*40, 36, 36 };
-            if (fr.y + 36 > by + bh - 4) break;
+            float fx = x + (i % per) * (cell + 8);
+            float fy = gridTop + (i / per) * (cell + 8) - charFrameScroll_;
+            if (fy + cell < gridTop || fy > panelBot) continue;
+            Rectangle fr = { fx, fy, cell, cell };
             DrawRectangleRec(fr, ui::kPanelHi);
             const Texture2D& t = engine_.assetTexture(clip.frames[i]);
-            float sc = std::min(32.0f / std::max(1, t.width), 32.0f / std::max(1, t.height));
+            float sc = std::min((cell - 8) / std::max(1, t.width), (cell - 8) / std::max(1, t.height));
             DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
-                           { fr.x + (36 - t.width*sc)/2, fr.y + (36 - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+                           { fr.x + (cell - t.width*sc)/2, fr.y + (cell - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
             DrawRectangleLinesEx(fr, 2, charFrameSel_ == i ? ui::kAccent : Fade(BLACK, 0.5f));
-            DrawTextU(TextFormat("%d", i+1), (int)fr.x + 1, (int)fr.y + 1, 10, ui::kTextDim);
+            DrawTextU(TextFormat("%d", i+1), (int)fr.x + 2, (int)fr.y + 2, 11, ui::kGood);
             if (ui::mouseIn(fr) && lclick) charFrameSel_ = i;
         }
+        EndScissorMode();
+        if (clip.frames.empty())
+            DrawTextU("→ 오른쪽 '이미지 소스'에서 이미지를 클릭해 채우세요.", (int)x, (int)gridTop + 8, 13, ui::kTextDim);
     }
 
-    // ============ image library (frame source) ============
-    float gy2 = by + bh + 8;
-    ui::label(building ? TextFormat("이미지 라이브러리 — 클릭하면 '%s' 모션에 프레임으로 추가됩니다", kMotionNames[charMotionTab_])
-                       : "이미지 라이브러리",
-             20, (int)gy2, 16, ui::kAccent);
-    if (building) {
-        if (ui::button({ 430, gy2 - 4, 120, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_))
-            charLibFilter_ = !charLibFilter_;
-        if (ui::button({ 558, gy2 - 4, 150, 24 },
-                       charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_))
-            charSliceMode_ = !charSliceMode_;
-        if (charSliceMode_) ui::intStepper({ 716, gy2 - 4, 130, 24 }, "분할수", charSliceN_, 1, 2, 16);
-    }
-    float cell = 92;
-    // mouse-wheel scroll over the library region (E)
-    float clipY = gy2 + 22;
-    Rectangle libRegion = { 0, clipY, area.width, (float)GetScreenHeight() - clipY };
-    int perRow   = std::max(1, (int)((area.width - 36) / (cell + 10)));
-    int rowsTot  = ((int)imgs.size() + perRow - 1) / perRow;
-    float contentH = rowsTot * (cell + 42) + 8;
-    int maxScroll  = std::max(0, (int)(contentH - libRegion.height));
-    float wheel = GetMouseWheelMove();
-    if (wheel != 0 && ui::mouseIn(libRegion)) charLibScroll_ -= (int)(wheel * 48);
-    charLibScroll_ = std::max(0, std::min(charLibScroll_, maxScroll));
+    // ====================== RIGHT: 이미지 소스 ======================
+    {
+        float x = rightX + 10, w = rightW - 20;
+        ui::label("이미지 소스", (int)x, (int)panelTop + 8, 15, ui::kAccent);
+        if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { charBrowse_ = true; browseScroll_ = 0; return; }
+        float ry = panelTop + 66;
+        if (ui::button({ x, ry, w/2 - 2, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_)) charLibFilter_ = !charLibFilter_;
+        if (ui::button({ x + w/2 + 2, ry, w/2 - 2, 24 }, charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_)) charSliceMode_ = !charSliceMode_;
+        ry += 28;
+        if (charSliceMode_) { ui::intStepper({ x, ry, w, 24 }, "분할수", charSliceN_, 1, 2, 16); ry += 28; }
+        DrawTextU(building ? TextFormat("클릭 → '%s' 모션에 추가 (움짤은 통째로)", kMotionNames[charMotionTab_])
+                           : "먼저 캐릭터를 선택/생성하세요",
+                  (int)x, (int)ry, 12, building ? ui::kAccentHi : ui::kTextDim);
+        ry += 20;
 
-    BeginScissorMode(0, (int)clipY, (int)area.width, GetScreenHeight() - (int)clipY);
-    float x = 20, y = gy2 + 26 - charLibScroll_;
-    for (auto* a : imgs) {
-        if (building && charLibFilter_) {                 // show only frame-sized images
-            const Texture2D& tt = engine_.assetTexture(a->id);
-            if (tt.height > 64) continue;
-        }
-        bool vis = !(y + cell + 36 < clipY || y > GetScreenHeight());
-        if (vis) {
-            ui::panel({ x, y, cell, cell + 36 }, (a->id == p.playerSprite && p.playerCharId < 0) ? ui::kPanelHi : ui::kPanel);
+        float gridTop = ry, gridH = panelBot - 8 - gridTop;
+        float cell = (w - 8) / 2, cardH = cell + 34;
+        int visN = 0;
+        for (auto* a : imgs) { if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; } visN++; }
+        int grows = (visN + 1) / 2;
+        int maxGS = std::max(0, (int)(grows * (cardH + 8) + 4 - gridH));
+        Rectangle gReg = { rightX, gridTop, rightW, gridH };
+        if (GetMouseWheelMove() != 0 && ui::mouseIn(gReg)) charLibScroll_ -= (int)(GetMouseWheelMove() * 44);
+        charLibScroll_ = std::max(0, std::min(charLibScroll_, maxGS));
+        BeginScissorMode((int)rightX, (int)gridTop, (int)rightW, (int)gridH);
+        int idx = 0;
+        for (auto* a : imgs) {
+            if (building && charLibFilter_) { const Texture2D& tt = engine_.assetTexture(a->id); if (tt.height > 64) continue; }
+            int col = idx % 2, row = idx / 2; idx++;
+            float cx = x + col * (cell + 8);
+            float cy = gridTop + row * (cardH + 8) - charLibScroll_;
+            if (cy + cardH < gridTop || cy > panelBot) continue;
+            ui::panel({ cx, cy, cell, cardH }, ui::kPanelHi);
             const Texture2D& tex = engine_.assetTexture(a->id);
-            float sc = std::min((cell-10) / std::max(1, tex.width), 58.0f / std::max(1, tex.height));
+            float sc = std::min((cell - 12) / std::max(1, tex.width), (cell - 14) / std::max(1, tex.height));
             DrawTexturePro(tex, { 0,0,(float)tex.width,(float)tex.height },
-                           { x + (cell - tex.width*sc)/2, y + 5, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
-            DrawTextU(a->name.c_str(), (int)x + 5, (int)(y + cell - 26), 11, ui::kText);
-            Rectangle clickArea = { x, y, cell, cell - 18 };
+                           { cx + (cell - tex.width*sc)/2, cy + 4, tex.width*sc, tex.height*sc }, {0,0}, 0, WHITE);
+            if (a->frames > 1) DrawTextU(TextFormat("움짤%d", a->frames), (int)cx + 4, (int)cy + 4, 11, ui::kGood);
+            DrawTextU(a->name.c_str(), (int)cx + 4, (int)(cy + cardH - 30), 10, ui::kText);
+            Rectangle clickArea = { cx, cy, cell, cardH - 18 };
             if (building && ui::mouseIn(clickArea) && lclick) {
                 MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
-                charUndo_ = mc; charUndoSet_ = true;       // snapshot for 되돌리기
+                charUndo_ = mc; charUndoSet_ = true;
                 auto& mf = mc.frames;
                 int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
-                // Animated assets (움짤 GIF / sprite-strips) auto-expand into all
-                // their frames so one click turns a 움짤 into a whole motion.
                 int n = (a->frames > 1) ? a->frames : (charSliceMode_ ? charSliceN_ : 1);
                 if (n > 1) {
                     std::vector<int> sl = sliceAsset(a->id, n);
@@ -396,29 +407,21 @@ void Editor::drawCharsTab() {
                 }
                 p.save();
             }
-            if (ui::button({ x + 5, y + cell - 14, cell - 10, 20 }, "시트P")) {
-                p.playerSprite = a->id; p.playerCharId = -1;
-                if (a->name.rfind("char_", 0) == 0) { p.playerFrames = 4; p.playerAtkFrames = 2; }
-                p.save(); setStatus("시트 플레이어 설정.");
-            }
-            if (building && ui::button({ x + 5, y + cell + 8, cell - 10, 20 }, "자동구성")) {  // D: sheet → walk+attack
+            if (building && ui::button({ cx + 4, cy + cardH - 16, cell - 8, 14 }, "자동구성")) {
                 CharacterDef& c = db.characters[charDefSel_];
                 std::vector<int> fr = sliceSheetRow0(a->id);
-                int w = std::min((int)fr.size(), 4);
-                c.motions[MO_Walk].frames.assign(fr.begin(), fr.begin() + w);
+                int wlk = std::min((int)fr.size(), 4);
+                c.motions[MO_Walk].frames.assign(fr.begin(), fr.begin() + wlk);
                 c.motions[MO_Walk].loop = true;
-                c.motions[MO_Attack].frames.assign(fr.begin() + w, fr.end());
+                c.motions[MO_Attack].frames.assign(fr.begin() + wlk, fr.end());
                 charFrameSel_ = -1; p.save();
-                setStatus(TextFormat("시트 자동구성: 걷기%d+공격%d", w, (int)fr.size() - w));
+                setStatus(TextFormat("시트 자동구성: 걷기%d+공격%d", wlk, (int)fr.size() - wlk));
             }
         }
-        x += cell + 10;
-        if (x + cell > area.width - 16) { x = 20; y += cell + 42; }
+        EndScissorMode();
+        if (imgs.empty())
+            DrawTextU("(이미지 없음 — 위 '+ 내 이미지 불러오기')", (int)x, (int)gridTop + 10, 12, ui::kTextDim);
     }
-    EndScissorMode();
-    if (imgs.empty())
-        ui::label("(이미지 없음 — 위 '+ 내 이미지 불러오기'로 가져오거나 '+ 시트 캐릭터'로 생성하세요)",
-                  20, (int)gy2 + 30, 16, ui::kTextDim);
 }
 
 // Built-in image file browser: lets the user import their own image files into

@@ -91,6 +91,8 @@ private:
     std::string browseDir_;           // current folder shown in the file browser
     int  browseScroll_ = 0;           // file browser scroll offset (px)
     bool charSkillEdit_ = false;      // per-character skill editor modal is open
+    int  charListScroll_ = 0;         // character list scroll (left column)
+    int  charFrameScroll_ = 0;        // frame timeline scroll (center column)
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to
