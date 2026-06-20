@@ -279,12 +279,13 @@ int main(int argc,char**argv){
     // m0..m3 = walk, m4..m5 = attack poses; each motion is an image flipbook.
     auto mkChar=[&](int id,const char*nm,const std::array<int,6>&M,int wfps,int afps){
         CharacterDef c; c.id=id; c.name=nm;
-        c.motions[MO_Walk]={{M[0],M[1],M[2],M[3]},wfps};
-        c.motions[MO_Attack]={{M[4],M[5]},afps};
-        c.motions[MO_Skill1]={{M[5],M[4],M[5]},afps};
-        c.motions[MO_Skill2]={{M[4],M[5],M[4],M[5]},afps+2};
-        c.motions[MO_Ult]={{M[4],M[5],M[4],M[5],M[4]},afps};
-        c.motions[MO_Death]={{M[3],M[0]},4};
+        auto set=[&](int mo,std::vector<int>fr,int fps){ c.motions[mo].frames=std::move(fr); c.motions[mo].fps=fps; };
+        set(MO_Walk,{M[0],M[1],M[2],M[3]},wfps);
+        set(MO_Attack,{M[4],M[5]},afps);
+        set(MO_Skill1,{M[5],M[4],M[5]},afps);
+        set(MO_Skill2,{M[4],M[5],M[4],M[5]},afps+2);
+        set(MO_Ult,{M[4],M[5],M[4],M[5],M[4]},afps);
+        set(MO_Death,{M[3],M[0]},4);
         c.motions[MO_Walk].loop = true;       // walk cycles continuously
         db.characters.push_back(c);
     };

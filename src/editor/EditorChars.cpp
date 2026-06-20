@@ -17,6 +17,11 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
+// The editable frame list for a motion's facing direction (0정면/1좌/2우/3위).
+static std::vector<int>& dirVecOf(MotionClip& c, int d) {
+    switch (d) { case 1: return c.left; case 2: return c.right; case 3: return c.up; default: return c.frames; }
+}
+
 // The cast-key slot a skill-capable motion maps to (-1 = not a skill motion).
 static int castSlotForMotion(int m) {
     switch (m) {
@@ -269,74 +274,91 @@ void Editor::drawCharsTab() {
             if (ui::button({ x + m*tw, tabsY, tw - 3, 28 }, lbl, charMotionTab_ == m)) { charMotionTab_ = m; charFrameSel_ = -1; }
         }
         MotionClip& clip = cd.motions[charMotionTab_];
-        if (charFrameSel_ >= (int)clip.frames.size()) charFrameSel_ = -1;
+
+        // ---- direction sub-tabs (정면/좌/우/뒤) ----
+        static const char* dirName[4] = { "정면", "좌", "우", "뒤" };
+        float dirY = tabsY + 32;
+        DrawTextU("방향", (int)x, (int)dirY + 5, 12, ui::kTextDim);
+        for (int d = 0; d < 4; ++d) {
+            int cnt = (int)dirVecOf(clip, d).size();
+            if (ui::button({ x + 40 + d*74, dirY, 70, 24 }, TextFormat("%s(%d)", dirName[d], cnt), charDirTab_ == d))
+                { charDirTab_ = d; charFrameSel_ = -1; }
+        }
+        std::vector<int>& fv = dirVecOf(clip, charDirTab_);     // the direction being edited
+        if (charFrameSel_ >= (int)fv.size()) charFrameSel_ = -1;
         auto snap = [&]() { charUndo_ = clip; charUndoSet_ = true; };
 
-        // ---- preview box + per-motion settings ----
-        float rowY = tabsY + 36;
-        const float PVS = 150;
+        // ---- preview (shows exactly what the game renders for this facing) ----
+        float rowY = dirY + 32;
+        const float PVS = 140;
         Rectangle pv = { x, rowY, PVS, PVS };
         DrawRectangleRec(pv, Color{ 16, 18, 26, 255 });
         DrawRectangleLinesEx(pv, 2, ui::kPanelHi);
         DrawTextU("재생", (int)pv.x + 5, (int)pv.y + 4, 12, ui::kAccent);
-        if (!clip.frames.empty()) {
-            int n = (int)clip.frames.size();
+        const std::vector<int>& pf = clip.dirFrames(charDirTab_);   // with fallback to 정면
+        bool pmir = clip.dirMirrored(charDirTab_);
+        if (!pf.empty()) {
+            int n = (int)pf.size();
             int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;
-            const Texture2D& t = engine_.assetTexture(clip.frames[fi]);
+            const Texture2D& t = engine_.assetTexture(pf[fi]);
             float sc = std::min((PVS - 22) / std::max(1, t.width), (PVS - 22) / std::max(1, t.height));
-            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
-                           { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+            Rectangle srcR = { 0, 0, pmir ? -(float)t.width : (float)t.width, (float)t.height };
+            DrawTexturePro(t, srcR, { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
             DrawTextU(TextFormat("%d/%d", fi+1, n), (int)pv.x + PVS - 46, (int)pv.y + 5, 14, ui::kGood);
         } else {
-            DrawTextU("프레임 없음", (int)pv.x + 32, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
+            DrawTextU("프레임 없음", (int)pv.x + 28, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
         }
         float sx = pv.x + PVS + 14, sw = x + w - sx, sy = rowY;
         ui::intStepper({ sx, sy, std::min(220.0f, sw), 26 }, "fps", clip.fps, 1, 1, 30); sy += 32;
         if (ui::button({ sx, sy, std::min(220.0f, sw), 26 }, clip.loop ? "반복 재생: 켜짐" : "반복 재생: 꺼짐", clip.loop)) { clip.loop = !clip.loop; p.save(); }
         sy += 32;
-        float dur = clip.frames.empty() ? 0 : (float)clip.frames.size() / std::max(1, clip.fps);
-        DrawTextU(TextFormat("길이 %.2f초 · %d프레임", dur, (int)clip.frames.size()), (int)sx, (int)sy + 3, 13, ui::kText);
-        sy += 28;
+        DrawTextU(fv.empty() && charDirTab_ != 0 ? "이 방향은 비어있어 '정면'을 사용합니다"
+                                                  : TextFormat("이 방향 %d프레임", (int)fv.size()),
+                  (int)sx, (int)sy + 3, 12, fv.empty() && charDirTab_ != 0 ? ui::kAccentHi : ui::kTextDim);
+        sy += 24;
+        DrawTextU("정면만 채워도 됩니다 (좌=자동 반전)", (int)sx, (int)sy + 2, 11, ui::kTextDim);
+        sy += 22;
         int castSlot = castSlotForMotion(charMotionTab_);
         if (castSlot >= 0) {
             static const char* slotKey[4] = { "Z", "X", "C", "V" };
             bool hasSkill = false; for (auto& sk : cd.skills) if (sk.slot == castSlot) { hasSkill = true; break; }
-            if (ui::button({ sx, sy, std::min(260.0f, sw), 28 }, TextFormat("[%s] 스킬 동작 편집", slotKey[castSlot]), hasSkill)) { charSkillEdit_ = true; return; }
+            if (ui::button({ sx, sy, std::min(260.0f, sw), 26 }, TextFormat("[%s] 스킬 동작 편집", slotKey[castSlot]), hasSkill)) { charSkillEdit_ = true; return; }
         }
 
-        // ---- frame timeline ----
-        float tlY = rowY + PVS + 12;
-        DrawTextU("프레임 타임라인", (int)x, (int)tlY, 13, ui::kAccent); tlY += 22;
-        if (ui::button({ x, tlY, 74, 24 }, "전체 비우기")) { snap(); clip.frames.clear(); charFrameSel_ = -1; p.save(); }
+        // ---- frame timeline (edits the selected direction) ----
+        float tlY = rowY + PVS + 10;
+        DrawTextU(TextFormat("프레임 타임라인 — %s · %s", kMotionNames[charMotionTab_], dirName[charDirTab_]), (int)x, (int)tlY, 13, ui::kAccent);
+        tlY += 22;
+        if (ui::button({ x, tlY, 74, 24 }, "전체 비우기")) { snap(); fv.clear(); charFrameSel_ = -1; p.save(); }
         if (ui::button({ x + 78, tlY, 60, 24 }, "되돌리기") && charUndoSet_) { std::swap(clip, charUndo_); charFrameSel_ = -1; p.save(); }
-        if (ui::button({ x + 142, tlY, 50, 24 }, "복사")) { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨"); }
-        if (ui::button({ x + 196, tlY, 64, 24 }, "붙여넣기") && charClipSet_) { snap(); clip.frames = charClip_.frames; clip.fps = charClip_.fps; p.save(); }
-        if (ui::button({ x + 264, tlY, 56, 24 }, "뒤집기")) { snap(); std::reverse(clip.frames.begin(), clip.frames.end()); p.save(); }
+        if (ui::button({ x + 142, tlY, 50, 24 }, "복사")) { charClip_ = clip; charClipSet_ = true; setStatus("모션 복사됨 (전 방향)"); }
+        if (ui::button({ x + 196, tlY, 64, 24 }, "붙여넣기") && charClipSet_) { snap(); clip = charClip_; charFrameSel_ = -1; p.save(); }
+        if (ui::button({ x + 264, tlY, 56, 24 }, "뒤집기")) { snap(); std::reverse(fv.begin(), fv.end()); p.save(); }
         tlY += 28;
         if (charFrameSel_ >= 0) {
-            if (ui::button({ x, tlY, 60, 24 }, "◀ 앞으로") && charFrameSel_ > 0) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_-1]); charFrameSel_--; p.save(); }
-            if (ui::button({ x + 64, tlY, 50, 24 }, "복제")) { clip.frames.insert(clip.frames.begin()+charFrameSel_+1, clip.frames[charFrameSel_]); charFrameSel_++; p.save(); }
-            if (ui::button({ x + 118, tlY, 50, 24 }, "삭제")) { snap(); clip.frames.erase(clip.frames.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
-            if (ui::button({ x + 172, tlY, 60, 24 }, "뒤로 ▶") && charFrameSel_ < (int)clip.frames.size()-1) { std::swap(clip.frames[charFrameSel_], clip.frames[charFrameSel_+1]); charFrameSel_++; p.save(); }
+            if (ui::button({ x, tlY, 60, 24 }, "◀ 앞으로") && charFrameSel_ > 0) { std::swap(fv[charFrameSel_], fv[charFrameSel_-1]); charFrameSel_--; p.save(); }
+            if (ui::button({ x + 64, tlY, 50, 24 }, "복제")) { fv.insert(fv.begin()+charFrameSel_+1, fv[charFrameSel_]); charFrameSel_++; p.save(); }
+            if (ui::button({ x + 118, tlY, 50, 24 }, "삭제")) { snap(); fv.erase(fv.begin()+charFrameSel_); charFrameSel_ = -1; p.save(); }
+            if (ui::button({ x + 172, tlY, 60, 24 }, "뒤로 ▶") && charFrameSel_ < (int)fv.size()-1) { std::swap(fv[charFrameSel_], fv[charFrameSel_+1]); charFrameSel_++; p.save(); }
         } else {
             DrawTextU("썸네일 클릭 = 선택 후 이동 / 복제 / 삭제", (int)x, (int)tlY + 5, 12, ui::kTextDim);
         }
         tlY += 30;
         float cell = 58, gridTop = tlY, gridH = panelBot - 8 - gridTop;
         int per = std::max(1, (int)(w / (cell + 8)));
-        int frows = ((int)clip.frames.size() + per - 1) / per;
+        int frows = ((int)fv.size() + per - 1) / per;
         int maxFS = std::max(0, (int)(frows * (cell + 8) + 4 - gridH));
         Rectangle gReg = { midX, gridTop, midW, gridH };
         if (GetMouseWheelMove() != 0 && ui::mouseIn(gReg)) charFrameScroll_ -= (int)(GetMouseWheelMove() * 40);
         charFrameScroll_ = std::max(0, std::min(charFrameScroll_, maxFS));
         BeginScissorMode((int)midX, (int)gridTop, (int)midW, (int)gridH);
-        for (int i = 0; i < (int)clip.frames.size(); ++i) {
+        for (int i = 0; i < (int)fv.size(); ++i) {
             float fx = x + (i % per) * (cell + 8);
             float fy = gridTop + (i / per) * (cell + 8) - charFrameScroll_;
             if (fy + cell < gridTop || fy > panelBot) continue;
             Rectangle fr = { fx, fy, cell, cell };
             DrawRectangleRec(fr, ui::kPanelHi);
-            const Texture2D& t = engine_.assetTexture(clip.frames[i]);
+            const Texture2D& t = engine_.assetTexture(fv[i]);
             float sc = std::min((cell - 8) / std::max(1, t.width), (cell - 8) / std::max(1, t.height));
             DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height },
                            { fr.x + (cell - t.width*sc)/2, fr.y + (cell - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
@@ -345,8 +367,8 @@ void Editor::drawCharsTab() {
             if (ui::mouseIn(fr) && lclick) charFrameSel_ = i;
         }
         EndScissorMode();
-        if (clip.frames.empty())
-            DrawTextU("→ 오른쪽 '이미지 소스'에서 이미지를 클릭해 채우세요.", (int)x, (int)gridTop + 8, 13, ui::kTextDim);
+        if (fv.empty())
+            DrawTextU("→ 오른쪽 '이미지 소스'에서 이미지를 클릭해 이 방향을 채우세요.", (int)x, (int)gridTop + 8, 13, ui::kTextDim);
     }
 
     // ====================== RIGHT: 이미지 소스 ======================
@@ -359,9 +381,12 @@ void Editor::drawCharsTab() {
         if (ui::button({ x + w/2 + 2, ry, w/2 - 2, 24 }, charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_)) charSliceMode_ = !charSliceMode_;
         ry += 28;
         if (charSliceMode_) { ui::intStepper({ x, ry, w, 24 }, "분할수", charSliceN_, 1, 2, 16); ry += 28; }
-        DrawTextU(building ? TextFormat("클릭 → '%s' 모션에 추가 (움짤은 통째로)", kMotionNames[charMotionTab_])
-                           : "먼저 캐릭터를 선택/생성하세요",
-                  (int)x, (int)ry, 12, building ? ui::kAccentHi : ui::kTextDim);
+        {
+            static const char* dn[4] = { "정면","좌","우","뒤" };
+            DrawTextU(building ? TextFormat("클릭 → '%s·%s'에 추가 (움짤 통째로)", kMotionNames[charMotionTab_], dn[charDirTab_])
+                               : "먼저 캐릭터를 선택/생성하세요",
+                      (int)x, (int)ry, 12, building ? ui::kAccentHi : ui::kTextDim);
+        }
         ry += 20;
 
         float gridTop = ry, gridH = panelBot - 8 - gridTop;
@@ -392,14 +417,15 @@ void Editor::drawCharsTab() {
             if (building && ui::mouseIn(clickArea) && lclick) {
                 MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
                 charUndo_ = mc; charUndoSet_ = true;
-                auto& mf = mc.frames;
+                auto& mf = dirVecOf(mc, charDirTab_);     // add into the selected direction
                 int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
                 int n = (a->frames > 1) ? a->frames : (charSliceMode_ ? charSliceN_ : 1);
                 if (n > 1) {
                     std::vector<int> sl = sliceAsset(a->id, n);
                     mf.insert(mf.begin() + pos, sl.begin(), sl.end());
                     if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
-                    setStatus(TextFormat("%s: %d프레임 추가 (움짤/시트 분할)", kMotionNames[charMotionTab_], (int)sl.size()));
+                    static const char* dn[4] = { "정면","좌","우","뒤" };
+                    setStatus(TextFormat("%s·%s: %d프레임 추가", kMotionNames[charMotionTab_], dn[charDirTab_], (int)sl.size()));
                 } else {
                     mf.insert(mf.begin() + pos, a->id);
                     if (charFrameSel_ >= 0) charFrameSel_++;

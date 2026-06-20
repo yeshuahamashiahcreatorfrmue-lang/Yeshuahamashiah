@@ -66,9 +66,19 @@ enum MotionId { MO_Walk=0, MO_Attack=1, MO_Skill1=2, MO_Skill2=3, MO_Ult=4, MO_D
 inline const char* const kMotionNames[MO_COUNT] = { "걷기","공격","스킬1","스킬2","궁극기","죽음" };
 
 struct MotionClip {
-    std::vector<int> frames;     // image asset ids, played in order
+    std::vector<int> frames;            // 정면(아래) 프레임 — 비어있는 방향의 기본값(fallback)
+    std::vector<int> left, right, up;   // 선택적 방향별 프레임 (비면 frames 사용)
     int fps = 8;                 // playback speed
     bool loop = false;           // true = cycle continuously, false = play once
+    // Frames shown for a facing direction (Down0/Left1/Right2/Up3). An empty
+    // direction falls back to `frames` (and the left fallback is mirrored).
+    const std::vector<int>& dirFrames(int dir) const {
+        if (dir == 1 && !left.empty())  return left;
+        if (dir == 2 && !right.empty()) return right;
+        if (dir == 3 && !up.empty())    return up;
+        return frames;
+    }
+    bool dirMirrored(int dir) const { return dir == 1 && left.empty(); }
 };
 
 struct CharacterDef {

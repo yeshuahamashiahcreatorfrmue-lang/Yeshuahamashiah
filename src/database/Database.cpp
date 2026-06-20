@@ -124,7 +124,8 @@ json Database::toJson() const {
     j["characters"] = json::array();
     for (const auto& c : characters) {
         json mo = json::array();
-        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames}, {"fps", m.fps}, {"loop", m.loop}});
+        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames},
+            {"left", m.left}, {"right", m.right}, {"up", m.up}, {"fps", m.fps}, {"loop", m.loop}});
         json sk = json::array();
         for (const auto& s : c.skills) sk.push_back(skillToJson(s));
         j["characters"].push_back({{"id", c.id}, {"name", c.name}, {"motions", mo}, {"skills", sk}});
@@ -185,6 +186,9 @@ void Database::fromJson(const json& j) {
         const auto& mo = c.value("motions", json::array());
         for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
             cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});
+            cd.motions[i].left   = mo[i].value("left",  std::vector<int>{});
+            cd.motions[i].right  = mo[i].value("right", std::vector<int>{});
+            cd.motions[i].up     = mo[i].value("up",    std::vector<int>{});
             cd.motions[i].fps = mo[i].value("fps", 8);
             cd.motions[i].loop = mo[i].value("loop", i == MO_Walk); // walk loops by default
         }

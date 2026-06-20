@@ -40,7 +40,7 @@ void GamePlay::updateMotion(float dt) {
         }
     }
     const MotionClip& clip = cd->motions[playMotion_];
-    int n = (int)clip.frames.size();
+    int n = (int)clip.dirFrames(dir_).size();   // count of the CURRENT facing's frames
     if (n <= 0) return;
     if (playMotion_ == MO_Walk && !moving_) { motionFrame_ = 0; motionAnim_ = 0; return; }
     motionAnim_ += dt;
@@ -57,13 +57,23 @@ int GamePlay::motionFrameAsset() const {
     const CharacterDef* cd = customChar();
     if (!cd) return -1;
     int m = playMotion_;
-    if (cd->motions[m].frames.empty()) m = MO_Walk;          // fall back to walk
-    const MotionClip& clip = cd->motions[m];
-    if (clip.frames.empty()) return -1;                       // none -> use sheet sprite
+    if (cd->motions[m].dirFrames(dir_).empty()) m = MO_Walk;  // fall back to walk
+    const std::vector<int>& fl = cd->motions[m].dirFrames(dir_);
+    if (fl.empty()) return -1;                                // none -> use sheet sprite
     int fi = motionFrame_;
     if (fi < 0) fi = 0;
-    if (fi >= (int)clip.frames.size()) fi = (int)clip.frames.size() - 1;
-    return clip.frames[fi];
+    if (fi >= (int)fl.size()) fi = (int)fl.size() - 1;
+    return fl[fi];
+}
+
+// Whether the current facing is rendered by mirroring the 정면 frames (true only
+// when facing left and no dedicated left frames exist).
+bool GamePlay::motionMirrored() const {
+    const CharacterDef* cd = customChar();
+    if (!cd) return false;
+    int m = playMotion_;
+    if (cd->motions[m].dirFrames(dir_).empty()) m = MO_Walk;
+    return cd->motions[m].dirMirrored(dir_);
 }
 
 void GamePlay::drawWeather(float dt) {
@@ -211,7 +221,7 @@ void GamePlay::drawField() {
         const Texture2D& ftex = engine_.assetTexture(frameAsset);
         float sz = TS * 1.25f;
         Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };
-        if (dir_ == (int)Direction::Left) src.width = -src.width;   // mirror facing left
+        if (motionMirrored()) src.width = -src.width;   // mirror only when falling back to 정면
         Rectangle dst = { pxX_ + (TS - sz)/2, pxY_ + (TS - sz)/2 + 2, sz, sz };
         DrawTexturePro(ftex, src, dst, {0,0}, 0, ptint);
     } else {

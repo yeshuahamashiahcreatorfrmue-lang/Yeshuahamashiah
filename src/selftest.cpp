@@ -182,6 +182,9 @@ static void testCharacterBuilder() {
         cd.motions[m].fps    = 6 + m;
         cd.motions[m].loop   = (m == MO_Walk);
     }
+    // 4-directional walk: dedicated left + up frames (right/down fall back to 정면)
+    cd.motions[MO_Walk].left = { imgIds[8], imgIds[9] };
+    cd.motions[MO_Walk].up   = { imgIds[10] };
     // the character's OWN skill (range/power/effect/sound), authored in the panel
     FieldSkill cs; cs.slot = 1; cs.name = "캐릭터파이어"; cs.projectile = true;
     cs.range = 9; cs.powerPct = 250; cs.mpCost = 7; cs.cooldown = 1.2f;
@@ -200,6 +203,13 @@ static void testCharacterBuilder() {
         if (c->motions[m].frames.size() != 2 || c->motions[m].fps != 6 + m) motionsOk = false;
     CHECK(motionsOk, "all 6 motions (걷기/공격/스킬1/스킬2/궁극기/죽음) kept their image frames");
     CHECK(c && c->motions[MO_Walk].loop && !c->motions[MO_Attack].loop, "per-motion loop flags persisted");
+    CHECK(c && c->motions[MO_Walk].left.size() == 2 && c->motions[MO_Walk].up.size() == 1,
+          "4-directional walk frames (left/up) persisted");
+    CHECK(c && c->motions[MO_Walk].dirFrames(1).size() == 2 && c->motions[MO_Walk].dirFrames(3).size() == 1
+            && c->motions[MO_Walk].dirFrames(2).size() == 2,   // right empty -> falls back to 정면
+          "directional lookup + empty-direction fallback to 정면");
+    CHECK(c && !c->motions[MO_Walk].dirMirrored(1) && c->motions[MO_Attack].dirMirrored(1),
+          "left mirrors only when no dedicated left frames");
     CHECK(p2.playerCharId == 1, "character is set as the driving player");
     bool skillOk = c && c->skills.size() == 1 && c->skills[0].slot == 1 &&
                    c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
