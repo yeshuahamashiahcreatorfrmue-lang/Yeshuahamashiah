@@ -17,7 +17,7 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
-// The editable frame list for a motion's facing direction (0정면/1좌/2우/3위).
+// The editable frame list for a motion facing direction (0아래/1왼쪽/2오른쪽/3위).
 static std::vector<int>& dirVecOf(MotionClip& c, int d) {
     switch (d) { case 1: return c.left; case 2: return c.right; case 3: return c.up; default: return c.frames; }
 }
@@ -275,13 +275,13 @@ void Editor::drawCharsTab() {
         }
         MotionClip& clip = cd.motions[charMotionTab_];
 
-        // ---- direction sub-tabs (정면/좌/우/뒤) ----
-        static const char* dirName[4] = { "정면", "좌", "우", "뒤" };
+        // ---- direction sub-tabs: 상하좌우 each registered separately ----
+        static const char* dirName[4] = { "아래", "왼쪽", "오른쪽", "위" };
         float dirY = tabsY + 32;
-        DrawTextU("방향", (int)x, (int)dirY + 5, 12, ui::kTextDim);
+        DrawTextU("방향(상하좌우):", (int)x, (int)dirY + 6, 13, ui::kAccentHi);
         for (int d = 0; d < 4; ++d) {
             int cnt = (int)dirVecOf(clip, d).size();
-            if (ui::button({ x + 40 + d*74, dirY, 70, 24 }, TextFormat("%s(%d)", dirName[d], cnt), charDirTab_ == d))
+            if (ui::button({ x + 100 + d*72, dirY, 68, 26 }, TextFormat("%s(%d)", dirName[d], cnt), charDirTab_ == d))
                 { charDirTab_ = d; charFrameSel_ = -1; }
         }
         std::vector<int>& fv = dirVecOf(clip, charDirTab_);     // the direction being edited
@@ -295,15 +295,13 @@ void Editor::drawCharsTab() {
         DrawRectangleRec(pv, Color{ 16, 18, 26, 255 });
         DrawRectangleLinesEx(pv, 2, ui::kPanelHi);
         DrawTextU("재생", (int)pv.x + 5, (int)pv.y + 4, 12, ui::kAccent);
-        const std::vector<int>& pf = clip.dirFrames(charDirTab_);   // with fallback to 정면
-        bool pmir = clip.dirMirrored(charDirTab_);
+        const std::vector<int>& pf = clip.dirFrames(charDirTab_);   // 비면 '아래'로 대체
         if (!pf.empty()) {
             int n = (int)pf.size();
             int fi = (int)(GetTime() * std::max(1, clip.fps)) % n;
             const Texture2D& t = engine_.assetTexture(pf[fi]);
             float sc = std::min((PVS - 22) / std::max(1, t.width), (PVS - 22) / std::max(1, t.height));
-            Rectangle srcR = { 0, 0, pmir ? -(float)t.width : (float)t.width, (float)t.height };
-            DrawTexturePro(t, srcR, { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
+            DrawTexturePro(t, { 0,0,(float)t.width,(float)t.height }, { pv.x + (PVS - t.width*sc)/2, pv.y + (PVS - t.height*sc)/2, t.width*sc, t.height*sc }, {0,0}, 0, WHITE);
             DrawTextU(TextFormat("%d/%d", fi+1, n), (int)pv.x + PVS - 46, (int)pv.y + 5, 14, ui::kGood);
         } else {
             DrawTextU("프레임 없음", (int)pv.x + 28, (int)pv.y + PVS/2 - 8, 13, ui::kTextDim);
@@ -312,11 +310,11 @@ void Editor::drawCharsTab() {
         ui::intStepper({ sx, sy, std::min(220.0f, sw), 26 }, "fps", clip.fps, 1, 1, 30); sy += 32;
         if (ui::button({ sx, sy, std::min(220.0f, sw), 26 }, clip.loop ? "반복 재생: 켜짐" : "반복 재생: 꺼짐", clip.loop)) { clip.loop = !clip.loop; p.save(); }
         sy += 32;
-        DrawTextU(fv.empty() && charDirTab_ != 0 ? "이 방향은 비어있어 '정면'을 사용합니다"
+        DrawTextU(fv.empty() && charDirTab_ != 0 ? "이 방향 비어있음 → '아래'로 대체됨"
                                                   : TextFormat("이 방향 %d프레임", (int)fv.size()),
-                  (int)sx, (int)sy + 3, 12, fv.empty() && charDirTab_ != 0 ? ui::kAccentHi : ui::kTextDim);
+                  (int)sx, (int)sy + 3, 12, fv.empty() && charDirTab_ != 0 ? ui::kDanger : ui::kTextDim);
         sy += 24;
-        DrawTextU("정면만 채워도 됩니다 (좌=자동 반전)", (int)sx, (int)sy + 2, 11, ui::kTextDim);
+        DrawTextU("걷기·공격·스킬 모두 상하좌우 각각 등록하세요", (int)sx, (int)sy + 2, 11, ui::kTextDim);
         sy += 22;
         int castSlot = castSlotForMotion(charMotionTab_);
         if (castSlot >= 0) {
@@ -382,7 +380,7 @@ void Editor::drawCharsTab() {
         ry += 28;
         if (charSliceMode_) { ui::intStepper({ x, ry, w, 24 }, "분할수", charSliceN_, 1, 2, 16); ry += 28; }
         {
-            static const char* dn[4] = { "정면","좌","우","뒤" };
+            static const char* dn[4] = { "아래","왼쪽","오른쪽","위" };
             DrawTextU(building ? TextFormat("클릭 → '%s·%s'에 추가 (움짤 통째로)", kMotionNames[charMotionTab_], dn[charDirTab_])
                                : "먼저 캐릭터를 선택/생성하세요",
                       (int)x, (int)ry, 12, building ? ui::kAccentHi : ui::kTextDim);
@@ -424,7 +422,7 @@ void Editor::drawCharsTab() {
                     std::vector<int> sl = sliceAsset(a->id, n);
                     mf.insert(mf.begin() + pos, sl.begin(), sl.end());
                     if (charFrameSel_ >= 0) charFrameSel_ += (int)sl.size();
-                    static const char* dn[4] = { "정면","좌","우","뒤" };
+                    static const char* dn[4] = { "아래","왼쪽","오른쪽","위" };
                     setStatus(TextFormat("%s·%s: %d프레임 추가", kMotionNames[charMotionTab_], dn[charDirTab_], (int)sl.size()));
                 } else {
                     mf.insert(mf.begin() + pos, a->id);

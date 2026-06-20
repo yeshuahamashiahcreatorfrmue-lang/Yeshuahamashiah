@@ -66,16 +66,6 @@ int GamePlay::motionFrameAsset() const {
     return fl[fi];
 }
 
-// Whether the current facing is rendered by mirroring the 정면 frames (true only
-// when facing left and no dedicated left frames exist).
-bool GamePlay::motionMirrored() const {
-    const CharacterDef* cd = customChar();
-    if (!cd) return false;
-    int m = playMotion_;
-    if (cd->motions[m].dirFrames(dir_).empty()) m = MO_Walk;
-    return cd->motions[m].dirMirrored(dir_);
-}
-
 void GamePlay::drawWeather(float dt) {
     if (!map_ || map_->weather == 0) return;
     int sw = GetScreenWidth(), sh = GetScreenHeight();
@@ -220,8 +210,7 @@ void GamePlay::drawField() {
     if (frameAsset >= 0) {
         const Texture2D& ftex = engine_.assetTexture(frameAsset);
         float sz = TS * 1.25f;
-        Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };
-        if (motionMirrored()) src.width = -src.width;   // mirror only when falling back to 정면
+        Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };   // each facing uses its own frames
         Rectangle dst = { pxX_ + (TS - sz)/2, pxY_ + (TS - sz)/2 + 2, sz, sz };
         DrawTexturePro(ftex, src, dst, {0,0}, 0, ptint);
     } else {

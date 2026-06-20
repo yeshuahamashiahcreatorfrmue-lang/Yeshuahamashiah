@@ -86,7 +86,6 @@ private:
     void triggerMotion(int motionId);        // play a one-shot motion (attack/skill/death)
     void updateMotion(float dt);             // advance the current motion's frames
     int  motionFrameAsset() const;           // current frame's image id, or -1 (use sheet)
-    bool motionMirrored() const;             // true if the current facing mirrors the 정면 frames
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();

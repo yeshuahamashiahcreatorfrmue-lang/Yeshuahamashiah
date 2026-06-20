@@ -70,15 +70,15 @@ struct MotionClip {
     std::vector<int> left, right, up;   // 선택적 방향별 프레임 (비면 frames 사용)
     int fps = 8;                 // playback speed
     bool loop = false;           // true = cycle continuously, false = play once
-    // Frames shown for a facing direction (Down0/Left1/Right2/Up3). An empty
-    // direction falls back to `frames` (and the left fallback is mirrored).
+    // Frames shown for a facing direction (Down0/Left1/Right2/Up3). Each direction
+    // is registered separately; an empty direction falls back to `frames`(아래) so
+    // the character is never invisible.
     const std::vector<int>& dirFrames(int dir) const {
         if (dir == 1 && !left.empty())  return left;
         if (dir == 2 && !right.empty()) return right;
         if (dir == 3 && !up.empty())    return up;
         return frames;
     }
-    bool dirMirrored(int dir) const { return dir == 1 && left.empty(); }
 };
 
 struct CharacterDef {

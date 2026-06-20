@@ -206,10 +206,8 @@ static void testCharacterBuilder() {
     CHECK(c && c->motions[MO_Walk].left.size() == 2 && c->motions[MO_Walk].up.size() == 1,
           "4-directional walk frames (left/up) persisted");
     CHECK(c && c->motions[MO_Walk].dirFrames(1).size() == 2 && c->motions[MO_Walk].dirFrames(3).size() == 1
-            && c->motions[MO_Walk].dirFrames(2).size() == 2,   // right empty -> falls back to 정면
-          "directional lookup + empty-direction fallback to 정면");
-    CHECK(c && !c->motions[MO_Walk].dirMirrored(1) && c->motions[MO_Attack].dirMirrored(1),
-          "left mirrors only when no dedicated left frames");
+            && c->motions[MO_Walk].dirFrames(2).size() == 2,   // right empty -> falls back to 아래
+          "directional lookup + empty-direction fallback to 아래");
     CHECK(p2.playerCharId == 1, "character is set as the driving player");
     bool skillOk = c && c->skills.size() == 1 && c->skills[0].slot == 1 &&
                    c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
