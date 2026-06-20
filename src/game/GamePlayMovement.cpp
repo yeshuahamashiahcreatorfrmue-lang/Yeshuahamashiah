@@ -121,6 +121,15 @@ void GamePlay::updateField(float dt) {
             engine_.state().playerX = destX_;
             engine_.state().playerY = destY_;
             if (autowalk) TraceLog(LOG_INFO, "AUTOWALK arrived at tile (%d,%d)", destX_, destY_);
+            // stepped onto a middle-edge gate while heading that way -> change zone
+            Direction zd;
+            if (zoneEdgeDir(destX_, destY_, zd) && (int)zd == dir_) {
+                Vec2i zl = dirToDelta(zd);
+                if (engine_.project().mapAtWorld(map_->worldX + zl.x, map_->worldY + zl.y)) {
+                    tryZoneTransition(zd);
+                    return;
+                }
+            }
             if (Event* e = map_->eventAt(destX_, destY_))
                 if (e->trigger == TriggerType::PlayerTouch) runEvent(*e);
         } else {
@@ -145,31 +154,78 @@ void GamePlay::tryMove(Direction d) {
     dir_ = (int)d;
     Vec2i delta = dirToDelta(d);
     int nx = destX_ + delta.x, ny = destY_ + delta.y;
-    // walking off an edge: hop to the adjacent placed map (zone loading) if any
-    if (!map_->tilemap.inBounds(nx, ny)) { tryZoneTransition(d); return; }
+    if (!map_->tilemap.inBounds(nx, ny)) return;      // map edge blocks (gates are inside)
     if (map_->tilemap.blocked(nx, ny)) return;
     if (monsterAt(nx, ny)) return;                    // can't walk through monsters
     if (npcAt(nx, ny)) return;                        // ...or NPCs
     destX_ = nx; destY_ = ny; moving_ = true;
 }
 
-// Walk off the map edge into the orthogonally-adjacent map placed in the
-// All-Map Viewer grid. The player re-enters at the opposite edge, keeping the
-// crossing coordinate. No neighbour there → the edge just blocks (no-op).
+// Zone gate = the middle 7 tiles of an edge (N/S/E/W). Returns the outward
+// direction of that gate, or false if (x,y) is not a gate tile.
+bool GamePlay::zoneEdgeDir(int x, int y, Direction& out) const {
+    if (!map_) return false;
+    int W = map_->tilemap.width(), H = map_->tilemap.height();
+    auto inBand = [](int v, int dim) {                // central 7-tile band of an axis
+        if (dim <= 7) return true;
+        int c = dim / 2;
+        return v >= c - 3 && v <= c + 3;
+    };
+    if (x == 0      && inBand(y, H)) { out = Direction::Left;  return true; }
+    if (x == W - 1  && inBand(y, H)) { out = Direction::Right; return true; }
+    if (y == 0      && inBand(x, W)) { out = Direction::Up;    return true; }
+    if (y == H - 1  && inBand(x, W)) { out = Direction::Down;  return true; }
+    return false;
+}
+
+// Make the middle-7 edge gates passable wherever a placed neighbour exists, so
+// the player can always reach and cross them (maps may have walled borders).
+void GamePlay::carveZoneGates() {
+    if (!map_ || !map_->placed) return;
+    Project& proj = engine_.project();
+    int W = map_->tilemap.width(), H = map_->tilemap.height();
+    int cY = H / 2, cX = W / 2;
+    auto open = [&](int x, int y) { if (map_->tilemap.inBounds(x, y)) map_->tilemap.setBlocked(x, y, false); };
+    bool any = false;
+    if (proj.mapAtWorld(map_->worldX - 1, map_->worldY)) { for (int dy=-3; dy<=3; ++dy) open(0,   cY+dy); any=true; }
+    if (proj.mapAtWorld(map_->worldX + 1, map_->worldY)) { for (int dy=-3; dy<=3; ++dy) open(W-1, cY+dy); any=true; }
+    if (proj.mapAtWorld(map_->worldX, map_->worldY - 1)) { for (int dx=-3; dx<=3; ++dx) open(cX+dx, 0);   any=true; }
+    if (proj.mapAtWorld(map_->worldX, map_->worldY + 1)) { for (int dx=-3; dx<=3; ++dx) open(cX+dx, H-1); any=true; }
+    (void)any;
+}
+
+// Cross a middle-edge gate into the orthogonally-adjacent placed map. The player
+// enters one tile INSIDE the matching edge (so they can step back out to return),
+// aligned to the same band offset. No neighbour → no-op.
 void GamePlay::tryZoneTransition(Direction d) {
     if (!map_ || !map_->placed) return;
     Vec2i delta = dirToDelta(d);
     auto nb = engine_.project().mapAtWorld(map_->worldX + delta.x, map_->worldY + delta.y);
     if (!nb) return;
     GameState& gs = engine_.state();
-    int curY = destY_, curX = destX_;
+    int oldW = map_->tilemap.width(), oldH = map_->tilemap.height();
+    int curX = destX_, curY = destY_;
     loadMap(nb->id);
     int W = map_->tilemap.width(), H = map_->tilemap.height();
-    int ex = destX_, ey = destY_;
-    if (delta.x > 0)      { ex = 0;     ey = std::min(curY, H - 1); }   // went right -> enter left
-    else if (delta.x < 0) { ex = W - 1; ey = std::min(curY, H - 1); }   // went left  -> enter right
-    else if (delta.y > 0) { ey = 0;     ex = std::min(curX, W - 1); }   // went down  -> enter top
-    else                  { ey = H - 1; ex = std::min(curX, W - 1); }   // went up    -> enter bottom
+    // keep the crossing offset relative to each edge's centre
+    int offY = curY - oldH / 2, offX = curX - oldW / 2;
+    int ex, ey;
+    if      (delta.x > 0) { ex = (W > 1 ? 1 : 0);     ey = std::clamp(H/2 + offY, 0, H-1); } // entered west side
+    else if (delta.x < 0) { ex = (W > 1 ? W - 2 : 0); ey = std::clamp(H/2 + offY, 0, H-1); } // entered east side
+    else if (delta.y > 0) { ey = (H > 1 ? 1 : 0);     ex = std::clamp(W/2 + offX, 0, W-1); } // entered north side
+    else                  { ey = (H > 1 ? H - 2 : 0); ex = std::clamp(W/2 + offX, 0, W-1); } // entered south side
+    // nudge to a walkable tile if the computed spot is blocked
+    if (map_->tilemap.blocked(ex, ey)) {
+        for (int r = 1; r <= 4; ++r) {
+            bool horiz = (delta.x != 0);
+            int a = horiz ? ey : ex;
+            for (int s : { a + r, a - r }) {
+                int tx = horiz ? ex : std::clamp(s, 0, W-1);
+                int ty = horiz ? std::clamp(s, 0, H-1) : ey;
+                if (!map_->tilemap.blocked(tx, ty)) { ex = tx; ey = ty; r = 99; break; }
+            }
+        }
+    }
     int TS = map_->tileset.tileWidth;
     destX_ = ex; destY_ = ey;
     pxX_ = ex * (float)TS; pxY_ = ey * (float)TS;

@@ -12,6 +12,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": 42,
       "id": 1,
@@ -38,6 +40,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": -1,
       "id": 2,
@@ -57,10 +61,39 @@
       "wander": false,
       "x": 20,
       "y": 26
+    },
+    {
+      "amount": 1,
+      "behavior": 0,
+      "conditionSwitch": -1,
+      "conditionValue": true,
+      "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
+      "faction": 0,
+      "graphicAsset": -1,
+      "id": 3,
+      "itemId": -1,
+      "npcAtk": 8,
+      "npcDef": 2,
+      "npcHp": 20,
+      "once": false,
+      "switchId": -1,
+      "switchValue": true,
+      "targetMap": 64,
+      "targetX": 5,
+      "targetY": 6,
+      "text": "",
+      "trigger": "touch",
+      "type": "teleport",
+      "wander": false,
+      "x": 17,
+      "y": 15
     }
   ],
   "id": 23,
   "name": "21. 황무지 안전가옥",
+  "placed": false,
   "tilemap": {
     "collision": [
       0,
@@ -680,7 +713,7 @@
       0,
       1,
       1,
-      1,
+      0,
       1,
       1,
       0,
@@ -4882,5 +4915,8 @@
     "tileHeight": 32,
     "tileWidth": 32
   },
-  "weather": 0
+  "viewerCopy": false,
+  "weather": 0,
+  "worldX": 0,
+  "worldY": 0
 }

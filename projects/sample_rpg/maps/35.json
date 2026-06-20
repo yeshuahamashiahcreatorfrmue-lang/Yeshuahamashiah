@@ -12,6 +12,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": 46,
       "id": 1,
@@ -38,6 +40,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 2,
       "graphicAsset": 52,
       "id": 2,
@@ -64,6 +68,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": -1,
       "id": 3,
@@ -87,6 +93,7 @@
   ],
   "id": 35,
   "name": "33. 사막",
+  "placed": false,
   "tilemap": {
     "collision": [
       0,
@@ -4908,5 +4915,8 @@
     "tileHeight": 32,
     "tileWidth": 32
   },
-  "weather": 0
+  "viewerCopy": false,
+  "weather": 0,
+  "worldX": 0,
+  "worldY": 0
 }

@@ -270,6 +270,66 @@ int main(int argc,char**argv){
     if (append) { p = std::make_shared<Project>(); if (!p->load(out)) { append = false; } }
     if (!append) p = Project::createNew(out, "컨셉 맵 팩");
 
+    // ---- '--interiors' mode: NON-destructively give every building (DOOR/GATE
+    // tile) on the existing concept maps an enterable interior room + a two-way
+    // door teleport. Idempotent (skips doors that already teleport). ----
+    if (argc > 2 && std::string(argv[2]) == "--interiors") {
+        if (!append) { printf("no project to add interiors to: %s\n", out.c_str()); return 1; }
+        int tilesId = -1;
+        for (const auto& a : p->assets.all()) if (a.name == "concept_tiles") tilesId = a.id;
+        if (tilesId < 0) { printf("concept tileset missing in %s\n", out.c_str()); return 1; }
+        auto clampi = [](int v,int lo,int hi){ return v<lo?lo:(v>hi?hi:v); };
+        auto makeInterior = [&](const std::string& nm)->std::shared_ptr<Map>{
+            auto in = std::make_shared<Map>();
+            in->id = p->nextMapId(); in->name = nm;
+            const int IW = 11, IH = 8;
+            in->tilemap.resize(IW, IH);
+            in->tileset.assetId = tilesId; in->tileset.columns = TSC; in->tileset.rows = TSR;
+            in->tileset.tileWidth = T; in->tileset.tileHeight = T;
+            for (int y=0;y<IH;y++) for (int x=0;x<IW;x++) in->tilemap.setTile(0,x,y,WOODFLR);
+            auto wall=[&](int x,int y){ in->tilemap.setTile(1,x,y,WOODWALLIN); in->tilemap.setBlocked(x,y,true); };
+            for (int x=0;x<IW;x++){ wall(x,0); wall(x,IH-1); }
+            for (int y=0;y<IH;y++){ wall(0,y); wall(IW-1,y); }
+            auto prop=[&](int x,int y,int t){ in->tilemap.setTile(1,x,y,t); in->tilemap.setBlocked(x,y,true); };
+            prop(2,2,BED); prop(IW-3,2,TABLE); in->tilemap.setTile(1,IW-2,2,CHAIR);
+            prop(2,IH-3,FIREPLACE); in->tilemap.setTile(1,IW-3,IH-3,RUGRED);
+            int dx = IW/2;                                   // exit door (walkable)
+            in->tilemap.setTile(1,dx,IH-1,DOORIN); in->tilemap.setBlocked(dx,IH-1,false);
+            p->maps.push_back(in);
+            return in;
+        };
+        int made = 0;
+        // snapshot the current map list (we append interiors while iterating)
+        std::vector<std::shared_ptr<Map>> src(p->maps.begin(), p->maps.end());
+        for (auto& m : src) {
+            if (m->tileset.assetId != tilesId) continue;          // only concept-tileset maps
+            if (m->name.rfind("내부:", 0) == 0) continue;          // skip interiors themselves
+            int MW = m->tilemap.width(), MH = m->tilemap.height();
+            int cap = 6, cnt = 0;
+            for (int y=0; y<MH && cnt<cap; ++y) for (int x=0; x<MW && cnt<cap; ++x) {
+                int t1 = m->tilemap.tile(1,x,y);
+                if (t1 != DOOR && t1 != GATE) continue;
+                bool has=false; for (auto& e : m->events) if (e.x==x && e.y==y && e.type==EventType::Teleport) has=true;
+                if (has) continue;
+                m->tilemap.setBlocked(x,y,false);                 // make the doorway steppable
+                auto in = makeInterior("내부: " + m->name);
+                int iW = in->tilemap.width(), iH = in->tilemap.height(), idx = iW/2;
+                Event ent; ent.id=m->nextEventId(); ent.x=x; ent.y=y;
+                ent.type=EventType::Teleport; ent.trigger=TriggerType::PlayerTouch;
+                ent.targetMap=in->id; ent.targetX=idx; ent.targetY=iH-2;
+                m->events.push_back(ent);
+                Event ret; ret.id=in->nextEventId(); ret.x=idx; ret.y=iH-1;
+                ret.type=EventType::Teleport; ret.trigger=TriggerType::PlayerTouch;
+                ret.targetMap=m->id; ret.targetX=x; ret.targetY=clampi(y+1,0,MH-1);
+                in->events.push_back(ret);
+                ++cnt; ++made;
+            }
+        }
+        p->save();
+        printf("interiors added: %d (maps now %d)\n", made, (int)p->maps.size());
+        return 0;
+    }
+
     // idempotency guard: if the pack's tileset is already registered, do nothing.
     for (const auto& a : p->assets.all())
         if (a.name == "concept_tiles") { printf("concept pack already present in %s — skipping\n", out.c_str()); return 0; }

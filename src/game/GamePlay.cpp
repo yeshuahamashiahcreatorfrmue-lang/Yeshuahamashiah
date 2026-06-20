@@ -57,6 +57,7 @@ void GamePlay::loadMap(int id) {
     animTileSet_.clear();
     if (map_) animTileSet_.insert(map_->animTiles.begin(), map_->animTiles.end());
     spawnNpcs();
+    carveZoneGates();      // ensure the middle-edge gates toward neighbours are walkable
     if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
 }
 

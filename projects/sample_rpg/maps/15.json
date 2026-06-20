@@ -12,6 +12,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": 41,
       "id": 1,
@@ -38,6 +40,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": -1,
       "id": 2,
@@ -61,6 +65,7 @@
   ],
   "id": 15,
   "name": "13. 식당",
+  "placed": false,
   "tilemap": {
     "collision": [
       1,
@@ -4882,5 +4887,8 @@
     "tileHeight": 32,
     "tileWidth": 32
   },
-  "weather": 0
+  "viewerCopy": false,
+  "weather": 0,
+  "worldX": 0,
+  "worldY": 0
 }

@@ -41,7 +41,9 @@ private:
     // --- movement (GamePlayMovement.cpp) ---
     void updateField(float dt);
     void tryMove(Direction d);
-    void tryZoneTransition(Direction d);    // walk off an edge -> load the adjacent placed map
+    void tryZoneTransition(Direction d);    // step on a middle-edge gate -> adjacent placed map
+    bool zoneEdgeDir(int x, int y, Direction& out) const; // is (x,y) a middle-7 edge gate? dir out
+    void carveZoneGates();                  // open the middle-7 edge tiles toward placed neighbours
     bool walkable(int x, int y);            // not blocked / not occupied (any mover)
 
     // --- events / dialogue (GamePlayEvents.cpp) ---

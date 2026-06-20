@@ -12,6 +12,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 2,
       "graphicAsset": 52,
       "id": 1,
@@ -38,6 +40,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 2,
       "graphicAsset": 50,
       "id": 2,
@@ -64,6 +68,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 2,
       "graphicAsset": 52,
       "id": 3,
@@ -90,6 +96,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": 50,
       "id": 4,
@@ -116,6 +124,8 @@
       "conditionSwitch": -1,
       "conditionValue": true,
       "drawPct": 100,
+      "drawTilesH": 1,
+      "drawTilesW": 1,
       "faction": 0,
       "graphicAsset": -1,
       "id": 5,
@@ -139,6 +149,7 @@
   ],
   "id": 36,
   "name": "34. 죽음과 시체 더미",
+  "placed": false,
   "tilemap": {
     "collision": [
       0,
@@ -4960,5 +4971,8 @@
     "tileHeight": 32,
     "tileWidth": 32
   },
-  "weather": 0
+  "viewerCopy": false,
+  "weather": 0,
+  "worldX": 0,
+  "worldY": 0
 }
