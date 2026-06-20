@@ -26,4 +26,14 @@ void UnloadUIFont();
 void DrawTextU(const char* text, int x, int y, int fontSize, Color color);
 int  MeasureTextU(const char* text, int fontSize);
 
+// --- global UI scale (webpage-style zoom) ---------------------------------
+// The whole UI is rendered at a LOGICAL resolution and scaled up to the window,
+// so all editor/game code lays out against screenW()/screenH() (logical), NOT
+// raylib's screenW(). Engine updates these every frame.
+void setLogicalScreen(int w, int h);
+int  screenW();           // logical width  (= window width  / uiScale)
+int  screenH();           // logical height (= window height / uiScale)
+void  setUiScale(float s); // clamps to [1.0, 3.0]
+float uiScale();
+
 } // namespace tsukuru

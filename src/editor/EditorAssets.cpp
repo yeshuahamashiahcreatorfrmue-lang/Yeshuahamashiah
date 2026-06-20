@@ -28,7 +28,7 @@ void Editor::cycleAsset(int& cur, AssetType t) {
 }
 
 void Editor::drawAssetsTab() {
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     ui::label(".png / .wav / .ogg 파일을 창에 끌어다 놓으면 등록됩니다.",
               20, (int)kToolbarH + 16, 20, ui::kText);
@@ -61,7 +61,7 @@ void Editor::drawAssetsTab() {
             }
         }
         x += cellW + pad;
-        if (x + cellW > GetScreenWidth() - 20) { x = 20; y += thumb + 60 + pad; }
+        if (x + cellW > screenW() - 20) { x = 20; y += thumb + 60 + pad; }
     }
 
     if (assets.empty())

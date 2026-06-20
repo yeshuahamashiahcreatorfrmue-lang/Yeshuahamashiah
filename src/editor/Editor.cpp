@@ -117,13 +117,13 @@ void Editor::draw() {
 
     if (statusTimer_ > 0) {
         int w = MeasureTextU(status_.c_str(), 16);
-        DrawRectangle(GetScreenWidth() - w - 28, GetScreenHeight() - 34, w + 20, 26, ui::kAccent);
-        DrawTextU(status_.c_str(), GetScreenWidth() - w - 18, GetScreenHeight() - 30, 16, BLACK);
+        DrawRectangle(screenW() - w - 28, screenH() - 34, w + 20, 26, ui::kAccent);
+        DrawTextU(status_.c_str(), screenW() - w - 18, screenH() - 30, 16, BLACK);
     }
 }
 
 void Editor::drawToolbar() {
-    int sw = GetScreenWidth();
+    int sw = screenW();
     ui::panel({ 0, 0, (float)sw, kToolbarH }, ui::kPanelHi);
 
     float x = 8;

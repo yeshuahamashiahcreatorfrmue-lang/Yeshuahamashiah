@@ -95,7 +95,7 @@ void GamePlay::update(float dt) {
 
 void GamePlay::draw() {
     if (phase_ == Phase::GameClear) {
-        int sw = GetScreenWidth(), sh = GetScreenHeight();
+        int sw = screenW(), sh = screenH();
         DrawRectangleGradientV(0, 0, sw, sh, Color{ 30, 30, 60, 255 }, Color{ 10, 10, 24, 255 });
         const char* a = "THE END";
         int aw = MeasureTextU(a, 72);
@@ -108,13 +108,13 @@ void GamePlay::draw() {
         return;
     }
     if (phase_ == Phase::GameOver) {
-        DrawRectangle(0,0,GetScreenWidth(),GetScreenHeight(), Color{0,0,0,255});
+        DrawRectangle(0,0,screenW(),screenH(), Color{0,0,0,255});
         const char* go = "GAME OVER";
         int w = MeasureTextU(go, 64);
-        DrawTextU(go, GetScreenWidth()/2 - w/2, GetScreenHeight()/2 - 60, 64, ui::kDanger);
+        DrawTextU(go, screenW()/2 - w/2, screenH()/2 - 60, 64, ui::kDanger);
         const char* sub = "Enter를 누르세요";
         int sw2 = MeasureTextU(sub, 22);
-        DrawTextU(sub, GetScreenWidth()/2 - sw2/2, GetScreenHeight()/2 + 20, 22, ui::kTextDim);
+        DrawTextU(sub, screenW()/2 - sw2/2, screenH()/2 + 20, 22, ui::kTextDim);
         return;
     }
     drawField();

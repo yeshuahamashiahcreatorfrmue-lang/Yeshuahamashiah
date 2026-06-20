@@ -6,6 +6,7 @@
 #include "game/TitleScreen.h"
 #include "render/UI.h"
 #include <filesystem>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -69,22 +70,67 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
     while (!WindowShouldClose() && !quit_) {
         float dt = GetFrameTime();
         audio_.update();
+
+        // --- global UI zoom: logical size = window / uiScale ---
+        int winW = GetScreenWidth(), winH = GetScreenHeight();
+        // Ctrl + wheel zooms the whole UI like a web page.
+        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
+            float wheel = GetMouseWheelMove();
+            if (wheel != 0) setUiScale(uiScale() + wheel * 0.1f);
+        }
+        float sc = uiScale();
+        int lw = std::max(640, (int)(winW / sc)), lh = std::max(360, (int)(winH / sc));
+        setLogicalScreen(lw, lh);
+        if (rtW_ != lw || rtH_ != lh) {
+            if (frameRT_.id) UnloadRenderTexture(frameRT_);
+            frameRT_ = LoadRenderTexture(lw, lh);
+            SetTextureFilter(frameRT_.texture, TEXTURE_FILTER_BILINEAR);
+            rtW_ = lw; rtH_ = lh;
+        }
+        // map mouse into logical space so all hit-testing matches the scaled view
+        SetMouseScale(1.0f / sc, 1.0f / sc);
+
         update(dt);
-        BeginDrawing();
+
+        BeginTextureMode(frameRT_);
         ClearBackground(Color{ 18, 20, 26, 255 });
         draw();
+        drawUiScaleBar();
+        EndTextureMode();
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+        // blit the logical frame to the window, scaled up (flip Y for RT)
+        DrawTexturePro(frameRT_.texture,
+                       { 0, 0, (float)lw, -(float)lh },
+                       { 0, 0, (float)winW, (float)winH }, { 0, 0 }, 0, WHITE);
         EndDrawing();
         ++frame;
         if (!shotPath_.empty() && maxFrames > 0 && frame == maxFrames - 1)
             TakeScreenshot(shotPath_.c_str());
         if (maxFrames > 0 && frame >= maxFrames) break;
     }
+    if (frameRT_.id) UnloadRenderTexture(frameRT_);
 
     audio_.shutdown();
     textures_.clear();
     UnloadUIFont();
     CloseWindow();
     return 0;
+}
+
+// Bottom-centre UI zoom control (글자/패널 크기). Drawn in logical space so its
+// own mouse hit-testing matches; visible in every mode. Ctrl+wheel also zooms.
+void Engine::drawUiScaleBar() {
+    int sw = screenW(), sh = screenH();
+    float h = 24, y = sh - h - 5, cx = sw / 2.0f - 132;
+    DrawRectangle((int)cx - 8, (int)y - 4, 290, (int)h + 8, Fade(BLACK, 0.6f));
+    DrawTextU("UI 크기", (int)cx, (int)y + 4, 14, ui::kText);
+    if (ui::button({ cx + 66, y, 30, h }, "-"))   setUiScale(uiScale() - 0.1f);
+    DrawTextU(TextFormat("%d%%", (int)(uiScale() * 100 + 0.5f)), (int)cx + 104, (int)y + 4, 15, ui::kAccentHi);
+    if (ui::button({ cx + 150, y, 30, h }, "+"))  setUiScale(uiScale() + 0.1f);
+    if (ui::button({ cx + 188, y, 40, h }, "1x"))  setUiScale(1.0f);
+    if (ui::button({ cx + 232, y, 40, h }, "2x"))  setUiScale(2.0f);
 }
 
 void Engine::update(float dt) {

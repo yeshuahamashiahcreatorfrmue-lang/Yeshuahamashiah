@@ -169,7 +169,7 @@ void GamePlay::drawSkillPanel() {
         for (const auto& s : skills_) if (s.slot == slot) { bound[slot] = &s; ++nBound; break; }
     if (nBound == 0) return;
 
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int sw = screenW(), sh = screenH();
     float pw = 178, ph = 72, gap = 7;
     float px = sw - pw - 12;
     float py = sh - (ph + gap) * nBound - 14;

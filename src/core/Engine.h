@@ -70,6 +70,13 @@ private:
     std::unique_ptr<Editor>      editor_;
     std::unique_ptr<GamePlay>    play_;
     std::unique_ptr<TitleScreen> title_;
+
+    // Webpage-style global UI zoom: the frame is drawn to a logical-size render
+    // texture and scaled up to the window. Adjustable via Ctrl+wheel / on-screen
+    // buttons. frameRT_ is (re)created when the window or scale changes.
+    RenderTexture2D frameRT_{};
+    int  rtW_ = 0, rtH_ = 0;
+    void drawUiScaleBar();   // bottom-centre zoom control (drawn in logical space)
 };
 
 } // namespace tsukuru

@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 namespace tsukuru {
 
 void Editor::drawDatabaseTab() {
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Database& db = engine_.project().database;
 

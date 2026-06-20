@@ -68,7 +68,7 @@ int GamePlay::motionFrameAsset() const {
 
 void GamePlay::drawWeather(float dt) {
     if (!map_ || map_->weather == 0) return;
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int sw = screenW(), sh = screenH();
     bool rain = map_->weather == 1;
     int target = rain ? 220 : 120;
     if ((int)weatherP_.capacity() < target) weatherP_.reserve(target); // avoid realloc churn
@@ -113,7 +113,7 @@ void GamePlay::drawMinimap() {
 
     int mmW = 132, mmH = 100;
     float s = std::min((float)mmW/w, (float)mmH/h);
-    int ox = GetScreenWidth() - (int)(w*s) - 12, oy = 40;
+    int ox = screenW() - (int)(w*s) - 12, oy = 40;
     DrawRectangle(ox-3, oy-3, (int)(w*s)+6, (int)(h*s)+6, Fade(BLACK,0.55f));
     DrawTexturePro(minimapTex_, { 0,0,(float)w,(float)h },
                    { (float)ox,(float)oy,(float)w*s,(float)h*s }, {0,0}, 0, WHITE);
@@ -125,7 +125,7 @@ void GamePlay::drawMinimap() {
 void GamePlay::visibleRange(int& x0,int& y0,int& x1,int& y1) const {
     int TS = map_->tileset.tileWidth;
     Vector2 tl = GetScreenToWorld2D({0,0}, cam_);
-    Vector2 br = GetScreenToWorld2D({(float)GetScreenWidth(),(float)GetScreenHeight()}, cam_);
+    Vector2 br = GetScreenToWorld2D({(float)screenW(),(float)screenH()}, cam_);
     x0 = std::max(0, (int)(tl.x/TS) - 1);  y0 = std::max(0, (int)(tl.y/TS) - 1);
     x1 = std::min(map_->tilemap.width()-1,  (int)(br.x/TS) + 1);
     y1 = std::min(map_->tilemap.height()-1, (int)(br.y/TS) + 1);
@@ -162,7 +162,7 @@ void GamePlay::drawField() {
     int w = map_->tilemap.width(), h = map_->tilemap.height();
 
     // follow the player, but clamp so the view never shows past the map edges
-    float sw = (float)GetScreenWidth(), sh = (float)GetScreenHeight();
+    float sw = (float)screenW(), sh = (float)screenH();
     float halfW = sw / (2.0f * cam_.zoom), halfH = sh / (2.0f * cam_.zoom);
     float mapW = w * (float)TS, mapH = h * (float)TS;
     float tgx = pxX_ + TS/2.0f, tgy = pxY_ + TS/2.0f;
@@ -239,7 +239,7 @@ void GamePlay::drawField() {
     // darkness + torch-light (cave / night atmosphere)
     if (map_->darkness > 0) {
         unsigned char a = (unsigned char)std::min(245, map_->darkness);
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Color{ 6, 8, 16, a });
+        DrawRectangle(0, 0, screenW(), screenH(), Color{ 6, 8, 16, a });
         Vector2 ps = GetWorldToScreen2D({ pxX_ + TS/2.0f, pxY_ + TS/2.0f }, cam_);
         BeginBlendMode(BLEND_ADDITIVE);
         float R = TS * 5.0f;
@@ -252,7 +252,7 @@ void GamePlay::drawField() {
     if (map_->dayNight) {
         float t = fmodf(worldTime_, 120.0f) / 120.0f;        // full cycle every 2 min
         float night = 0.5f - 0.5f * cosf(t * 2.0f * PI);     // 0 noon -> 1 midnight
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
+        DrawRectangle(0, 0, screenW(), screenH(),
                       Color{ 20, 24, 64, (unsigned char)(night * 150) });
     }
 
@@ -264,7 +264,7 @@ void GamePlay::drawField() {
 
     // HUD
     GameState& gs = engine_.state();
-    DrawRectangle(0, 0, GetScreenWidth(), 32, Fade(BLACK, 0.55f));
+    DrawRectangle(0, 0, screenW(), 32, Fade(BLACK, 0.55f));
     if (!gs.party.empty()) {
         PartyMember& m = gs.party[0];
         DrawTextU(TextFormat("Lv %d   체력 %d/%d   기력 %d/%d   EXP %d   Gold %d",
@@ -276,14 +276,14 @@ void GamePlay::drawField() {
         DrawTextU(TextFormat("목표: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
     }
     DrawTextU("Z:공격 X:원거리 C:회피 V:궁극기  방향키/WASD:이동  Enter:대화  ESC:메뉴  F2:에디터",
-             12, GetScreenHeight() - 24, 15, Fade(ui::kText, 0.7f));
+             12, screenH() - 24, 15, Fade(ui::kText, 0.7f));
 
     drawSkillPanel();
 
     if (toastTimer_ > 0) {
         int tw = MeasureTextU(toast_.c_str(), 18);
-        DrawRectangle(GetScreenWidth()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
-        DrawTextU(toast_.c_str(), GetScreenWidth()/2 - tw/2, 46, 18, BLACK);
+        DrawRectangle(screenW()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
+        DrawTextU(toast_.c_str(), screenW()/2 - tw/2, 46, 18, BLACK);
     }
 }
 

@@ -26,7 +26,7 @@ void TitleScreen::update(float dt) {
     bool confirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
 
     // Mouse support: hovering highlights an option, clicking confirms it.
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int sw = screenW(), sh = screenH();
     int oy = sh / 2 + 40;
     Vector2 mp = GetMousePosition();
     for (int i = 0; i < count; ++i) {
@@ -52,7 +52,7 @@ void TitleScreen::update(float dt) {
 }
 
 void TitleScreen::draw() {
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int sw = screenW(), sh = screenH();
     // Backdrop gradient
     DrawRectangleGradientV(0, 0, sw, sh, Color{ 20, 28, 48, 255 }, Color{ 8, 10, 18, 255 });
 

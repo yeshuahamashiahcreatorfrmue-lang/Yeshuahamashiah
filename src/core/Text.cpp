@@ -66,4 +66,13 @@ int MeasureTextU(const char* text, int fontSize) {
     return MeasureText(text, fontSize);
 }
 
+// --- global UI scale ---
+static int   s_logicalW = 1280, s_logicalH = 720;
+static float s_uiScale = 1.5f;   // default: 1.5x bigger UI/text
+void setLogicalScreen(int w, int h) { s_logicalW = w; s_logicalH = h; }
+int  screenW() { return s_logicalW; }
+int  screenH() { return s_logicalH; }
+void setUiScale(float s) { s_uiScale = s < 1.0f ? 1.0f : (s > 3.0f ? 3.0f : s); }
+float uiScale() { return s_uiScale; }
+
 } // namespace tsukuru

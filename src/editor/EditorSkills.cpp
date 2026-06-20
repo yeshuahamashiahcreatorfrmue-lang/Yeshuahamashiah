@@ -120,7 +120,7 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
 
     // ---- live effect preview (right of the column): plays the strip in real time ----
     float pvx = dx + 272, pvw = 104, pvh = 104;
-    if (pvx + pvw + 8 < GetScreenWidth()) {
+    if (pvx + pvw + 8 < screenW()) {
         DrawTextU("이펙트 미리보기", (int)pvx, (int)fxTop, 13, ui::kAccent);
         Rectangle box = { pvx, fxTop + 20, pvw, pvh };
         ui::panel(box, ui::kPanelHi);

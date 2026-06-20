@@ -159,8 +159,8 @@ void Menu::draw() {
     }
     if (toastTimer_ > 0) {
         int w = MeasureTextU(toast_.c_str(), 20);
-        DrawRectangle(GetScreenWidth()/2 - w/2 - 12, 20, w + 24, 36, ui::kAccent);
-        DrawTextU(toast_.c_str(), GetScreenWidth()/2 - w/2, 28, 20, BLACK);
+        DrawRectangle(screenW()/2 - w/2 - 12, 20, w + 24, 36, ui::kAccent);
+        DrawTextU(toast_.c_str(), screenW()/2 - w/2, 28, 20, BLACK);
     }
 }
 

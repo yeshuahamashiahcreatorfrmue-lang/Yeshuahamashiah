@@ -284,28 +284,18 @@ void Editor::pickAndImportEffect() {
     try {
         fs::create_directories(fs::path(p.dir) / "assets", ec);
 
-        // ---- single file: reuse the importer + strip auto-detect ----
+        // ---- single file: import via the AI/colour cut-out (no auto-slicing,
+        //      which previously mis-sliced single images and broke the effect) ----
         if (imgs.size() == 1) {
             fs::path tmp = stagingPath(imgs[0]);
             if (!plat::copyFileUtf8(imgs[0], tmp.string())) { setStatus("이펙트 복사 실패."); return; }
-            int id = importImageFile(tmp.string());
+            int id = importImageFile(tmp.string());     // runs AI cut-out / bg removal
             fs::remove(tmp, ec);
             if (id < 0) { setStatus("이펙트 불러오기 실패."); return; }
-            const AssetEntry* ae = p.assets.find(id);
-            if (ae && ae->frames <= 1) {
-                Image img = LoadImage(p.assetFullPath(id).c_str());
-                if (img.data) {
-                    if (img.height > 0 && img.width % img.height == 0) {
-                        int n = img.width / img.height;
-                        if (n >= 2 && n <= 32) p.assets.setAnim(id, n, 12);
-                    }
-                    UnloadImage(img);
-                }
-            }
+            const AssetEntry* ae = p.assets.find(id);   // a real GIF strip keeps its frames
             s->effectAsset = id; s->effectLoops = std::max(1, s->effectLoops);
-            const AssetEntry* fin = p.assets.find(id);
             p.save();
-            setStatus(TextFormat("이펙트 적용됨 (%d프레임)", fin ? fin->frames : 1));
+            setStatus(TextFormat("이펙트 적용됨 (%d프레임, 배경 제거)", ae ? ae->frames : 1));
             return;
         }
 

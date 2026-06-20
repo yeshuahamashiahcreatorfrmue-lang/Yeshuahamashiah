@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 namespace tsukuru {
 
 void Editor::drawMapTab() {
-    float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
+    float W = (float)screenW(), H = (float)screenH();
     float rightW = npcMode_ ? 324.0f : 0.0f;          // NPC inspector panel width
     Rectangle paletteArea = { 0, kToolbarH, kPaletteW, H - kToolbarH };
     Rectangle canvasArea  = { kPaletteW, kToolbarH, W - kPaletteW - rightW, H - kToolbarH };

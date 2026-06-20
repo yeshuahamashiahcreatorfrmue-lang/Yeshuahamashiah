@@ -79,7 +79,7 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
 }
 
 void Editor::drawEventsTab() {
-    Rectangle canvasArea = { 0, kToolbarH, (float)GetScreenWidth() - 320, (float)GetScreenHeight() - kToolbarH };
+    Rectangle canvasArea = { 0, kToolbarH, (float)screenW() - 320, (float)screenH() - kToolbarH };
     auto m = activeMap();
     BeginScissorMode((int)canvasArea.x, (int)canvasArea.y, (int)canvasArea.width, (int)canvasArea.height);
     DrawRectangleRec(canvasArea, Color{ 24, 26, 34, 255 });
@@ -134,7 +134,7 @@ void Editor::drawEventsTab() {
     EndScissorMode();
 
     // ---- event inspector panel ----
-    Rectangle panel = { (float)GetScreenWidth() - 320, kToolbarH, 320, (float)GetScreenHeight() - kToolbarH };
+    Rectangle panel = { (float)screenW() - 320, kToolbarH, 320, (float)screenH() - kToolbarH };
     ui::panel(panel, ui::kPanel);
     ui::label("이벤트", (int)panel.x + 12, (int)panel.y + 10, 22, ui::kAccent);
     Event* ev = nullptr;

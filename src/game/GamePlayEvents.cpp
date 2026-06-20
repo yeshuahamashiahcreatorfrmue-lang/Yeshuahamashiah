@@ -132,7 +132,7 @@ void GamePlay::runEvent(Event& e) {
 }
 
 void GamePlay::drawMessage() {
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    int sw = screenW(), sh = screenH();
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };
     DrawRectangleRec(box, Fade(Color{ 20, 24, 36, 255 }, 0.95f));
     DrawRectangleLinesEx(box, 2, ui::kAccent);

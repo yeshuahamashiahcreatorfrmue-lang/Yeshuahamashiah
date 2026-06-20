@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 namespace tsukuru {
 
 void Editor::drawWorldTab() {
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
 
@@ -23,7 +23,7 @@ void Editor::drawWorldTab() {
     ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
     ui::label("맵 목록", (int)lx + 12, (int)ly + 10, 22, ui::kAccent);
     DrawTextU(TextFormat("%d개", (int)p.maps.size()), (int)lx + 120, (int)ly + 16, 16, ui::kTextDim);
-    DrawTextU(kBuildTag, 12, GetScreenHeight() - 22, 14, ui::kGood);   // build-confirm tag (bottom-left)
+    DrawTextU(kBuildTag, 12, screenH() - 22, 14, ui::kGood);   // build-confirm tag (bottom-left)
 
     // search box: filter the list by name (or #id)
     Rectangle sf = { lx + 10, ly + 40, lw - 20, 26 };
@@ -229,7 +229,7 @@ void Editor::drawWorldTab() {
 // independent. Click a map (list or grid) to select; click an empty cell to drop
 // the selected map there.
 void Editor::drawWorldViewTab() {
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 20, 22, 30, 255 });
     Project& p = engine_.project();
     const float cell = 180.0f;
@@ -328,7 +328,7 @@ void Editor::drawWorldViewTab() {
     }
     EndScissorMode();
     DrawTextU("휠=확대/축소 · 가운데드래그=이동 · 좌클릭=배치/선택", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 13, ui::kTextDim);
-    DrawTextU(kBuildTag, 12, GetScreenHeight()-22, 13, ui::kGood);
+    DrawTextU(kBuildTag, 12, screenH()-22, 13, ui::kGood);
 }
 
 } // namespace tsukuru

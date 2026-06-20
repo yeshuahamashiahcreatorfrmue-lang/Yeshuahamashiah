@@ -253,7 +253,7 @@ void Editor::scrollbar(Rectangle r, int& scroll, float contentH) {
 void Editor::drawCharsTab() {
     if (charSkillEdit_) { drawCharSkillEditor(); return; }   // modal: this character's skill
     if (charDataEdit_)  { drawCharDataEditor();  return; }   // modal: this character's full data
-    float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
+    float W = (float)screenW(), H = (float)screenH();
     DrawRectangleRec({ 0, kToolbarH, W, H - kToolbarH }, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
     Database& db = p.database;
@@ -682,7 +682,7 @@ void Editor::drawCharsTab() {
 void Editor::drawCharSkillEditor() {
     Project& p = engine_.project();
     Database& db = p.database;
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
 
     if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charSkillEdit_ = false; return; }
@@ -765,7 +765,7 @@ void Editor::drawCharSkillEditor() {
 void Editor::drawCharDataEditor() {
     Project& p = engine_.project();
     Database& db = p.database;
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
     if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charDataEdit_ = false; return; }
     CharacterDef& cd = db.characters[charDefSel_];
