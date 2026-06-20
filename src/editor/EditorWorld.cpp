@@ -102,8 +102,11 @@ void Editor::drawWorldTab() {
                 float bx = pvBox.x + (pvBox.width - pw) / 2, by = pvBox.y + (pvBox.height - ph) / 2;
                 DrawTexturePro(th->texture, { 0,0,tw,-tht }, { bx,by,pw,ph }, {0,0}, 0, WHITE);
             }
-            if (ui::mouseIn(pvBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            if (ui::mouseIn(pvBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 worldPreviewFull_ = true;             // open the fullscreen overlay
+                worldPreviewMapId_ = p.maps[selIdx]->id;
+                worldPreviewStack_.clear();
+            }
         }
         DrawRectangleLinesEx(pvBox, 1, ui::mouseIn(pvBox) ? ui::kAccentHi : Fade(BLACK, 0.6f));
     }
@@ -465,24 +468,92 @@ void Editor::buildMapThumb(Map& m) {
 }
 
 // Fullscreen map preview overlay (opened by clicking the World-tab thumbnail).
+// Shows the map plus markers for NPCs / events / mob spawns / building entrances;
+// clicking an entrance (텔레포트) dives into that interior map — recursively, with
+// the same markers. Click the dark margin, X, or ESC to close; ← 뒤로 steps back.
 void Editor::drawWorldPreviewOverlay() {
+    Project& p = engine_.project();
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 248 });
-    DrawTextU("맵 전체 미리보기  (X 또는 ESC 로 닫기)", 20, 12, 18, ui::kAccent);
-    if (worldBigThumb_.id && worldBigId_ >= 0) {
+    auto pm = p.map(worldPreviewMapId_);
+    DrawTextU(TextFormat("미리보기: %s   (빈 곳·X·ESC = 닫기)", pm ? pm->name.c_str() : "맵"),
+              20, (int)kToolbarH + 10, 18, ui::kAccent);
+
+    Rectangle imgR = { 0, 0, 0, 0 };
+    int gotoMap = -1;
+    if (worldBigThumb_.id && pm && worldBigId_ == worldPreviewMapId_) {
         float tw = (float)worldBigThumb_.texture.width, th = (float)worldBigThumb_.texture.height;
-        float maxW = sw - 60.0f, maxH = sh - 100.0f;
+        float maxW = sw - 60.0f, maxH = sh - kToolbarH - 120.0f;
         float s = std::min(maxW / tw, maxH / th);
         float pw = tw * s, ph = th * s;
-        float bx = (sw - pw) / 2, by = 52 + (sh - 52 - ph) / 2;
+        float bx = (sw - pw) / 2, by = kToolbarH + 50 + (sh - (kToolbarH + 50) - ph - 40) / 2;
+        imgR = { bx, by, pw, ph };
         DrawRectangle((int)bx-3, (int)by-3, (int)pw+6, (int)ph+6, Color{ 20, 22, 30, 255 });
-        DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, { bx,by,pw,ph }, {0,0}, 0, WHITE);
+        DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, imgR, {0,0}, 0, WHITE);
         DrawRectangleLinesEx({ bx-3,by-3,pw+6,ph+6 }, 1, Fade(BLACK, 0.6f));
+
+        // ---- markers (events: NPCs / entrances / mob spawns / generic) ----
+        int mw = pm->tilemap.width(), mh = pm->tilemap.height();
+        if (mw > 0 && mh > 0) {
+            float r = std::max(5.0f, std::min(pw/mw, ph/mh) * 0.5f);
+            Vector2 mouse = GetMousePosition();
+            for (auto& e : pm->events) {
+                Vector2 sp = { bx + (e.x + 0.5f)/mw*pw, by + (e.y + 0.5f)/mh*ph };
+                bool entrance = (e.type == EventType::Teleport && e.targetMap >= 0);
+                Color col;
+                if (entrance)                         col = ui::kGood;                       // 문(입구)
+                else if (e.type == EventType::StartBattle) col = ui::kDanger;                 // 몹 스폰
+                else if (e.graphicAsset >= 0)
+                    col = e.faction==NpcFaction::Enemy ? ui::kDanger
+                        : e.faction==NpcFaction::Ally  ? Color{90,170,255,255}
+                                                       : Color{215,215,215,255};              // NPC
+                else                                   col = Color{240,210,80,255};            // 이벤트
+                DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
+                DrawCircleV(sp, r, col);
+                if (entrance) {
+                    DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE);
+                    bool hov = CheckCollisionPointCircle(mouse, sp, r + 5);
+                    if (hov) {
+                        auto tgt = p.map(e.targetMap);
+                        DrawTextU(tgt ? tgt->name.c_str() : "내부", (int)sp.x + 8, (int)sp.y - 8, 14, WHITE);
+                        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) gotoMap = e.targetMap;
+                    }
+                }
+            }
+        }
+        // ---- legend ----
+        float ly = by + ph + 10, lx = bx;
+        auto chip = [&](Color c, const char* t){ DrawCircle((int)lx+6,(int)ly+8,6,c); DrawTextU(t,(int)lx+16,(int)ly+1,13,ui::kText); lx += 18 + MeasureTextU(t,13) + 16; };
+        chip(ui::kGood, "문/입구(클릭=내부)"); chip(Color{215,215,215,255}, "NPC");
+        chip(Color{90,170,255,255}, "아군"); chip(ui::kDanger, "적/몹");
+        chip(Color{240,210,80,255}, "이벤트");
     } else {
         DrawTextU("미리보기 생성 중…", sw/2 - 70, sh/2, 18, ui::kTextDim);
     }
-    if (ui::button({ (float)sw - 52, 8, 42, 32 }, "X") || IsKeyPressed(KEY_ESCAPE))
+
+    // ---- top-right controls (below the toolbar so they're visible) ----
+    bool back = false, close = false;
+    if (!worldPreviewStack_.empty())
+        back = ui::button({ (float)sw - 168, (float)kToolbarH + 8, 100, 30 }, "← 뒤로");
+    close = ui::button({ (float)sw - 56, (float)kToolbarH + 8, 46, 32 }, "X");
+
+    // click on the dark margin (outside the image & the control strip) closes
+    Rectangle ctlZone = { (float)sw - 180, (float)kToolbarH, 180, 50 };
+    Vector2 mp = GetMousePosition();
+    bool clickedEmpty = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && mp.y > kToolbarH
+                      && !CheckCollisionPointRec(mp, imgR)
+                      && !CheckCollisionPointRec(mp, ctlZone);
+
+    if (gotoMap >= 0) {                        // enter a building interior
+        worldPreviewStack_.push_back(worldPreviewMapId_);
+        worldPreviewMapId_ = gotoMap;
+    } else if (back) {                         // step back out
+        worldPreviewMapId_ = worldPreviewStack_.back();
+        worldPreviewStack_.pop_back();
+    } else if (close || clickedEmpty || IsKeyPressed(KEY_ESCAPE)) {
         worldPreviewFull_ = false;
+        worldPreviewStack_.clear();
+    }
 }
 
 const RenderTexture2D* Editor::mapThumb(int mapId) {
@@ -505,6 +576,7 @@ void Editor::ensureThumbsForTab() {
     // edits are reflected; then lazily build the ones actually needed.
     if (tab_ != prevTab_) {
         if (tab_ == Tab::World || tab_ == Tab::WorldView) clearMapThumbs();
+        if (tab_ != Tab::World) { worldPreviewFull_ = false; worldPreviewStack_.clear(); }
         prevTab_ = tab_;
     }
     Project& p = engine_.project();
@@ -514,11 +586,14 @@ void Editor::ensureThumbsForTab() {
         if (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) {
             auto& m = p.maps[worldSelected_];
             if (!mapThumb(m->id)) buildMapThumb(*m);
-            // hi-res texture for the fullscreen preview (rebuild when selection changes)
-            if (worldPreviewFull_ && worldBigId_ != m->id) {
+        }
+        // hi-res texture for the fullscreen preview (rebuild when the shown map changes,
+        // including when diving into a building interior)
+        if (worldPreviewFull_ && worldPreviewMapId_ >= 0 && worldBigId_ != worldPreviewMapId_) {
+            if (auto pm = p.map(worldPreviewMapId_)) {
                 if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
-                worldBigThumb_ = makeMapThumb(*m, 1280, 860);
-                worldBigId_ = m->id;
+                worldBigThumb_ = makeMapThumb(*pm, 1280, 860);
+                worldBigId_ = worldPreviewMapId_;
             }
         }
     }

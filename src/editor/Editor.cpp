@@ -39,6 +39,11 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
+    if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview
+        tab_ = Tab::World; worldSelected_ = 0;
+        worldPreviewFull_ = true;
+        if (auto m = activeMap()) worldPreviewMapId_ = m->id;
+    }
 }
 
 std::shared_ptr<Map> Editor::activeMap() {
