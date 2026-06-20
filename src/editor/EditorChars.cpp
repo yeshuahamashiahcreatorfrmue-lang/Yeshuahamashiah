@@ -46,16 +46,41 @@ static const char* const kSlotKeys6[6] = { "Z", "X", "C", "V", "F", "G" };
 
 // Unregister a set of image assets from the project and remove any references to
 // them from every character motion (so no frame points at a deleted id).
+void Editor::drawFootprintGrid(Rectangle a, int& wT, int& hT, int previewAsset, bool sheet4dir, int maxN) {
+    wT = std::max(1, std::min(maxN, wT));
+    hT = std::max(1, std::min(maxN, hT));
+    float cs = std::min(a.width, a.height) / maxN;     // square cells
+    float gridBottom = a.y + maxN * cs;
+    // grid cells; the chosen footprint is the bottom-left wT×hT block
+    for (int gy = 0; gy < maxN; ++gy)
+        for (int gx = 0; gx < maxN; ++gx) {
+            int rb = maxN - 1 - gy;                     // row index counted from the bottom
+            Rectangle c = { a.x + gx*cs, a.y + gy*cs, cs - 3, cs - 3 };
+            bool inFp = (gx < wT && rb < hT);
+            DrawRectangleRec(c, inFp ? Fade(ui::kAccent, 0.35f) : Color{ 40, 44, 56, 255 });
+            DrawRectangleLinesEx(c, 1, Fade(BLACK, 0.5f));
+            // click OR drag over a cell sets the footprint to (col+1)×(rowFromBottom+1)
+            if (ui::mouseIn(c) && (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON))) {
+                wT = gx + 1; hT = rb + 1;
+            }
+        }
+    // live preview: the sprite drawn filling exactly the chosen footprint block
+    if (previewAsset >= 0) {
+        const Texture2D& tex = engine_.assetTexture(previewAsset);
+        float fw = sheet4dir ? tex.width / 4.0f : (float)tex.width;
+        float fh = sheet4dir ? tex.height / 4.0f : (float)tex.height;
+        Rectangle src = { 0, 0, fw, fh };              // facing-down / first frame
+        Rectangle dst = { a.x, gridBottom - hT*cs, wT*cs - 3, hT*cs - 3 };
+        DrawTexturePro(tex, src, dst, { 0, 0 }, 0, Fade(WHITE, 0.95f));
+    }
+    DrawRectangleLinesEx({ a.x, a.y, maxN*cs, maxN*cs }, 1, Fade(WHITE, 0.25f));
+}
+
 void Editor::deleteAssets(const std::vector<int>& ids) {
     Project& p = engine_.project();
-    auto hit = [&](int id){ return std::find(ids.begin(), ids.end(), id) != ids.end(); };
-    auto scrub = [&](std::vector<int>& v){ v.erase(std::remove_if(v.begin(), v.end(), hit), v.end()); };
-    for (auto& cd : p.database.characters)
-        for (int mi = 0; mi < MO_COUNT; ++mi) {
-            MotionClip& mc = cd.motions[mi];
-            scrub(mc.frames); scrub(mc.left); scrub(mc.right); scrub(mc.up);
-        }
-    for (int id : ids) p.assets.remove(id);
+    for (int id : ids) engine_.invalidateAsset(id);   // free GPU texture + path cache first
+    p.deleteAssets(ids);                              // scrub refs, delete files, unregister
+    charLibSel_.clear();                              // selection may reference removed ids
     charFrameSel_ = -1;
     p.save();
 }
@@ -788,7 +813,13 @@ void Editor::drawCharDataEditor() {
     ui::intStepper({ lx, ly, lw, 26 }, "공격력",        cd.atk,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 32;
-    ui::intStepper({ lx, ly, lw, 26 }, "크기(칸%, 100=1칸)", cd.drawPct, 25, 25, 400); ly += 36;
+    // tile footprint (칸): drag/click the grid; sprite fits the chosen block
+    DrawTextU("차지 칸수 (드래그/클릭)", (int)lx, (int)ly, 13, ui::kTextDim); ly += 18;
+    int prev = cd.motions[MO_Walk].frames.empty() ? -1 : cd.motions[MO_Walk].frames.front();
+    drawFootprintGrid({ lx, ly, 132, 132 }, cd.drawTilesW, cd.drawTilesH, prev, false);
+    DrawTextU(TextFormat("%d×%d칸", cd.drawTilesW, cd.drawTilesH), (int)lx + 142, (int)ly + 6, 18, ui::kAccentHi);
+    ui::intStepper({ lx + 142, ly + 34, lw - 142, 24 }, "미세 %", cd.drawPct, 5, 25, 400);
+    ly += 140;
     DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
     DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
     bool isP = (p.playerCharId == cd.id);

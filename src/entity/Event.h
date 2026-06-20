@@ -68,7 +68,9 @@ struct Event {
     // --- NPC presentation & behaviour (only used when graphicAsset >= 0) ---
     NpcFaction  faction  = NpcFaction::Neutral;
     NpcBehavior behavior = NpcBehavior::Idle;
-    int  drawPct = 100;  // on-map sprite size as a % of one tile (100 = 1칸, 200 = 2칸)
+    int  drawPct = 100;  // fine size %, applied on top of the tile footprint (100 = exact)
+    int  drawTilesW = 1; // tile footprint WIDTH  the NPC occupies on the map (칸)
+    int  drawTilesH = 1; // tile footprint HEIGHT the NPC occupies on the map (칸)
     // Combat stats for Ally/Enemy NPCs (ignored for Neutral):
     int  npcHp  = 20;    // 체력
     int  npcAtk = 8;     // 공격력

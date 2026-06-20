@@ -28,7 +28,12 @@ void Editor::drawNpcStatRows(Event& ev, float x, float& y, float w) {
         ev.behavior = (NpcBehavior)(((int)ev.behavior + 1) % 5);
     }
     y += 28;
-    ui::intStepper({ x, y, w, 24 }, "크기(칸%, 100=1칸)", ev.drawPct, 25, 25, 400); y += 28;
+    // tile footprint (칸): drag/click the grid; the sprite fits the chosen block
+    DrawTextU("차지 칸수 (드래그/클릭)", (int)x, (int)y, 12, ui::kTextDim); y += 16;
+    drawFootprintGrid({ x, y, 112, 112 }, ev.drawTilesW, ev.drawTilesH, ev.graphicAsset, true);
+    DrawTextU(TextFormat("%d×%d칸", ev.drawTilesW, ev.drawTilesH), (int)x + 120, (int)y + 4, 16, ui::kAccentHi);
+    ui::intStepper({ x + 120, y + 30, w - 120, 24 }, "미세 %", ev.drawPct, 5, 25, 400);
+    y += 120;
     if (ev.faction != NpcFaction::Neutral) {
         ui::intStepper({ x, y, w, 24 }, "체력",   ev.npcHp,  5, 1, 9999); y += 26;
         ui::intStepper({ x, y, w, 24 }, "공격력", ev.npcAtk, 1, 0, 999);  y += 26;

@@ -162,10 +162,12 @@ void Editor::drawMapCanvas(Rectangle area) {
         for (auto& e : m->events) {
             if (e.graphicAsset < 0) continue;
             const Texture2D& nt = engine_.assetTexture(e.graphicAsset);
-            float sz = TS * (e.drawPct > 0 ? e.drawPct/100.0f : 1.0f);
+            float pct = (e.drawPct > 0 ? e.drawPct : 100) / 100.0f;
+            float sw = TS * std::max(1, e.drawTilesW) * pct;
+            float sh = TS * std::max(1, e.drawTilesH) * pct;
             float fw = nt.width / 4.0f, fh = nt.height / 4.0f;   // 4-dir sheet, frame 0 facing down
             Rectangle src = { 0, 0, fw, fh };
-            Rectangle dst = { e.x*(float)TS + (TS-sz)/2, e.y*(float)TS + (TS-sz), sz, sz };
+            Rectangle dst = { e.x*(float)TS + (TS-sw)/2, e.y*(float)TS + (TS-sh), sw, sh };
             DrawTexturePro(nt, src, dst, {0,0}, 0, WHITE);
             Color fc = e.faction==NpcFaction::Enemy ? ui::kDanger
                      : e.faction==NpcFaction::Ally  ? Color{90,170,255,255} : Color{200,200,200,255};

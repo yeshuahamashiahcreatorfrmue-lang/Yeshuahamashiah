@@ -139,7 +139,8 @@ json Database::toJson() const {
         for (const auto& s : c.skills) sk.push_back(skillToJson(s));
         j["characters"].push_back({{"id", c.id}, {"name", c.name},
             {"maxHp", c.maxHp}, {"maxGp", c.maxGp}, {"atk", c.atk}, {"def", c.def}, {"spd", c.spd},
-            {"drawPct", c.drawPct}, {"motions", mo}, {"skills", sk}});
+            {"drawPct", c.drawPct}, {"drawTilesW", c.drawTilesW}, {"drawTilesH", c.drawTilesH},
+            {"motions", mo}, {"skills", sk}});
     }
     return j;
 }
@@ -197,6 +198,8 @@ void Database::fromJson(const json& j) {
         cd.maxHp = c.value("maxHp", 100); cd.maxGp = c.value("maxGp", 30);
         cd.atk = c.value("atk", 12); cd.def = c.value("def", 5); cd.spd = c.value("spd", 5);
         cd.drawPct = c.value("drawPct", 125);
+        cd.drawTilesW = c.value("drawTilesW", 1);
+        cd.drawTilesH = c.value("drawTilesH", 1);
         const auto& mo = c.value("motions", json::array());
         for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
             cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});

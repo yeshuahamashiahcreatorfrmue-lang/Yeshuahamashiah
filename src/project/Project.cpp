@@ -61,6 +61,52 @@ std::shared_ptr<Map> Project::addMap(const std::string& mapName, int w, int h) {
     return m;
 }
 
+bool Project::deleteMap(int id) {
+    auto it = std::find_if(maps.begin(), maps.end(),
+                           [id](const std::shared_ptr<Map>& m){ return m->id == id; });
+    if (it == maps.end()) return false;
+    if (maps.size() <= 1) return false;          // always keep at least one map
+    maps.erase(it);
+    std::error_code ec;
+    fs::remove(mapPath(id), ec);                  // drop the on-disk .json (no orphan file)
+    if (startMap == id) startMap = maps.front()->id;
+    return true;
+}
+
+void Project::deleteAssets(const std::vector<int>& ids) {
+    if (ids.empty()) return;
+    auto hit = [&](int id){ return std::find(ids.begin(), ids.end(), id) != ids.end(); };
+    auto scrub = [&](std::vector<int>& v){ v.erase(std::remove_if(v.begin(), v.end(), hit), v.end()); };
+    auto clr = [&](int& ref){ if (hit(ref)) ref = -1; };
+
+    // --- scrub every reference so nothing dangles ---
+    for (auto& cd : database.characters) {
+        for (int mi = 0; mi < MO_COUNT; ++mi) {
+            MotionClip& mc = cd.motions[mi];
+            scrub(mc.frames); scrub(mc.left); scrub(mc.right); scrub(mc.up);
+        }
+        for (auto& s : cd.skills) { clr(s.effectAsset); clr(s.soundAsset); }
+    }
+    for (auto& s  : database.fieldSkills) { clr(s.effectAsset); clr(s.soundAsset); }
+    for (auto& a  : database.actors)      clr(a.spriteAsset);
+    for (auto& e  : database.enemies)     clr(e.spriteAsset);
+    for (auto& it : database.items)       clr(it.iconAsset);
+    for (auto& eq : database.equipment)   clr(eq.iconAsset);
+    for (auto& m  : maps) {
+        clr(m->tileset.assetId);
+        clr(m->bgmAsset);
+        for (auto& ev : m->events) clr(ev.graphicAsset);
+    }
+    clr(playerSprite);
+
+    // --- delete the files and unregister, so no orphan media remains ---
+    for (int id : ids) {
+        std::string full = assetFullPath(id);
+        if (!full.empty()) { std::error_code ec; fs::remove(full, ec); }
+        assets.remove(id);
+    }
+}
+
 bool Project::load(const std::string& projectDir) {
     dir = projectDir;
     json meta;

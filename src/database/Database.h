@@ -100,7 +100,9 @@ struct CharacterDef {
     int atk   = 12;    // 공격력 (모든 스킬 공통, 배수 이전)
     int def   = 5;     // 방어력
     int spd   = 5;     // 속도
-    int drawPct = 125; // on-map draw size as a % of one tile (100 = 1칸, 200 = 2칸)
+    int drawPct = 125; // fine size %, applied on top of the tile footprint (100 = exact)
+    int drawTilesW = 1; // tile footprint WIDTH  the character occupies on the map (칸)
+    int drawTilesH = 1; // tile footprint HEIGHT the character occupies on the map (칸)
     MotionClip motions[MO_COUNT]; // walk/attack/skill1/skill2/ultimate/death
     std::vector<FieldSkill> skills; // this character's own skills (by slot); override
                                     // the global field skills when it drives the player

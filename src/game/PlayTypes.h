@@ -45,6 +45,7 @@ struct NpcInst {
     NpcFaction  faction  = NpcFaction::Neutral;
     NpcBehavior behavior = NpcBehavior::Idle;
     int  drawPct = 100;
+    int  drawTilesW = 1, drawTilesH = 1;  // tile footprint copied from the source Event
     int  homeX = 0, homeY = 0;   // spawn tile — patrol anchor / leash centre
     int  patrolDir = -1;         // 0=down 1=left 2=right 3=up, flips at obstacles
 

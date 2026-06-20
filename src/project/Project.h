@@ -41,6 +41,13 @@ public:
     std::shared_ptr<Map> addMap(const std::string& name, int w, int h);
     int nextMapId() const;
 
+    // Residue-free removal (data layer; no GPU/texture handling — the editor wraps
+    // these to also drop cached textures/thumbnails). deleteMap erases the map and
+    // its on-disk .json; deleteAssets scrubs every reference to the given asset ids
+    // across the database/maps/project, deletes their files, and unregisters them.
+    bool deleteMap(int id);
+    void deleteAssets(const std::vector<int>& ids);
+
     std::string assetFullPath(int assetId) const; // dir + relPath, "" if missing
 
     // Create a fresh empty project on disk.

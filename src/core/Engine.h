@@ -46,6 +46,7 @@ public:
 
     const Texture2D& assetTexture(int assetId); // convenience: asset id -> texture
     std::string assetPath(int assetId) const { return project_->assetFullPath(assetId); }
+    void invalidateAsset(int assetId);          // drop cached texture + path for a removed asset
 
     void requestQuit() { quit_ = true; }
 

@@ -30,7 +30,8 @@ json Map::toJson() const {
         {"weather", weather},
         {"dayNight", dayNight},
         {"animTiles", animTiles},
-        {"worldX", worldX}, {"worldY", worldY}, {"placed", placed}
+        {"worldX", worldX}, {"worldY", worldY}, {"placed", placed},
+        {"viewerCopy", viewerCopy}
     };
 }
 
@@ -52,6 +53,7 @@ void Map::fromJson(const json& j) {
     worldX           = j.value("worldX", 0);
     worldY           = j.value("worldY", 0);
     placed           = j.value("placed", false);
+    viewerCopy       = j.value("viewerCopy", false);
 }
 
 } // namespace tsukuru

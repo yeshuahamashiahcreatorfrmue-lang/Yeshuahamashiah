@@ -25,6 +25,14 @@ const Texture2D& Engine::assetTexture(int assetId) {
     return textures_.get(it->second);
 }
 
+void Engine::invalidateAsset(int assetId) {
+    auto it = assetPathCache_.find(assetId);
+    if (it != assetPathCache_.end()) {
+        textures_.invalidate(it->second);   // free the GPU texture
+        assetPathCache_.erase(it);          // drop the stale id->path entry
+    }
+}
+
 void Engine::setMode(Mode m) {
     mode_ = m;
     if (m == Mode::Play && play_) play_->onEnter();

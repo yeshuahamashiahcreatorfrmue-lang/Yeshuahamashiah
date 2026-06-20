@@ -97,7 +97,7 @@ private:
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
-    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float scale = 1.0f);
+    void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float wScale = 1.0f, float hScale = 1.0f);
     void drawWeather(float dt);
     void drawMinimap();
     void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling

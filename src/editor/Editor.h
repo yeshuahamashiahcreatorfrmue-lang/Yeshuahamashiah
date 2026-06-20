@@ -32,6 +32,7 @@ private:
     // map thumbnails (rendered to cached textures in update(), drawn on World/WorldView)
     void buildMapThumb(Map& m);
     const RenderTexture2D* mapThumb(int mapId);
+    void dropMapThumb(int mapId);   // unload+erase one cached thumbnail (on map removal)
     void clearMapThumbs();
     void ensureThumbsForTab();   // build any missing thumbnails for the current tab
     void drawMapTab();
@@ -57,6 +58,10 @@ private:
     void drawDatabaseTab();
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
+    // Interactive tile-footprint picker: a maxN×maxN grid you click/drag to set how
+    // many tiles (칸) the character/NPC occupies; the sprite is drawn filling the
+    // chosen block as a live preview. Updates wTiles/hTiles in place.
+    void drawFootprintGrid(Rectangle gridArea, int& wTiles, int& hTiles, int previewAsset, bool sheet4dir, int maxN = 4);
     void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
     void drawNpcStatRows(Event& ev, float x, float& y, float w); // 진영/AI/크기/전투 rows (shared)
     int  stageImportImage(const std::string& src, const char* prefix); // copy ext image -> asset id, -1 fail

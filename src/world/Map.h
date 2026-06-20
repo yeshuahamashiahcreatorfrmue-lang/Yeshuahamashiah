@@ -34,6 +34,8 @@ public:
     // unplaced/far-apart maps are independent. placed=false = not on the grid.
     int  worldX = 0, worldY = 0;
     bool placed = false;
+    bool viewerCopy = false;           // created by the All-Map Viewer's copy-paste;
+                                       // right-click there deletes it fully (no residue)
 
     Map() : tilemap(20, 15) {}
 

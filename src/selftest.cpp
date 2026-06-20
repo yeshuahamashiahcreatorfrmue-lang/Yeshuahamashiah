@@ -188,7 +188,8 @@ static void testCharacterBuilder() {
     // 2) "+새 캐릭터" + fill ALL six motion tabs from the registered images.
     CharacterDef cd; cd.id = 1; cd.name = "테스트영웅";
     cd.maxHp = 250; cd.maxGp = 80; cd.atk = 40; cd.def = 12; cd.spd = 9;   // 캐릭터 데이터
-    cd.drawPct = 175;                                                       // 1.75칸 크기
+    cd.drawPct = 175;                                                       // 미세 175%
+    cd.drawTilesW = 2; cd.drawTilesH = 3;                                   // 차지 칸수 2×3
     for (int m = 0; m < MO_COUNT; ++m) {
         cd.motions[m].frames = { imgIds[m*2], imgIds[m*2 + 1] };   // = clicking 2 library images
         cd.motions[m].fps    = 6 + m;
@@ -251,6 +252,8 @@ static void testCharacterBuilder() {
     // character battle data (체력/기력/공격력/방어력/속도) round-trips
     CHECK(c && c->maxHp == 250 && c->maxGp == 80 && c->atk == 40 && c->def == 12 && c->spd == 9,
           "character stats (체력/기력/공격력/방어력/속도) persisted");
+    CHECK(c && c->drawTilesW == 2 && c->drawTilesH == 3 && c->drawPct == 175,
+          "character tile footprint (차지 칸수 2×3 + 미세%) persisted");
     // and those stats drive the live party + skill damage uses 공격력 before the multiplier
     GameState gs; gs.newGame(p2.database, 1, p2.playerCharId, 1, 0, 0);
     bool statApplied = !gs.party.empty() && gs.party[0].maxHp == 250 && gs.party[0].maxMp == 80
@@ -260,6 +263,97 @@ static void testCharacterBuilder() {
         int dmg = std::max(1, gs.party[0].totalAtk(p2.database) * c->skills[0].powerPct / 100);
         CHECK(dmg == 40 * 250 / 100, "skill damage = 공격력 × 위력배수 (배수 이전 공격력 공통 적용)");
     }
+
+    fs::remove_all(tmp, ec);
+}
+
+// Count regular files in a directory (0 if it doesn't exist).
+static int countFiles(const fs::path& dir) {
+    std::error_code ec; int n = 0;
+    if (!fs::exists(dir, ec)) return 0;
+    for (auto& e : fs::directory_iterator(dir, ec)) if (e.is_regular_file()) ++n;
+    return n;
+}
+// Write a tiny dummy file (stand-in for an imported image; no graphics needed).
+static void writeDummy(const fs::path& path, const std::string& tag) {
+    std::error_code ec; fs::create_directories(path.parent_path(), ec);
+    FILE* f = std::fopen(path.string().c_str(), "wb");
+    if (f) { std::fputs(tag.c_str(), f); std::fclose(f); }
+}
+
+// Add/remove stress test: repeatedly register & delete maps and assets and verify
+// NOTHING accumulates — no leftover map .json, no orphan asset files, no dangling
+// references. This guards the "잔여물 남지 않게" (residue-free) requirement.
+static void testResidueStress() {
+    std::printf("== Residue / add-remove stress (잔여물 검사) ==\n");
+    std::string tmp = (fs::temp_directory_path() / "tsukuru_residue").string();
+    std::error_code ec; fs::remove_all(tmp, ec);
+    auto p = Project::createNew(tmp, "ResidueTest");
+    p->save();
+
+    fs::path mapsDir   = fs::path(tmp) / "maps";
+    fs::path assetsDir = fs::path(tmp) / "assets";
+    fs::path incoming  = fs::path(tmp) / "_incoming";
+
+    // --- 1. map add/delete cycles leave no orphan map files ---
+    size_t baseMaps  = p->maps.size();
+    int    baseMapF  = (p->save(), countFiles(mapsDir));
+    for (int i = 0; i < 200; ++i) {
+        auto m = p->addMap("Stress" + std::to_string(i), 16, 16);
+        int id = m->id; p->save();
+        p->deleteMap(id); p->save();
+    }
+    CHECK(p->maps.size() == baseMaps, "맵 200회 추가/삭제 후 맵 수 원상복구");
+    CHECK(countFiles(mapsDir) == baseMapF, "맵 추가/삭제 후 잔여 .json 없음");
+
+    // --- 2. asset register/delete cycles leave no orphan files ---
+    int baseAssets = (int)p->assets.all().size();
+    int baseAssetF = countFiles(assetsDir);
+    for (int i = 0; i < 200; ++i) {
+        fs::path src = incoming / ("img" + std::to_string(i) + ".png");
+        writeDummy(src, "PNGDUMMY");
+        int id = p->assets.registerAsset(p->dir, src.string(), AssetType::Image, "img");
+        p->deleteAssets({ id });
+    }
+    CHECK((int)p->assets.all().size() == baseAssets, "에셋 200회 등록/삭제 후 에셋 수 원상복구");
+    CHECK(countFiles(assetsDir) == baseAssetF, "에셋 등록/삭제 후 잔여 파일 없음");
+
+    // --- 3. deleting an asset scrubs EVERY reference (no dangling ids) ---
+    fs::path s2 = incoming / "ref.png"; writeDummy(s2, "PNGDUMMY");
+    int rid = p->assets.registerAsset(p->dir, s2.string(), AssetType::Image, "ref");
+    auto rm = p->addMap("RefMap", 12, 12);
+    rm->tileset.assetId = rid; rm->bgmAsset = rid;
+    Event rev; rev.id = 1; rev.x = 1; rev.y = 1; rev.graphicAsset = rid; rm->events.push_back(rev);
+    p->database.actors.push_back({99, "RefHero", rid, 100, 20, 10, 5, 5, {}});
+    CharacterDef rcd; rcd.id = 99; rcd.motions[MO_Walk].frames = { rid }; rcd.skills.push_back({});
+    rcd.skills.back().effectAsset = rid; rcd.skills.back().soundAsset = rid;
+    p->database.characters.push_back(rcd);
+    p->playerSprite = rid;
+    p->deleteAssets({ rid });
+    bool scrubbed = rm->tileset.assetId == -1 && rm->bgmAsset == -1
+                 && rm->events[0].graphicAsset == -1
+                 && p->database.actors.back().spriteAsset == -1
+                 && p->database.characters.back().motions[MO_Walk].frames.empty()
+                 && p->database.characters.back().skills[0].effectAsset == -1
+                 && p->database.characters.back().skills[0].soundAsset == -1
+                 && p->playerSprite == -1
+                 && p->assets.find(rid) == nullptr;
+    CHECK(scrubbed, "에셋 삭제 시 모든 참조(타일셋/BGM/NPC/액터/모션/스킬/플레이어) 정리됨");
+
+    // --- 4. viewer copy-paste duplicate + delete leaves no residue ---
+    p->deleteMap(rm->id);                  // tidy the ref map first
+    size_t beforeDup = p->maps.size();
+    int    beforeF   = (p->save(), countFiles(mapsDir));
+    auto base = p->maps.front();
+    for (int i = 0; i < 100; ++i) {
+        auto nm = std::make_shared<Map>(*base);
+        nm->id = p->nextMapId(); nm->name = base->name + " (" + std::to_string(i+2) + ")";
+        nm->placed = true; nm->viewerCopy = true;
+        p->maps.push_back(nm); p->save();
+        p->deleteMap(nm->id); p->save();   // right-click delete of a viewer copy
+    }
+    CHECK(p->maps.size() == beforeDup, "전맵뷰어 복제 100회 추가/삭제 후 맵 수 원상복구");
+    CHECK(countFiles(mapsDir) == beforeF, "전맵뷰어 복제 추가/삭제 후 잔여 .json 없음");
 
     fs::remove_all(tmp, ec);
 }
@@ -280,6 +374,7 @@ int main() {
     testBattle(db);
     testProjectIO();
     testCharacterBuilder();
+    testResidueStress();
 
     std::printf("=========================================\n");
     if (g_failures == 0) { std::printf("ALL TESTS PASSED\n"); return 0; }

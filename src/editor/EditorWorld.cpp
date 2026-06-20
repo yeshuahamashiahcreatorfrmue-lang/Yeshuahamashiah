@@ -228,10 +228,8 @@ void Editor::drawWorldTab() {
     if ((int)p.maps.size() > 1) {
         if (ui::button({ dx, dy, 220, 30 }, "맵 삭제", false)) {
             int delId = m->id;
-            p.maps.erase(p.maps.begin() + worldSelected_);
-            std::error_code ec;
-            fs::remove(fs::path(p.dir) / "maps" / (std::to_string(delId) + ".json"), ec);
-            if (p.startMap == delId) p.startMap = p.maps.front()->id;
+            dropMapThumb(delId);                 // free its cached thumbnail (no GPU leak)
+            p.deleteMap(delId);                  // erase map + on-disk .json (no orphan file)
             if (activeMapId_ == delId) activeMapId_ = p.maps.front()->id;
             worldSelected_ = 0;
             p.save();
@@ -362,19 +360,33 @@ void Editor::drawWorldViewTab() {
                 do { cand = stem + " (" + std::to_string(n) + ")"; ++n; } while (taken(cand));
                 nm->name = cand;
                 nm->worldX = cx; nm->worldY = cy; nm->placed = true;
+                nm->viewerCopy = true;                // right-click deletes it fully later
                 p.maps.push_back(nm);
                 p.save();                             // thumbnail builds next frame (update())
                 setStatus(TextFormat("%s 복제 배치: (%d,%d)", nm->name.c_str(), cx, cy));
             }
         }
     }
-    // right-click: remove (un-place) the map under the cursor from the grid.
+    // right-click: remove the map under the cursor. A viewer-made copy is deleted
+    // outright (map + .json + thumbnail) so repeated add/remove leaves no residue;
+    // an original map is only un-placed (kept in the World list).
     if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
         Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
         int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
         if (auto occ = p.mapAtWorld(cx, cy)) {
-            occ->placed = false; p.save();
-            setStatus(TextFormat("%s 배치 제거", occ->name.c_str()));
+            std::string nm = occ->name;
+            if (occ->viewerCopy && (int)p.maps.size() > 1) {
+                int delId = occ->id;
+                dropMapThumb(delId);
+                if (activeMapId_ == delId) activeMapId_ = -1;
+                p.deleteMap(delId);
+                worldViewSel_ = -1;
+                p.save();
+                setStatus(nm + " 복제본 삭제");
+            } else {
+                occ->placed = false; p.save();
+                setStatus(nm + " 배치 제거");
+            }
         }
     }
     EndScissorMode();
@@ -417,6 +429,11 @@ void Editor::buildMapThumb(Map& m) {
 const RenderTexture2D* Editor::mapThumb(int mapId) {
     auto it = mapThumbs_.find(mapId);
     return it == mapThumbs_.end() ? nullptr : &it->second;
+}
+
+void Editor::dropMapThumb(int mapId) {
+    auto it = mapThumbs_.find(mapId);
+    if (it != mapThumbs_.end()) { UnloadRenderTexture(it->second); mapThumbs_.erase(it); }
 }
 
 void Editor::clearMapThumbs() {

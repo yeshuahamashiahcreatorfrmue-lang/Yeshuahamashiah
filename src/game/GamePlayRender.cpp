@@ -132,7 +132,7 @@ void GamePlay::visibleRange(int& x0,int& y0,int& x1,int& y1) const {
 }
 
 // ----------------------------- rendering helpers -----------------------------
-void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint, int frames, float scale) {
+void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint, int frames, float wScale, float hScale) {
     int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
     if (frames < 1) frames = 1;
     if (assetId >= 0) {
@@ -140,11 +140,11 @@ void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py
         float fw = tex.width / (float)frames, fh = tex.height / 4.0f;
         if (frame >= frames) frame %= frames;
         Rectangle src = { frame * fw, dir * fh, fw, fh };
-        // Scaled sprites are centred horizontally and stand on the tile's base,
-        // so a 2칸 character towers over its tile instead of floating. scale==1
-        // reduces to the original exact TS×TS fill.
-        float sz = TS * scale;
-        Rectangle dst = { px + (TS - sz) / 2.0f, py + (TS - sz), sz, sz };
+        // The sprite fills its tile FOOTPRINT (wScale×hScale tiles), centred
+        // horizontally on the base column and standing on the base row — so a
+        // 2×3칸 character rises up/out from its tile. 1×1 == exact TS×TS fill.
+        float sw = TS * wScale, sh = TS * hScale;
+        Rectangle dst = { px + (TS - sw) / 2.0f, py + (TS - sh), sw, sh };
         DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
     } else {
         DrawRectangle((int)px+6, (int)py+6, TS-12, TS-12, Color{ 80, 140, 220, 255 });
@@ -212,9 +212,12 @@ void GamePlay::drawField() {
     if (frameAsset >= 0) {
         const Texture2D& ftex = engine_.assetTexture(frameAsset);
         const CharacterDef* pcd = customChar();
-        float sz = TS * (pcd ? pcd->drawPct / 100.0f : 1.25f);
+        float pct = (pcd ? pcd->drawPct : 125) / 100.0f;
+        float wT  = pcd ? std::max(1, pcd->drawTilesW) : 1;
+        float hT  = pcd ? std::max(1, pcd->drawTilesH) : 1;
+        float sw = TS * wT * pct, sh = TS * hT * pct;
         Rectangle src = { 0, 0, (float)ftex.width, (float)ftex.height };   // each facing uses its own frames
-        Rectangle dst = { pxX_ + (TS - sz)/2, pxY_ + (TS - sz)/2 + 2, sz, sz };
+        Rectangle dst = { pxX_ + (TS - sw)/2, pxY_ + (TS - sh), sw, sh };  // centred horiz, stand on base
         DrawTexturePro(ftex, src, dst, {0,0}, 0, ptint);
     } else {
         int walk = std::max(1, proj.playerFrames);

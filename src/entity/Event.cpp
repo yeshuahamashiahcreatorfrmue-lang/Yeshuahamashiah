@@ -54,7 +54,7 @@ json Event::toJson() const {
         {"once", once},
         {"wander", behavior == NpcBehavior::Wander},
         {"faction", (int)faction}, {"behavior", (int)behavior},
-        {"drawPct", drawPct},
+        {"drawPct", drawPct}, {"drawTilesW", drawTilesW}, {"drawTilesH", drawTilesH},
         {"npcHp", npcHp}, {"npcAtk", npcAtk}, {"npcDef", npcDef}
     };
 }
@@ -84,6 +84,8 @@ Event Event::fromJson(const json& j) {
     if (j.contains("behavior")) e.behavior = (NpcBehavior)j.value("behavior", 0);
     else                        e.behavior = e.wander ? NpcBehavior::Wander : NpcBehavior::Idle;
     e.drawPct         = j.value("drawPct", 100);
+    e.drawTilesW      = j.value("drawTilesW", 1);
+    e.drawTilesH      = j.value("drawTilesH", 1);
     e.npcHp           = j.value("npcHp", 20);
     e.npcAtk          = j.value("npcAtk", 8);
     e.npcDef          = j.value("npcDef", 2);

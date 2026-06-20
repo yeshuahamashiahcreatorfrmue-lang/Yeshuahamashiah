@@ -22,6 +22,7 @@ void GamePlay::spawnNpcs() {
         NpcInst n;
         n.eventId = e.id; n.spriteAsset = e.graphicAsset;
         n.faction = e.faction; n.behavior = e.behavior; n.drawPct = e.drawPct;
+        n.drawTilesW = e.drawTilesW; n.drawTilesH = e.drawTilesH;
         n.x = n.destX = n.homeX = e.x; n.y = n.destY = n.homeY = e.y;
         n.px = e.x * (float)TS; n.py = e.y * (float)TS;
         n.moveCd = 0.6f + (std::rand() % 100) / 80.0f;
@@ -252,7 +253,8 @@ void GamePlay::drawNpcs() {
         else if (n.faction == NpcFaction::Enemy)     tint = Color{ 255, 200, 200, 255 };
         else if (n.faction == NpcFaction::Ally)      tint = Color{ 205, 235, 255, 255 };
         drawCharacter(n.spriteAsset, n.dir, n.moving ? n.frame : 0, n.px, n.py,
-                      tint, 4, n.drawPct / 100.0f);
+                      tint, 4, std::max(1, n.drawTilesW) * n.drawPct / 100.0f,
+                      std::max(1, n.drawTilesH) * n.drawPct / 100.0f);
         // faction tag dot + HP bar for combatants
         if (n.combatant()) {
             int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
