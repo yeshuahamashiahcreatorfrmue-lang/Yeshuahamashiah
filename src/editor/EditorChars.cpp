@@ -6,6 +6,7 @@
 #include "render/UI.h"
 #include "core/Text.h"
 #include "render/AssetGen.h"
+#include "render/SfxGen.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -31,14 +32,14 @@ int Editor::generateCharacter() {
     do { dest = fs::path(p.dir) / "assets" / ("char_" + std::to_string(n++) + ".png"); }
     while (fs::exists(dest));
 
-    Image img = gen::characterSheet(shirt, skin);
+    Image img = gen::characterSheet(shirt, skin, 2);   // 4 walk + 2 attack frames
     ExportImage(img, dest.string().c_str());
     UnloadImage(img);
 
     std::string rel = (fs::path("assets") / dest.filename()).generic_string();
     int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
     p.save();
-    setStatus("캐릭터 생성됨: " + dest.stem().string());
+    setStatus("캐릭터 생성됨 (걷기4+공격2): " + dest.stem().string());
     return id;
 }
 
@@ -68,6 +69,27 @@ int Editor::generateEffect(int style) {
     p.assets.setAnim(id, FR, 14);           // single-row animated effect
     p.save();
     setStatus("이펙트 에셋 생성됨: " + dest.stem().string());
+    return id;
+}
+
+// Synthesize a skill sound effect and register it as an audio asset.
+int Editor::generateSound(int style) {
+    Project& p = engine_.project();
+    static const char* tags[5] = { "snd_slash", "snd_magic", "snd_boom", "snd_dash", "snd_heal" };
+    int s = style % 5;
+    fs::create_directories(fs::path(p.dir) / "assets");
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir) / "assets" / (std::string(tags[s]) + "_" + std::to_string(n++) + ".wav"); }
+    while (fs::exists(dest));
+
+    Wave w = gen::skillSound(s);
+    ExportWave(w, dest.string().c_str());
+    UnloadWave(w);
+
+    std::string rel = (fs::path("assets") / dest.filename()).generic_string();
+    int id = p.assets.addExisting(AssetType::Audio, dest.stem().string(), rel);
+    p.save();
+    setStatus(std::string("효과음 생성됨: ") + gen::skillSoundName(s));
     return id;
 }
 
@@ -104,29 +126,46 @@ void Editor::drawCharsTab() {
         p.save();
     };
     float py = kToolbarH + 104;
-    ui::panel({ 20, py, 720, 92 }, ui::kPanel);
-    ui::label("플레이어 / 스킬 이펙트 지정", 30, (int)py + 6, 16, ui::kAccent);
-    ui::intStepper({ 30, py + 30, 200, 26 }, "이동 프레임", p.playerFrames, 1, 4, 7);
+    ui::panel({ 20, py, 760, 124 }, ui::kPanel);
+    ui::label("플레이어 모션 / 스킬 이펙트 지정", 30, (int)py + 6, 16, ui::kAccent);
+    ui::intStepper({ 30, py + 30, 200, 26 }, "걷기 프레임", p.playerFrames, 1, 4, 7);
+    ui::intStepper({ 30, py + 62, 200, 26 }, "공격 프레임", p.playerAtkFrames, 1, 0, 4);
+    DrawTextU("엔진 생성 캐릭터 = 걷기4+공격2", 30, (int)py + 94, 11, ui::kTextDim);
+
+    // live motion preview (down-facing): loops walk, then plays the attack swing
+    if (p.playerSprite >= 0) {
+        const Texture2D& ptex = engine_.assetTexture(p.playerSprite);
+        int walk = std::max(1, p.playerFrames), atk = std::max(0, p.playerAtkFrames);
+        float fh = ptex.height / 4.0f, fw = fh;          // frames are square
+        double cyc = fmod(GetTime(), 2.4);
+        int col;
+        if (atk > 0 && cyc > 2.0) col = walk + std::min(atk-1, (int)((cyc-2.0)/0.2));
+        else col = (int)(GetTime()*6) % walk;
+        Rectangle src = { col*fw, 0, fw, fh };           // row 0 = facing down
+        Rectangle box = { 244, py + 28, 64, 64 };
+        DrawRectangleRec(box, Color{20,22,30,255});
+        DrawTexturePro(ptex, src, { box.x, box.y, 64, 64 }, {0,0}, 0, WHITE);
+        DrawTextU("미리보기", 244, (int)py + 94, 11, ui::kTextDim);
+    }
+
     static const char* slotName[4] = { "공격(Z)", "원거리(X)", "회피(C)", "궁극기(V)" };
     int* slots[4] = { &p.attackEffect, &p.rangedEffect, &p.dashEffect, &p.ultEffect };
     for (int i = 0; i < 4; ++i) {
-        Rectangle r = { 250.0f + (i%2)*240, py + 30 + (i/2)*30, 232, 26 };
+        Rectangle r = { 330.0f + (i%2)*222, py + 30 + (i/2)*30, 214, 26 };
         if (ui::button(r, std::string(slotName[i]) + ": " + imgName(*slots[i]), *slots[i] >= 0))
             cycleAsset(*slots[i]);
     }
 
-    // grid of image assets, with the 'facing-down' frame preview
-    float x = 20, y = py + 108, cell = 150;
+    // grid of image assets — show the whole sheet scaled to fit (all frames)
+    float x = 20, y = py + 140, cell = 150;
     for (auto* a : imgs) {
         Rectangle c = { x, y, cell, cell + 56 };
         bool isPlayer = (a->id == p.playerSprite);
         ui::panel(c, isPlayer ? ui::kPanelHi : ui::kPanel);
         const Texture2D& tex = engine_.assetTexture(a->id);
-        // draw the down-facing first frame (sheet is 4x4); scale to ~96px
-        float fw = tex.width / 4.0f, fh = tex.height / 4.0f;
-        float sc = 96.0f / (fh > 0 ? fh : 1);
-        Rectangle src = { 0, 0, fw, fh };
-        Rectangle dst = { x + (cell - fw*sc)/2, y + 8, fw*sc, fh*sc };
+        float sc = std::min((cell-16) / std::max(1, tex.width), 104.0f / std::max(1, tex.height));
+        Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+        Rectangle dst = { x + (cell - tex.width*sc)/2, y + 8, tex.width*sc, tex.height*sc };
         DrawTexturePro(tex, src, dst, {0,0}, 0, WHITE);
         DrawTextU(a->name.c_str(), (int)x + 8, (int)(y + cell - 36), 14, ui::kText);
         if (ui::button({ x + 8, y + cell - 16, cell - 16, 26 },

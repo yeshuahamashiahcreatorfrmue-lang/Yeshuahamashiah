@@ -26,6 +26,7 @@ public:
     int startActor = -1;             // actor id the party begins with
     int playerSprite = -1;          // asset id for the on-map player graphic
     int playerFrames = 4;           // walk frames per direction in the sheet (4..7)
+    int playerAtkFrames = 0;        // attack frames appended after the walk frames
 
     // Skill effect sprites (asset ids). Drawn as animated overlays when the
     // matching skill fires. -1 = use the built-in procedural effect.

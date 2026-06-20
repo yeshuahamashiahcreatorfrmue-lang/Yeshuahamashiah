@@ -145,10 +145,20 @@ void GamePlay::drawField() {
     drawNpcs();
     drawMonsters();
 
-    // player (red flash when hurt)
+    // player: walk frames, or attack frames (appended after walk) while striking
     Color ptint = playerHurt_ > 0 ? Color{ 255, 130, 130, 255 } : WHITE;
-    drawCharacter(engine_.project().playerSprite, dir_, moving_ ? frame_ : 0, pxX_, pxY_, ptint,
-                  std::max(1, engine_.project().playerFrames));
+    const Project& proj = engine_.project();
+    int walk = std::max(1, proj.playerFrames);
+    int atk  = std::max(0, proj.playerAtkFrames);
+    int total = walk + atk;
+    int col;
+    if (attackTimer_ > 0 && atk > 0) {
+        float prog = 1.0f - attackTimer_ / 0.18f;            // 0..1 through the swing
+        col = walk + std::min(atk - 1, std::max(0, (int)(prog * atk)));
+    } else {
+        col = moving_ ? frame_ : 0;
+    }
+    drawCharacter(proj.playerSprite, dir_, col, pxX_, pxY_, ptint, total);
 
     drawProjectiles();
     drawFx();

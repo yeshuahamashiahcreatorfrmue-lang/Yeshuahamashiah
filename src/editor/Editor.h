@@ -35,6 +35,7 @@ private:
     void handleAssetDrop();
     int  generateCharacter();          // make + register a new character sheet
     int  generateEffect(int style);    // make + register a skill-effect sheet
+    int  generateSound(int style);     // make + register a skill sound effect
     std::shared_ptr<Map> activeMap();
 
     Engine& engine_;
@@ -63,6 +64,7 @@ private:
     // Skills tab (field-skill designer)
     int  skillSel_ = -1;
     bool skillNameFocus_ = false;
+    int  skillPatSize_ = 3;            // range/radius used by shape presets
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag
     std::vector<std::string> undo_, redo_;
     int  undoMap_ = -1;             // which map id the undo stacks belong to

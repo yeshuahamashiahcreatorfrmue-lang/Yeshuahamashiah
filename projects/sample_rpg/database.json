@@ -89,10 +89,10 @@
     {
       "blink": 0,
       "cooldown": 0.3199999928474426,
-      "effectAsset": -1,
+      "effectAsset": 13,
       "id": 1,
       "mpCost": 0,
-      "name": "공격",
+      "name": "베기",
       "patX": [
         0,
         0
@@ -103,47 +103,47 @@
       ],
       "powerPct": 100,
       "projectile": false,
-      "range": 6,
+      "range": 1,
       "slot": 0,
-      "soundAsset": -1
+      "soundAsset": 17
     },
     {
       "blink": 0,
       "cooldown": 0.8999999761581421,
-      "effectAsset": -1,
+      "effectAsset": 14,
       "id": 2,
       "mpCost": 4,
-      "name": "원거리",
+      "name": "화염탄",
       "patX": [],
       "patY": [],
       "powerPct": 130,
       "projectile": true,
       "range": 8,
       "slot": 1,
-      "soundAsset": -1
+      "soundAsset": 18
     },
     {
       "blink": 4,
-      "cooldown": 1.600000023841858,
-      "effectAsset": -1,
+      "cooldown": 1.399999976158142,
+      "effectAsset": 15,
       "id": 3,
       "mpCost": 0,
-      "name": "회피 이동",
+      "name": "회피",
       "patX": [],
       "patY": [],
       "powerPct": 0,
       "projectile": false,
-      "range": 6,
+      "range": 1,
       "slot": 2,
-      "soundAsset": -1
+      "soundAsset": 20
     },
     {
       "blink": 5,
       "cooldown": 8.0,
-      "effectAsset": -1,
+      "effectAsset": 16,
       "id": 4,
       "mpCost": 16,
-      "name": "궁극기",
+      "name": "폭렬",
       "patX": [
         -2,
         -1,
@@ -200,9 +200,59 @@
       ],
       "powerPct": 200,
       "projectile": false,
-      "range": 6,
+      "range": 1,
       "slot": 3,
-      "soundAsset": -1
+      "soundAsset": 19
+    },
+    {
+      "blink": 0,
+      "cooldown": 1.2000000476837158,
+      "effectAsset": 13,
+      "id": 5,
+      "mpCost": 3,
+      "name": "십자베기",
+      "patX": [
+        0,
+        0,
+        0,
+        -1,
+        1
+      ],
+      "patY": [
+        0,
+        -1,
+        1,
+        0,
+        0
+      ],
+      "powerPct": 110,
+      "projectile": false,
+      "range": 1,
+      "slot": 4,
+      "soundAsset": 17
+    },
+    {
+      "blink": 0,
+      "cooldown": 1.600000023841858,
+      "effectAsset": 14,
+      "id": 6,
+      "mpCost": 5,
+      "name": "관통창",
+      "patX": [
+        0,
+        0,
+        0
+      ],
+      "patY": [
+        -1,
+        -2,
+        -3
+      ],
+      "powerPct": 150,
+      "projectile": false,
+      "range": 1,
+      "slot": 5,
+      "soundAsset": 18
     }
   ],
   "items": [

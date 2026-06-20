@@ -4,6 +4,7 @@
 // gardens, NPCs, a shop, a chest, signs, decorations and field monsters.
 #include "raylib.h"
 #include "render/AssetGen.h"
+#include "render/SfxGen.h"
 #include "project/Project.h"
 #include "database/Database.h"
 #include <string>
@@ -173,7 +174,7 @@ int main(int argc,char**argv){
     std::filesystem::create_directories(out+"/maps", ec);
     // generate art
     saveImg(genTileset(), ad+"/tileset.png");
-    saveImg(gen::characterSheet({80,140,220,255},{240,200,160,255}), ad+"/hero.png");
+    saveImg(gen::characterSheet({80,140,220,255},{240,200,160,255}, 2), ad+"/hero.png"); // +2 attack frames
     saveImg(gen::characterSheet({200,120,80,255},{240,200,160,255}),  ad+"/villager1.png");
     saveImg(gen::characterSheet({120,170,110,255},{238,202,168,255}), ad+"/villager2.png");
     saveImg(gen::characterSheet({170,170,180,255},{235,205,175,255}), ad+"/elder.png");
@@ -183,7 +184,14 @@ int main(int argc,char**argv){
     saveImg(gen::enemySprite({190,120,80,255}),  ad+"/boar.png");
     saveImg(gen::enemySprite({150,40,60,255}),   ad+"/guardian.png");
     genAudio(ad);
-    printf("art + audio generated\n");
+    // skill effect strips (6-frame) + skill sounds — the same assets the
+    // in-engine "이펙트/효과음 생성" tools produce.
+    const Color fxCol[4] = {{255,235,150,255},{130,200,255,255},{190,225,255,255},{255,170,110,255}};
+    const char* fxTag[4] = {"fx_slash","fx_bolt","fx_dash","fx_burst"};
+    for (int s=0;s<4;s++) saveImg(gen::effectSheet(fxCol[s], s, 6), ad+"/"+fxTag[s]+".png");
+    const char* sndTag[4] = {"snd_slash","snd_magic","snd_boom","snd_dash"};
+    for (int s=0;s<4;s++){ Wave w=gen::skillSound(s); ExportWave(w,(ad+"/"+sndTag[s]+".wav").c_str()); UnloadWave(w); }
+    printf("art + audio + skill assets generated\n");
 
     auto p = std::make_shared<Project>();
     p->dir = out; p->name = "윌로우브룩";
@@ -199,6 +207,15 @@ int main(int argc,char**argv){
     int A_guard= p->assets.addExisting(AssetType::Image,"guardian","assets/guardian.png");
     int A_bgmV = p->assets.addExisting(AssetType::Audio,"bgm_village","assets/bgm_village.wav");
     int A_bgmC = p->assets.addExisting(AssetType::Audio,"bgm_cave","assets/bgm_cave.wav");
+    // skill effect (animated 6-frame strips) + sound assets
+    int FX_slash=p->assets.addExisting(AssetType::Image,"fx_slash","assets/fx_slash.png"); p->assets.setAnim(FX_slash,6,14);
+    int FX_bolt =p->assets.addExisting(AssetType::Image,"fx_bolt","assets/fx_bolt.png");   p->assets.setAnim(FX_bolt,6,14);
+    int FX_dash =p->assets.addExisting(AssetType::Image,"fx_dash","assets/fx_dash.png");   p->assets.setAnim(FX_dash,6,14);
+    int FX_burst=p->assets.addExisting(AssetType::Image,"fx_burst","assets/fx_burst.png"); p->assets.setAnim(FX_burst,6,14);
+    int SN_slash=p->assets.addExisting(AssetType::Audio,"snd_slash","assets/snd_slash.wav");
+    int SN_magic=p->assets.addExisting(AssetType::Audio,"snd_magic","assets/snd_magic.wav");
+    int SN_boom =p->assets.addExisting(AssetType::Audio,"snd_boom","assets/snd_boom.wav");
+    int SN_dash =p->assets.addExisting(AssetType::Audio,"snd_dash","assets/snd_dash.wav");
 
     // database
     Database& db = p->database;
@@ -215,7 +232,27 @@ int main(int argc,char**argv){
     db.enemies.push_back({2,"박쥐",A_bat,26,0,12,3,7,11,9});
     db.enemies.push_back({3,"멧돼지",A_boar,60,0,15,6,5,22,18});
     db.enemies.push_back({4,"동굴 수호자",A_guard,220,0,18,9,4,150,120});
-    db.fieldSkills = Database::defaultFieldSkills(); // Z/X/C/V real-time skills
+    // ---- field skills: 6 demo skills bound to Z/X/C/V/F/G with varied effect
+    //      regions (front / projectile / dash / AoE / cross / line) + FX + sound.
+    auto mkSkill=[&](int id,const char*nm,int slot,bool proj,int blink,int range,
+                     int mp,float cd,int pow,std::vector<int>px,std::vector<int>py,int fx,int snd){
+        FieldSkill s; s.id=id; s.name=nm; s.slot=slot; s.projectile=proj; s.blink=blink;
+        s.range=range; s.mpCost=mp; s.cooldown=cd; s.powerPct=pow; s.patX=px; s.patY=py;
+        s.effectAsset=fx; s.soundAsset=snd; return s; };
+    db.fieldSkills.clear();
+    // Z 베기: 자기+정면 1칸
+    db.fieldSkills.push_back(mkSkill(1,"베기",0,false,0,1,0,0.32f,100,{0,0},{0,-1},FX_slash,SN_slash));
+    // X 화염탄: 전방 직선 발사체
+    db.fieldSkills.push_back(mkSkill(2,"화염탄",1,true,0,8,4,0.9f,130,{},{},FX_bolt,SN_magic));
+    // C 회피: 전방 4칸 순간이동
+    db.fieldSkills.push_back(mkSkill(3,"회피",2,false,4,1,0,1.4f,0,{},{},FX_dash,SN_dash));
+    // V 폭렬(궁극기): 전방 5칸 순간이동 + 5x5 광역
+    { std::vector<int> ax,ay; for(int y=-2;y<=2;y++)for(int x=-2;x<=2;x++){ax.push_back(x);ay.push_back(y);}
+      db.fieldSkills.push_back(mkSkill(4,"폭렬",3,false,5,1,16,8.0f,200,ax,ay,FX_burst,SN_boom)); }
+    // F 십자베기: 플레이어 상하좌우 (다양한 지점)
+    db.fieldSkills.push_back(mkSkill(5,"십자베기",4,false,0,1,3,1.2f,110,{0,0,0,-1,1},{0,-1,1,0,0},FX_slash,SN_slash));
+    // G 관통창: 전방 3칸 직선 범위
+    db.fieldSkills.push_back(mkSkill(6,"관통창",5,false,0,1,5,1.6f,150,{0,0,0},{-1,-2,-3},FX_bolt,SN_magic));
 
     auto m = p->addMap("윌로우브룩 마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;
@@ -369,6 +406,7 @@ int main(int argc,char**argv){
     sign(20,3,"동굴 입구 ->|안에서 속삭이는 것을 조심하라.");
 
     p->startMap=m->id; p->startX=22; p->startY=20; p->startActor=1; p->playerSprite=A_hero;
+    p->playerFrames=4; p->playerAtkFrames=2;   // hero sheet = 4 walk + 2 attack
     p->save();
     printf("Built '%s': village(%d ev) + cave(%d ev) at %s\n", p->name.c_str(), (int)m->events.size(), (int)cave->events.size(), out.c_str());
     return 0;

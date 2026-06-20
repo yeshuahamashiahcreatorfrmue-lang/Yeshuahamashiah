@@ -96,9 +96,73 @@
         "name": "bgm_cave",
         "path": "assets/bgm_cave.wav",
         "type": "audio"
+      },
+      {
+        "fps": 14,
+        "frames": 6,
+        "id": 13,
+        "name": "fx_slash",
+        "path": "assets/fx_slash.png",
+        "type": "image"
+      },
+      {
+        "fps": 14,
+        "frames": 6,
+        "id": 14,
+        "name": "fx_bolt",
+        "path": "assets/fx_bolt.png",
+        "type": "image"
+      },
+      {
+        "fps": 14,
+        "frames": 6,
+        "id": 15,
+        "name": "fx_dash",
+        "path": "assets/fx_dash.png",
+        "type": "image"
+      },
+      {
+        "fps": 14,
+        "frames": 6,
+        "id": 16,
+        "name": "fx_burst",
+        "path": "assets/fx_burst.png",
+        "type": "image"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 17,
+        "name": "snd_slash",
+        "path": "assets/snd_slash.wav",
+        "type": "audio"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 18,
+        "name": "snd_magic",
+        "path": "assets/snd_magic.wav",
+        "type": "audio"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 19,
+        "name": "snd_boom",
+        "path": "assets/snd_boom.wav",
+        "type": "audio"
+      },
+      {
+        "fps": 8,
+        "frames": 1,
+        "id": 20,
+        "name": "snd_dash",
+        "path": "assets/snd_dash.wav",
+        "type": "audio"
       }
     ],
-    "nextId": 13
+    "nextId": 21
   },
   "attackEffect": -1,
   "dashEffect": -1,
@@ -107,6 +171,7 @@
     2
   ],
   "name": "윌로우브룩",
+  "playerAtkFrames": 2,
   "playerFrames": 4,
   "playerSprite": 2,
   "rangedEffect": -1,

@@ -68,6 +68,7 @@ bool Project::load(const std::string& projectDir) {
     startActor  = meta.value("startActor", -1);
     playerSprite= meta.value("playerSprite", -1);
     playerFrames= meta.value("playerFrames", 4);
+    playerAtkFrames = meta.value("playerAtkFrames", 0);
     attackEffect= meta.value("attackEffect", -1);
     rangedEffect= meta.value("rangedEffect", -1);
     dashEffect  = meta.value("dashEffect", -1);
@@ -108,7 +109,7 @@ bool Project::save() const {
         {"name", name},
         {"startMap", startMap}, {"startX", startX}, {"startY", startY},
         {"startActor", startActor}, {"playerSprite", playerSprite},
-        {"playerFrames", playerFrames},
+        {"playerFrames", playerFrames}, {"playerAtkFrames", playerAtkFrames},
         {"attackEffect", attackEffect}, {"rangedEffect", rangedEffect},
         {"dashEffect", dashEffect}, {"ultEffect", ultEffect},
         {"assets", assets.toJson()},
