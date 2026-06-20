@@ -100,6 +100,13 @@ if(BUILD_ENGINE)
     target_link_libraries(TsukuruEngine PRIVATE tsukuru_core raylib)
     target_include_directories(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+    # Embed Windows version-info metadata into the .exe (reduces "unknown
+    # publisher / info-less binary" AV & SmartScreen false positives).
+    if(WIN32)
+        enable_language(RC)
+        target_sources(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src/win/TsukuruEngine.rc)
+    endif()
+
     if(APPLE)
         target_link_libraries(TsukuruEngine PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")
     endif()
