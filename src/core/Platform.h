@@ -24,6 +24,9 @@ std::vector<std::string> openImageFiles();
 // Same as openImageFiles() but filtered to audio files (wav/ogg/mp3/flac…).
 std::vector<std::string> openAudioFiles();
 
+// Pick a single map/data file (*.json) to register/import.
+std::vector<std::string> openMapFiles();
+
 // Copy a file using UTF-8 paths (Unicode-safe on Windows). Returns true on success.
 bool copyFileUtf8(const std::string& src, const std::string& dst);
 

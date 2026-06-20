@@ -45,6 +45,9 @@ private:
     void drawDatabaseTab();
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
+    void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
+    void pickAndImportNpcChar();                     // file picker -> assign an NPC's character sprite
+    void pickAndImportMapFile();                     // file picker -> load a map .json for preview/registration
     void handleAssetDrop();
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
     void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
@@ -68,6 +71,7 @@ private:
     Tool tool_ = Tool::Pencil;
     int  activeLayer_ = 0;
     bool collisionMode_ = false;
+    bool npcMode_ = false;           // Map tab: place/select NPCs instead of painting
     int  selectedTile_ = 0;
     int  activeMapId_ = -1;
 
@@ -102,6 +106,11 @@ private:
     bool pendingEffectImport_ = false;     // request the picker to assign a skill effect strip
     bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
     bool pendingTilesetImport_ = false;    // request the picker to assign the map tileset
+    bool pendingNpcCharImport_ = false;    // request the picker to assign an NPC sprite
+    int  pendingNpcEventId_ = -1;          // event awaiting an imported NPC sprite
+    bool pendingMapImport_ = false;        // request the picker to load a map .json
+    std::shared_ptr<Map> mapPreview_;      // a loaded-but-not-yet-added map (World tab preview)
+    std::string mapPreviewName_;           // source filename of the preview map
     FieldSkill* pendingEffectSkill_ = nullptr; // skill awaiting an imported effect/sound (valid 1 frame)
     int* scrollDragTarget_ = nullptr; // which scroll offset the dragged scrollbar thumb controls
     float scrollDragGrab_ = 0;        // grab offset within the thumb while dragging

@@ -312,9 +312,19 @@ int main(int argc,char**argv){
         m.tilemap.setTile(layer,x,y,t);
         if(layer<2 && isSolid(t)) m.tilemap.setBlocked(x,y,true);
     };
+    // terrain fill: coarse 3x3 noise cells so the secondary tile forms natural
+    // patches instead of salt-and-pepper speckle.
     auto baseFill = [&](Map& m,int a,int b){
-        for(int y=0;y<m.tilemap.height();y++)for(int x=0;x<m.tilemap.width();x++)
-            m.tilemap.setTile(0,x,y,(hsh(x,y)%5==0)?b:a);
+        for(int y=0;y<m.tilemap.height();y++)for(int x=0;x<m.tilemap.width();x++){
+            int v=hsh(x/3,y/3);
+            m.tilemap.setTile(0,x,y,(v%4==0)?b:a);
+        }
+    };
+    // a cross road/plaza of tile `t` (call after baseFill, before structures)
+    auto road = [&](Map& m,int t){
+        int w=m.tilemap.width(),h=m.tilemap.height();
+        for(int x=0;x<w;x++){ setC(m,0,x,h/2,t); setC(m,0,x,h/2-1,t); }
+        for(int y=0;y<h;y++){ setC(m,0,w/2,y,t); setC(m,0,w/2+1,y,t); }
     };
     auto patch = [&](Map& m,int t,int n,int sz){            // random blobs on ground
         int w=m.tilemap.width(),h=m.tilemap.height();
@@ -359,7 +369,7 @@ int main(int argc,char**argv){
     };
 
     // 1. 필드 -----------------------------------------------------------------
-    { Map& m=mk("1. 필드"); defNpc=NV; baseFill(m,F_GRASS,F_GRASS2); patch(m,F_PATH,3,2); patch(m,WATER,2,2);
+    { Map& m=mk("1. 필드"); defNpc=NV; baseFill(m,F_GRASS,F_GRASS2); road(m,F_PATH); patch(m,F_PATH,3,2); patch(m,WATER,2,2);
       for(int i=0;i<26;i++) tree(m,2+rnd(W-4),2+rnd(H-4));
       scatter(m,1,BUSH,14); scatter(m,1,ROCK,8); scatter(m,1,FLR,10); scatter(m,1,FLY,10);
       scatter(m,2,TALLG,16); scatter(m,1,MUSH,5);
@@ -374,7 +384,7 @@ int main(int argc,char**argv){
       scatter(m,1,BOULDER,14); scatter(m,1,SNOWROCK,10); scatter(m,1,CLIFF,16);
       sign(m,W/2,H/2,"험준한 산맥. 발을 조심하라."); }
     // 4. 도시 -----------------------------------------------------------------
-    { Map& m=mk("4. 도시"); defNpc=NMER; baseFill(m,COBBLE,PAVE);
+    { Map& m=mk("4. 도시"); defNpc=NMER; baseFill(m,COBBLE,PAVE); road(m,PAVE);
       for(int i=0;i<10;i++){int bx=2+rnd(W-8),by=2+rnd(H-8);
         for(int dx=0;dx<4;dx++){setC(m,1,bx+dx,by+1,BRICKWALL);setC(m,2,bx+dx,by,ROOFTOP);setC(m,2,bx+dx,by-1,ROOFTOP);}
         setC(m,1,bx+1,by+1,DOOR); setC(m,1,bx+2,by+1,WINDOW);}
@@ -472,12 +482,12 @@ int main(int argc,char**argv){
       scatter(m,1,SANDBAG,14); scatter(m,1,BARRICADE,8); scatter(m,1,CRATEIN,6); scatter(m,1,ROCK,6);
       npc(m,17,16,"여긴 안전해. 들어와."); sign(m,W/2,H-4,"황무지 안전가옥"); }
     // 22. 축제 ----------------------------------------------------------------
-    { Map& m=mk("22. 축제"); defNpc=NMER; baseFill(m,COBBLE,PAVE);
+    { Map& m=mk("22. 축제"); defNpc=NMER; baseFill(m,COBBLE,PAVE); road(m,PAVE);
       scatter(m,1,STALL,12); scatter(m,1,TENT,8); scatter(m,1,BANNER,10); scatter(m,1,LAMP,12);
       scatter(m,2,BALLOON,10); setC(m,1,W/2,H/2,FOUNTAIN);
       npc(m,W/2+2,H/2,"축제다! 즐기고 가세요!"); npc(m,10,10,"솜사탕 사세요~"); sign(m,5,5,"마을 축제"); }
     // 23. 놀이동산 -----------------------------------------------------------
-    { Map& m=mk("23. 놀이동산"); defNpc=NV; baseFill(m,PAVE,COBBLE);
+    { Map& m=mk("23. 놀이동산"); defNpc=NV; baseFill(m,PAVE,COBBLE); road(m,COBBLE);
       setC(m,1,10,10,FERRIS); setC(m,1,28,12,FERRIS);
       scatter(m,1,TENT,8); scatter(m,1,STALL,8); scatter(m,2,BALLOON,14); scatter(m,1,LAMP,10); scatter(m,1,FLY,8);
       npc(m,W/2,H/2,"놀이기구 타러 가요!"); sign(m,5,H-4,"놀이동산"); }
@@ -506,7 +516,7 @@ int main(int argc,char**argv){
       scatter(m,2,CLOUD,10); scatter(m,1,GLOWFLOWER,14);
       npc(m,W/2,H/2,"빛이 당신을 인도하리라."); npc(m,10,10,"평화가 깃들기를.",NPRI); sign(m,W/2,H-4,"빛 환상"); }
     // 29. 황금의 도시 --------------------------------------------------------
-    { Map& m=mk("29. 황금의 도시"); defNpc=NNOB; baseFill(m,GOLDFLR,GOLDFLR);
+    { Map& m=mk("29. 황금의 도시"); defNpc=NNOB; baseFill(m,GOLDFLR,GOLDFLR); road(m,PAVE);
       for(int i=0;i<8;i++){int bx=3+rnd(W-7),by=3+rnd(H-6); for(int dx=0;dx<4;dx++){setC(m,1,bx+dx,by+2,GOLDWALL);setC(m,2,bx+dx,by,GOLDROOF);setC(m,2,bx+dx,by+1,GOLDROOF);} setC(m,1,bx+1,by+2,GATE);}
       setC(m,1,W/2,H/2,GOLDFOUNT); scatter(m,1,GOLDSTATUE,8); scatter(m,1,LAMP,8);
       npc(m,W/2+2,H/2,"황금의 도시에 오신 걸 환영하오."); npc(m,9,9,"여기선 금이 흔하다오.",NMER); sign(m,5,5,"황금의 도시"); }
@@ -516,12 +526,12 @@ int main(int argc,char**argv){
       scatter(m,1,GOLDSTATUE,8); scatter(m,2,CLOUD,8); setC(m,1,W/2,H/2,GOLDFOUNT);
       npc(m,W/2,H/2+2,"황금과 빛이 어우러진 낙원."); npc(m,12,10,"축복받으소서.",NPRI); sign(m,W/2,H-4,"황금과 빛의 환상"); }
     // 31. 비단결 도시 --------------------------------------------------------
-    { Map& m=mk("31. 비단결 도시"); defNpc=NMER; baseFill(m,SILKFLR,PAVE);
+    { Map& m=mk("31. 비단결 도시"); defNpc=NMER; baseFill(m,SILKFLR,PAVE); road(m,PAVE);
       for(int i=0;i<8;i++){int bx=3+rnd(W-7),by=3+rnd(H-6); for(int dx=0;dx<4;dx++){setC(m,1,bx+dx,by+2,SILKDRAPE);setC(m,2,bx+dx,by,TILEROOF);setC(m,2,bx+dx,by+1,TILEROOF);} setC(m,1,bx+1,by+2,DOOR);}
       scatter(m,0,SILKRUG,10); scatter(m,1,STALL,8); scatter(m,1,LAMP,8); scatter(m,1,BANNER,8);
       npc(m,W/2,H/2,"비단결처럼 고운 도시랍니다."); npc(m,10,10,"비단 한 필 어떠세요?",NMER); sign(m,5,5,"비단결 도시"); }
     // 32. 사막 상인 ----------------------------------------------------------
-    { Map& m=mk("32. 사막 상인"); defNpc=NDES; baseFill(m,SAND,DUNE);
+    { Map& m=mk("32. 사막 상인"); defNpc=NDES; baseFill(m,SAND,DUNE); road(m,F_PATH);
       setC(m,0,W/2,H/2,OASIS); for(int dx=-1;dx<=1;dx++)for(int dy=-1;dy<=1;dy++)if(dx||dy)setC(m,0,W/2+dx,H/2+dy,OASIS);
       scatter(m,1,TENT,8); scatter(m,1,STALL,8); scatter(m,1,PALM,8); scatter(m,1,CACTUS,6); scatter(m,1,BARRELIN,6);
       npc(m,W/2,H/2+3,"사막을 건너려면 물부터 사시오."); npc(m,12,10,"향신료 사려~",NDES); npc(m,26,18,"낙타도 팝니다.",NDES); sign(m,5,5,"사막 상인 시장"); }

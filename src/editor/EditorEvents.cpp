@@ -13,6 +13,71 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
+// Shared NPC data panel: character sprite (cycle + import), faction (중립/아군/
+// 적군), AI behaviour, on-map size, combat stats, dialogue, delete. Used by the
+// Map tab's NPC mode (and mirrors the Events-tab NPC controls).
+void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
+    float x = panel.x + 12, y = panel.y + 10;
+    ui::label("NPC 데이터", (int)x, (int)y, 22, ui::kAccent); y += 38;
+
+    // --- character sprite: cycle existing or import from a character asset ---
+    if (ui::button({ x, y, 300, 26 }, std::string("캐릭터: ") + assetName(ev.graphicAsset), ev.graphicAsset >= 0))
+        cycleAsset(ev.graphicAsset, AssetType::Image);
+    y += 30;
+    if (ui::button({ x, y, 300, 24 }, "캐릭터 에셋 가져오기 (외부 이미지)", true)) {
+        pendingNpcEventId_ = ev.id; pendingNpcCharImport_ = true;
+    }
+    y += 28;
+    DrawTextU("4방향(세로4×가로4) 캐릭터 시트 권장.", (int)x, (int)y, 11, ui::kTextDim); y += 20;
+
+    // --- faction ---
+    static const char* fac[3] = { "중립", "아군", "적군" };
+    Color fcol[3] = { Color{200,200,200,255}, Color{90,170,255,255}, ui::kDanger };
+    if (ui::button({ x, y, 300, 26 }, TextFormat("진영: %s", fac[(int)ev.faction])))
+        ev.faction = (NpcFaction)(((int)ev.faction + 1) % 3);
+    DrawRectangle((int)x + 282, (int)y + 7, 12, 12, fcol[(int)ev.faction]);
+    y += 30;
+    // --- AI behaviour ---
+    static const char* beh[5] = { "대기", "배회", "순찰", "추격", "도망" };
+    if (ui::button({ x, y, 300, 26 }, TextFormat("AI 행동: %s", beh[(int)ev.behavior])))
+        ev.behavior = (NpcBehavior)(((int)ev.behavior + 1) % 5);
+    y += 30;
+    // --- on-map size ---
+    ui::intStepper({ x, y, 300, 24 }, "크기(칸%, 100=1칸)", ev.drawPct, 25, 25, 400); y += 30;
+
+    // --- combat stats (Ally/Enemy only) ---
+    if (ev.faction != NpcFaction::Neutral) {
+        ui::intStepper({ x, y, 300, 24 }, "체력",   ev.npcHp,  5, 1, 9999); y += 26;
+        ui::intStepper({ x, y, 300, 24 }, "공격력", ev.npcAtk, 1, 0, 999);  y += 26;
+        ui::intStepper({ x, y, 300, 24 }, "방어력", ev.npcDef, 1, 0, 999);  y += 26;
+        DrawTextU(ev.faction == NpcFaction::Enemy ? "적군: 추격 시 플레이어를 공격"
+                                                  : "아군: 주변 적과 싸움",
+                  (int)x, (int)y, 11, ui::kTextDim);
+        y += 20;
+    } else {
+        DrawTextU("중립: 전투 없음 (대화·분위기용)", (int)x, (int)y, 11, ui::kTextDim); y += 20;
+    }
+
+    // --- dialogue ---
+    DrawTextU("대사:", (int)x, (int)y, 13, ui::kTextDim); y += 18;
+    Rectangle tf = { x, y, 300, 26 };
+    if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
+    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
+    ui::textField(tf, ev.text, eventTextFocus_, 120);
+    y += 34;
+
+    if (ui::button({ x, y, 300, 28 }, "NPC 삭제", false)) {
+        if (auto m = activeMap()) {
+            auto& evs = m->events;
+            evs.erase(std::remove_if(evs.begin(), evs.end(),
+                      [&](const Event& e){ return e.id == ev.id; }), evs.end());
+        }
+        editingEventId_ = -1;
+    }
+    y += 34;
+    DrawTextU("정밀 설정(이동/전투/조건)은 '이벤트' 탭.", (int)x, (int)y, 11, ui::kTextDim);
+}
+
 void Editor::drawEventsTab() {
     Rectangle canvasArea = { 0, kToolbarH, (float)GetScreenWidth() - 320, (float)GetScreenHeight() - kToolbarH };
     auto m = activeMap();
@@ -152,6 +217,10 @@ void Editor::drawEventsTab() {
     // ---- NPC settings (only meaningful when the event carries a sprite) ----
     if (ev->graphicAsset >= 0) {
         DrawTextU("─ NPC 설정 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+        if (ui::button({ panel.x + 12, y, 296, 22 }, "캐릭터 에셋 가져오기 (외부)", true)) {
+            pendingNpcEventId_ = ev->id; pendingNpcCharImport_ = true;
+        }
+        y += 26;
         const char* facNames[] = { "중립", "아군", "적군" };
         Color facCol[] = { ui::kTextDim, Color{120,200,255,255}, Color{255,130,130,255} };
         if (ui::button({ panel.x + 12, y, 296, 24 },

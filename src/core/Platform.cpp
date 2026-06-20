@@ -77,6 +77,9 @@ std::vector<std::string> openAudioFiles() {
     return openFiles(L"오디오 파일\0*.wav;*.ogg;*.mp3;*.flac;*.qoa;*.xm;*.mod\0모든 파일\0*.*\0",
                      L"사운드 불러오기");
 }
+std::vector<std::string> openMapFiles() {
+    return openFiles(L"맵 파일\0*.json\0모든 파일\0*.*\0", L"맵 파일 불러오기");
+}
 bool copyFileUtf8(const std::string& src, const std::string& dst) {
     return CopyFileW(toWide(src).c_str(), toWide(dst).c_str(), FALSE) != 0;
 }
@@ -90,6 +93,7 @@ void popup(const char*, const char*) {}
 void installCrashHandler(void (*)(unsigned long)) {}
 std::vector<std::string> openImageFiles() { return {}; }   // native dialog is Windows-only
 std::vector<std::string> openAudioFiles() { return {}; }   // native dialog is Windows-only
+std::vector<std::string> openMapFiles()   { return {}; }   // native dialog is Windows-only
 bool copyFileUtf8(const std::string& src, const std::string& dst) {
     std::error_code ec;
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);

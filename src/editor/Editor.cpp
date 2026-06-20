@@ -54,6 +54,8 @@ void Editor::update(float dt) {
     if (pendingEffectImport_) { pendingEffectImport_ = false; pickAndImportEffect(); }
     if (pendingSoundImport_)  { pendingSoundImport_  = false; pickAndImportSound(); }
     if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
+    if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
+    if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
 
     // Global shortcuts
     bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_ || skillNameFocus_;
@@ -142,11 +144,12 @@ void Editor::drawToolbar() {
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {
         float bw = 54, gap = 56;
-        float rx = sw - 8 - 6*gap;
-        auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_)){tool_=t;collisionMode_=false;} rx+=gap; };
+        float rx = sw - 8 - 7*gap;
+        auto tbtn=[&](const char* n, Tool t){ if (ui::button({rx,6,bw,28},n, tool_==t && !collisionMode_ && !npcMode_)){tool_=t;collisionMode_=false;npcMode_=false;} rx+=gap; };
         tbtn("펜",Tool::Pencil); tbtn("지우개",Tool::Erase); tbtn("채우기",Tool::Fill);
         tbtn("사각형",Tool::Rect); tbtn("스탬프",Tool::Stamp);
-        if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) collisionMode_ = !collisionMode_;
+        if (ui::button({ rx, 6, bw, 28 }, "충돌", collisionMode_)) { collisionMode_ = !collisionMode_; if(collisionMode_) npcMode_=false; } rx += gap;
+        if (ui::button({ rx, 6, bw, 28 }, "NPC", npcMode_)) { npcMode_ = !npcMode_; if(npcMode_) collisionMode_=false; }
     }
 }
 

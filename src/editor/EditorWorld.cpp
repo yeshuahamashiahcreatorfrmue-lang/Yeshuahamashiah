@@ -84,14 +84,62 @@ void Editor::drawWorldTab() {
     if (shown.empty())
         DrawTextU("검색 결과 없음", (int)listR.x + 10, (int)listR.y + 8, 15, ui::kTextDim);
 
+    // ---- right panel ----
+    float dx = lx + lw + 24, dy = ly;
+    ui::panel({ dx - 8, ly, area.width - dx - 4, area.height - 24 }, ui::kPanel);
+
+    // map registration: load a whole map .json, preview it, then add it
+    if (ui::button({ area.width - 230, ly + 8, 206, 26 }, "+ 맵 파일 등록 (.json)", true))
+        pendingMapImport_ = true;
+
+    if (mapPreview_) {
+        ui::label("맵 등록 미리보기", (int)dx + 4, (int)dy + 10, 22, ui::kAccent); dy += 44;
+        DrawTextU(TextFormat("파일: %s", mapPreviewName_.c_str()), (int)dx, (int)dy, 14, ui::kText); dy += 22;
+        DrawTextU(TextFormat("이름: %s   크기: %d×%d   이벤트: %d개",
+                  mapPreview_->name.c_str(), mapPreview_->tilemap.width(), mapPreview_->tilemap.height(),
+                  (int)mapPreview_->events.size()), (int)dx, (int)dy, 14, ui::kTextDim); dy += 30;
+        // thumbnail (best-effort: uses the preview's tileset if present, else the current one)
+        const Tileset* ts = &mapPreview_->tileset;
+        int tsAsset = p.assets.find(ts->assetId) ? ts->assetId : (activeMap() ? activeMap()->tileset.assetId : -1);
+        if (!p.assets.find(ts->assetId) && activeMap()) ts = &activeMap()->tileset;
+        Rectangle box = { dx, dy, 360, 270 };
+        DrawRectangleRec(box, Color{ 20, 22, 30, 255 });
+        if (tsAsset >= 0) {
+            const Texture2D& tex = engine_.assetTexture(tsAsset);
+            int mw = mapPreview_->tilemap.width(), mh = mapPreview_->tilemap.height();
+            float sc = std::min(box.width / mw, box.height / mh);
+            for (int layer = 0; layer < kLayerCount; ++layer)
+                for (int ty = 0; ty < mh; ++ty)
+                    for (int tx = 0; tx < mw; ++tx) {
+                        int t = mapPreview_->tilemap.tile(layer, tx, ty);
+                        if (t < 0) continue;
+                        int sx, sy; ts->srcOf(t, sx, sy);
+                        DrawTexturePro(tex, { (float)sx,(float)sy,(float)ts->tileWidth,(float)ts->tileHeight },
+                                       { box.x+tx*sc, box.y+ty*sc, sc, sc }, {0,0}, 0, WHITE);
+                    }
+        }
+        DrawRectangleLinesEx(box, 1, Fade(BLACK, 0.5f));
+        dy += 280;
+        if (ui::button({ dx, dy, 175, 30 }, "이 맵으로 등록", true)) {
+            auto nm = mapPreview_;
+            nm->id = p.nextMapId();
+            if (!p.assets.find(nm->tileset.assetId) && activeMap())
+                nm->tileset = activeMap()->tileset;          // give it a valid tileset
+            p.maps.push_back(nm);
+            activeMapId_ = nm->id; worldSelected_ = (int)p.maps.size() - 1;
+            mapPreview_.reset(); p.save();
+            setStatus("맵 등록됨: " + nm->name);
+            tab_ = Tab::Map;
+        }
+        if (ui::button({ dx + 185, dy, 120, 30 }, "취소")) { mapPreview_.reset(); setStatus("등록 취소"); }
+        return;   // previewing overrides the normal map-settings view
+    }
+
     // ---- right: selected map details ----
     if (worldSelected_ < 0 || worldSelected_ >= (int)p.maps.size())
         worldSelected_ = activeMap() ? 0 : -1;
     if (worldSelected_ < 0) return;
     auto m = p.maps[worldSelected_];
-
-    float dx = lx + lw + 24, dy = ly;
-    ui::panel({ dx - 8, ly, area.width - dx - 4, area.height - 24 }, ui::kPanel);
     ui::label("맵 설정", (int)dx + 4, (int)dy + 10, 22, ui::kAccent);
     dy += 46;
 

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <fstream>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -443,6 +444,57 @@ int Editor::makeTransparentBg(int assetId) {
     p.save();
     setStatus((ai ? "AI 배경 제거 이미지 생성: " : "배경(테두리) 제거 이미지 생성: ") + dest.stem().string());
     return id;
+}
+
+// Import an external character image and assign it as an NPC's sprite. Imported
+// as-is (no crop/bg-removal) so a 4-direction character sheet keeps its grid.
+void Editor::pickAndImportNpcChar() {
+    int evId = pendingNpcEventId_; pendingNpcEventId_ = -1;
+    auto m = activeMap();
+    if (!m || evId < 0) { setStatus("NPC 대상이 없습니다."); return; }
+    Event* ev = nullptr; for (auto& e : m->events) if (e.id == evId) ev = &e;
+    if (!ev) { setStatus("NPC를 찾지 못했습니다."); return; }
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("캐릭터 불러오기 취소됨."); return; }
+    Project& p = engine_.project();
+    std::error_code ec;
+    const std::string& src = files.front();
+    std::string ext = fs::path(src).extension().string();
+    for (auto& c : ext) c = (char)tolower((unsigned char)c);
+    if (!isImageExt(ext)) { setStatus("이미지 파일이 아닙니다."); return; }
+    try {
+        fs::create_directories(fs::path(p.dir) / "assets", ec);
+        int n = 1; fs::path dest;
+        do { dest = fs::path(p.dir)/"assets"/("npc_char_"+std::to_string(n++)+ext); } while (fs::exists(dest, ec));
+        if (!plat::copyFileUtf8(src, dest.string())) { setStatus("캐릭터 복사 실패."); return; }
+        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+        int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+        ev->graphicAsset = id;
+        p.save();
+        setStatus("NPC 캐릭터 적용됨: " + assetName(id));
+    } catch (const std::exception& e) {
+        setStatus(std::string("캐릭터 불러오기 실패: ") + e.what());
+    }
+}
+
+// Load a map .json from disk into mapPreview_ (World tab previews it before the
+// user commits it to the project as a new map).
+void Editor::pickAndImportMapFile() {
+    std::vector<std::string> files = plat::openMapFiles();
+    if (files.empty()) { setStatus("맵 불러오기 취소됨."); return; }
+    try {
+        std::ifstream in(files.front(), std::ios::binary);
+        if (!in) { setStatus("맵 파일을 열 수 없습니다."); return; }
+        nlohmann::json j; in >> j;
+        auto mp = std::make_shared<Map>();
+        mp->fromJson(j);
+        if (mp->tilemap.width() <= 0 || mp->tilemap.height() <= 0) { setStatus("유효한 맵이 아닙니다."); return; }
+        mapPreview_ = mp;
+        mapPreviewName_ = fs::path(files.front()).filename().string();
+        setStatus("맵 미리보기 로드됨: " + mapPreviewName_);
+    } catch (const std::exception& e) {
+        setStatus(std::string("맵 불러오기 실패: ") + e.what());
+    }
 }
 
 // ============================ draw ============================

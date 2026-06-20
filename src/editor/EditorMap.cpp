@@ -14,12 +14,28 @@ namespace fs = std::filesystem;
 namespace tsukuru {
 
 void Editor::drawMapTab() {
-    Rectangle paletteArea = { 0, kToolbarH, kPaletteW, (float)GetScreenHeight() - kToolbarH };
-    Rectangle canvasArea  = { kPaletteW, kToolbarH, (float)GetScreenWidth() - kPaletteW,
-                              (float)GetScreenHeight() - kToolbarH };
+    float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
+    float rightW = npcMode_ ? 324.0f : 0.0f;          // NPC inspector panel width
+    Rectangle paletteArea = { 0, kToolbarH, kPaletteW, H - kToolbarH };
+    Rectangle canvasArea  = { kPaletteW, kToolbarH, W - kPaletteW - rightW, H - kToolbarH };
     drawMapCanvas(canvasArea);
-    if (tool_ == Tool::Stamp) drawPrefabPalette(paletteArea);
+    if (tool_ == Tool::Stamp && !npcMode_) drawPrefabPalette(paletteArea);
     else drawTilePalette(paletteArea);
+
+    if (npcMode_) {
+        Rectangle panel = { W - rightW, kToolbarH, rightW, H - kToolbarH };
+        ui::panel(panel, ui::kPanel);
+        Event* ev = nullptr;
+        if (auto m = activeMap()) for (auto& e : m->events) if (e.id == editingEventId_) ev = &e;
+        if (ev && ev->graphicAsset >= 0) drawNpcInspector(*ev, panel);
+        else {
+            ui::label("NPC 배치", (int)panel.x + 12, (int)panel.y + 10, 22, ui::kAccent);
+            DrawTextU("· 빈 칸 클릭 = NPC 추가", (int)panel.x + 12, (int)panel.y + 48, 15, ui::kText);
+            DrawTextU("· 기존 NPC 클릭 = 선택/편집", (int)panel.x + 12, (int)panel.y + 70, 15, ui::kText);
+            DrawTextU("선택하면 진영·AI·스탯·스프라이트를", (int)panel.x + 12, (int)panel.y + 100, 13, ui::kTextDim);
+            DrawTextU("여기서 설정할 수 있습니다.", (int)panel.x + 12, (int)panel.y + 118, 13, ui::kTextDim);
+        }
+    }
 }
 
 void Editor::drawTilePalette(Rectangle area) {
@@ -141,7 +157,48 @@ void Editor::drawMapCanvas(Rectangle area) {
             for (int x = cx0; x <= cx1; ++x)
                 if (m->tilemap.blocked(x, y))
                     DrawRectangle(x*TS, y*TS, TS, TS, Fade(ui::kDanger, 0.45f));
+    // NPC preview: draw every NPC event's sprite + a faction-coloured frame
+    if (npcMode_) {
+        for (auto& e : m->events) {
+            if (e.graphicAsset < 0) continue;
+            const Texture2D& nt = engine_.assetTexture(e.graphicAsset);
+            float sz = TS * (e.drawPct > 0 ? e.drawPct/100.0f : 1.0f);
+            float fw = nt.width / 4.0f, fh = nt.height / 4.0f;   // 4-dir sheet, frame 0 facing down
+            Rectangle src = { 0, 0, fw, fh };
+            Rectangle dst = { e.x*(float)TS + (TS-sz)/2, e.y*(float)TS + (TS-sz), sz, sz };
+            DrawTexturePro(nt, src, dst, {0,0}, 0, WHITE);
+            Color fc = e.faction==NpcFaction::Enemy ? ui::kDanger
+                     : e.faction==NpcFaction::Ally  ? Color{90,170,255,255} : Color{200,200,200,255};
+            DrawRectangleLinesEx({ (float)e.x*TS, (float)e.y*TS, (float)TS, (float)TS }, 2,
+                                 e.id==editingEventId_ ? ui::kAccentHi : fc);
+        }
+    }
     EndMode2D();
+
+    // NPC placement mode: click adds/selects an NPC event (no tile painting)
+    if (npcMode_) {
+        if (ui::mouseIn(area) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+            Vector2 world = GetScreenToWorld2D(GetMousePosition(), cam_);
+            int tx = (int)std::floor(world.x / TS), ty = (int)std::floor(world.y / TS);
+            if (m->tilemap.inBounds(tx, ty)) {
+                Event* hit = m->eventAt(tx, ty);
+                if (hit) editingEventId_ = hit->id;
+                else {
+                    Event ne; ne.id = m->nextEventId(); ne.x = tx; ne.y = ty;
+                    ne.text = "안녕하세요!";
+                    auto imgs = engine_.project().assets.byType(AssetType::Image);
+                    ne.graphicAsset = imgs.empty() ? -1 : imgs.front()->id;  // a sprite so it shows
+                    ne.behavior = NpcBehavior::Idle;
+                    m->events.push_back(ne);
+                    editingEventId_ = ne.id;
+                    setStatus("NPC 추가됨 — 오른쪽에서 설정하세요");
+                }
+                eventTextFocus_ = false;
+            }
+        }
+        EndScissorMode();
+        return;
+    }
 
     // painting
     if (ui::mouseIn(area) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
