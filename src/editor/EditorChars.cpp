@@ -181,7 +181,7 @@ void Editor::drawCharsTab() {
     handleAssetDrop();   // drag&drop still works anywhere on this tab
 
     ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
-    DrawTextU("빌드 0620-4방향  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
+    DrawTextU("빌드 0620b-불러오기수정  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
 
     // ---- 3-column layout: [캐릭터] [모션·프레임·재생] [이미지 소스] ----
     float pad = 10;
@@ -375,7 +375,7 @@ void Editor::drawCharsTab() {
     {
         float x = rightX + 10, w = rightW - 20;
         ui::label("이미지 소스", (int)x, (int)panelTop + 8, 15, ui::kAccent);
-        if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { pickAndImportImages(); }
+        if (ui::button({ x, panelTop + 30, w, 30 }, "+ 내 이미지 불러오기 (PNG·JPG·GIF…)", true)) { pendingImport_ = true; }
         float ry = panelTop + 66;
         if (ui::button({ x, ry, w/2 - 2, 24 }, charLibFilter_ ? "필터: 캐릭터만" : "필터: 전체", charLibFilter_)) charLibFilter_ = !charLibFilter_;
         if (ui::button({ x + w/2 + 2, ry, w/2 - 2, 24 }, charSliceMode_ ? TextFormat("추가: %d분할", charSliceN_) : "추가: 1프레임", charSliceMode_)) charSliceMode_ = !charSliceMode_;

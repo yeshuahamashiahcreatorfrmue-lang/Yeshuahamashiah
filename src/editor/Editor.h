@@ -79,6 +79,7 @@ private:
     int  charDefSel_ = -1;            // selected custom character index
     int  charMotionTab_ = 0;          // selected motion tab (0..5)
     int  charDirTab_ = 0;             // edited direction: 0정면(아래)/1좌/2우/3위
+    bool pendingImport_ = false;      // request the native file picker outside the draw frame
     bool charDefNameFocus_ = false;
     int  charFrameSel_ = -1;          // selected frame within the current motion
     bool charSliceMode_ = false;      // library click adds N sliced frames instead of 1
