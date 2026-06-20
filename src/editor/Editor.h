@@ -90,6 +90,7 @@ private:
     // Character builder (custom multi-motion characters)
     int  charDefSel_ = -1;            // selected custom character index
     int  charMotionTab_ = 0;          // selected motion tab (0..5)
+    int  charSkillSlot_ = -1;         // skill slot being edited (0..5 Z/X/C/V/F/G; -1 = derive from motion)
     int  charDirTab_ = 0;             // edited direction: 0정면(아래)/1좌/2우/3위
     bool pendingImport_ = false;      // request the native file picker outside the draw frame
     bool pendingEffectImport_ = false;     // request the picker to assign a skill effect strip

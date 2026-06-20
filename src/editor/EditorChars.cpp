@@ -33,6 +33,16 @@ static int castSlotForMotion(int m) {
         default:        return -1;  // 걷기 / 죽음 — no skill
     }
 }
+// Inverse of castSlotForMotion: the motion a skill slot animates with. F/G
+// (slots 4·5) have no dedicated motion and reuse the attack motion at runtime.
+static int motionForCastSlot(int slot) {
+    switch (slot) {
+        case 0: return MO_Attack; case 1: return MO_Skill1;
+        case 2: return MO_Skill2; case 3: return MO_Ult;
+        default: return -1;       // F / G
+    }
+}
+static const char* const kSlotKeys6[6] = { "Z", "X", "C", "V", "F", "G" };
 
 // Unregister a set of image assets from the project and remove any references to
 // them from every character motion (so no frame points at a deleted id).
@@ -394,7 +404,7 @@ void Editor::drawCharsTab() {
         if (castSlot >= 0) {
             static const char* slotKey[4] = { "Z", "X", "C", "V" };
             bool hasSkill = false; for (auto& sk : cd.skills) if (sk.slot == castSlot) { hasSkill = true; break; }
-            if (ui::button({ sx, sy, std::min(260.0f, sw), 26 }, TextFormat("[%s] 스킬 동작 편집", slotKey[castSlot]), hasSkill)) { charSkillEdit_ = true; return; }
+            if (ui::button({ sx, sy, std::min(260.0f, sw), 26 }, TextFormat("[%s] 스킬 동작 편집", slotKey[castSlot]), hasSkill)) { charSkillSlot_ = castSlot; charSkillEdit_ = true; return; }
         }
 
         // ---- frame timeline (edits the selected direction) ----
@@ -677,8 +687,11 @@ void Editor::drawCharSkillEditor() {
 
     if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charSkillEdit_ = false; return; }
     CharacterDef& cd = db.characters[charDefSel_];
-    int slot = castSlotForMotion(charMotionTab_);
-    if (slot < 0) { charSkillEdit_ = false; return; }
+    // The slot is set explicitly on entry (Z/X/C/V motions or the F/G cards);
+    // fall back to the motion tab for safety.
+    int slot = charSkillSlot_ >= 0 ? charSkillSlot_ : castSlotForMotion(charMotionTab_);
+    if (slot < 0 || slot >= 6) { charSkillEdit_ = false; charSkillSlot_ = -1; return; }
+    int mot = motionForCastSlot(slot);
 
     // find this character's skill for the slot, or create it (seeded from the
     // matching global skill if one exists, else a simple front-tile preset).
@@ -687,20 +700,19 @@ void Editor::drawCharSkillEditor() {
     if (!sp) {
         FieldSkill ns;
         const FieldSkill* g = db.fieldSkillForSlot(slot);
-        if (g) ns = *g; else { ns.name = kMotionNames[charMotionTab_]; applyShape(ns, 0, 1); }
+        if (g) ns = *g; else { ns.name = mot >= 0 ? kMotionNames[mot] : (std::string(kSlotKeys6[slot]) + " 스킬"); applyShape(ns, 0, 1); }
         ns.slot = slot; ns.id = (int)cd.skills.size() + 1;
         cd.skills.push_back(ns); sp = &cd.skills.back();
     }
     FieldSkill& s = *sp;
 
-    static const char* slotKey[4] = { "Z", "X", "C", "V" };
-    ui::label(TextFormat("스킬 동작 편집 — %s / %s 모션 (단축키 %s)",
-              cd.name.c_str(), kMotionNames[charMotionTab_], slotKey[slot]),
+    ui::label(TextFormat("스킬 동작 편집 — %s / %s (단축키 %s)",
+              cd.name.c_str(), mot >= 0 ? kMotionNames[mot] : "추가 스킬", kSlotKeys6[slot]),
               20, (int)kToolbarH + 10, 20, ui::kAccent);
-    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 저장하고 닫기")) { p.save(); charSkillEdit_ = false; return; }
+    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 저장하고 닫기")) { p.save(); charSkillEdit_ = false; charSkillSlot_ = -1; return; }
     if (ui::button({ area.width - 348, kToolbarH + 8, 160, 28 }, "이 스킬 비우기")) {   // revert to global slot skill
         for (size_t k = 0; k < cd.skills.size(); ++k) if (cd.skills[k].slot == slot) { cd.skills.erase(cd.skills.begin()+k); break; }
-        p.save(); charSkillEdit_ = false; return;
+        p.save(); charSkillEdit_ = false; charSkillSlot_ = -1; return;
     }
 
     // ---- effect-area tile grid + shape presets ----
@@ -726,7 +738,9 @@ void Editor::drawCharSkillEditor() {
     if (ui::mouseIn(nf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) skillNameFocus_ = true;
     else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(nf)) skillNameFocus_ = false;
     ui::textField(nf, s.name, skillNameFocus_, 24); dy += 32;
-    DrawTextU(TextFormat("단축키: %s (모션에 고정)", slotKey[slot]), (int)dx, (int)dy, 13, ui::kTextDim); dy += 24;
+    DrawTextU(mot >= 0 ? TextFormat("단축키: %s (모션에 고정)", kSlotKeys6[slot])
+                       : TextFormat("단축키: %s (모션 없음 · 공격 모션으로 시전)", kSlotKeys6[slot]),
+              (int)dx, (int)dy, 13, ui::kTextDim); dy += 24;
     if (ui::button({ dx, dy, 260, 26 }, s.projectile ? "유형: 발사체(전방 직선)" : "유형: 범위(타일 패턴)"))
         s.projectile = !s.projectile;
     dy += 30;
@@ -820,7 +834,42 @@ void Editor::drawCharDataEditor() {
         DrawTextU(TextFormat("데미지 %d", std::max(1, cd.atk * s.powerPct / 100)),
                   (int)(ix + colw + 12), (int)iy + 4, 14, ui::kGood); iy += 30;
         if (ui::button({ ix, iy, colw, 26 }, "범위·이펙트 편집")) {
-            charMotionTab_ = slotMot[slot]; charSkillEdit_ = true; charDataEdit_ = false; return;
+            charMotionTab_ = slotMot[slot]; charSkillSlot_ = slot; charSkillEdit_ = true; charDataEdit_ = false; return;
+        }
+        if (ui::button({ ix + colw + 8, iy, colw, 26 }, "스킬 삭제")) {
+            for (size_t k = 0; k < cd.skills.size(); ++k) if (cd.skills[k].slot == slot) { cd.skills.erase(cd.skills.begin()+k); break; }
+            p.save(); return;
+        }
+    }
+
+    // ---- F · G 추가 슬롯 (모션 없음 — 공격 모션으로 시전) ----
+    float fy = ry0 + 2 * (cardH + 12) + 8;       // just below the Z/X/C/V grid
+    ui::label("추가 스킬 (F · G — 모션 없음)", (int)rx0, (int)fy, 14, ui::kAccent); fy += 22;
+    for (int e = 0; e < 2; ++e) {
+        int slot = 4 + e;                        // 4=F, 5=G
+        float cx = rx0 + e * (cardW + 12);
+        ui::panel({ cx, fy, cardW, 70 }, ui::kPanelHi);
+        float ix = cx + 12, iy = fy + 10, iw = cardW - 24;
+        FieldSkill* sp = nullptr;
+        for (auto& s : cd.skills) if (s.slot == slot) { sp = &s; break; }
+        if (!sp) {
+            DrawTextU(TextFormat("[%s] 스킬 없음", kSlotKeys6[slot]), (int)ix, (int)iy, 13, ui::kTextDim); iy += 22;
+            if (ui::button({ ix, iy, iw, 26 }, "+ 이 스킬 만들기")) {
+                FieldSkill ns; const FieldSkill* g = db.fieldSkillForSlot(slot);
+                if (g) ns = *g; else { ns.name = std::string(kSlotKeys6[slot]) + " 스킬"; applyShape(ns, 0, 1); }
+                ns.slot = slot; ns.id = (int)cd.skills.size() + 1;
+                cd.skills.push_back(ns); p.save();
+            }
+            continue;
+        }
+        FieldSkill& s = *sp;
+        DrawTextU(TextFormat("[%s]", kSlotKeys6[slot]), (int)ix, (int)iy + 3, 14, ui::kAccent);
+        Rectangle snf = { ix + 28, iy, iw - 28, 24 };
+        if (ui::mouseIn(snf) && lclick) charDataNameFocus_ = slot + 1;
+        ui::textField(snf, s.name, charDataNameFocus_ == (slot + 1), 24); iy += 30;
+        float colw = (iw - 8) / 2;
+        if (ui::button({ ix, iy, colw, 26 }, "범위·이펙트 편집")) {
+            charSkillSlot_ = slot; charSkillEdit_ = true; charDataEdit_ = false; return;
         }
         if (ui::button({ ix + colw + 8, iy, colw, 26 }, "스킬 삭제")) {
             for (size_t k = 0; k < cd.skills.size(); ++k) if (cd.skills[k].slot == slot) { cd.skills.erase(cd.skills.begin()+k); break; }

@@ -203,6 +203,9 @@ static void testCharacterBuilder() {
     cs.patX = {0, 0}; cs.patY = {0, -1};
     cs.effectAsset = imgIds[0]; cs.effectLoops = 7;   // 7프레임 이펙트를 7회 반복
     cd.skills.push_back(cs);
+    // extra F/G slots (4·5) — editable per-character like Z/X/C/V
+    FieldSkill fsk; fsk.slot = 4; fsk.name = "F스킬"; fsk.powerPct = 140; cd.skills.push_back(fsk);
+    FieldSkill gsk; gsk.slot = 5; gsk.name = "G스킬"; gsk.powerPct = 160; cd.skills.push_back(gsk);
     p->database.characters.push_back(cd);
     p->playerCharId = cd.id;                                       // "플레이어로 설정"
     CHECK(p->save(), "save new character + registered images");
@@ -223,12 +226,17 @@ static void testCharacterBuilder() {
           "directional lookup + empty-direction fallback to 아래");
     CHECK(p2.playerCharId == 1, "character is set as the driving player");
     CHECK(c && c->drawPct == 175, "character draw size (칸) persisted");
-    bool skillOk = c && c->skills.size() == 1 && c->skills[0].slot == 1 &&
+    bool skillOk = c && c->skills.size() == 3 && c->skills[0].slot == 1 &&
                    c->skills[0].powerPct == 250 && c->skills[0].range == 9 &&
                    c->skills[0].projectile && c->skills[0].name == "캐릭터파이어";
     CHECK(skillOk, "character's own skill (range/power/projectile) persisted");
     CHECK(c && c->skills[0].effectLoops == 7 && c->skills[0].effectAsset == imgIds[0],
           "skill effect image + 반복(회) count persisted");
+    // F·G slots (4·5) authored per-character round-trip
+    const FieldSkill* fS = nullptr; const FieldSkill* gS = nullptr;
+    if (c) for (const auto& sk : c->skills) { if (sk.slot == 4) fS = &sk; if (sk.slot == 5) gS = &sk; }
+    CHECK(fS && fS->powerPct == 140 && gS && gS->powerPct == 160,
+          "캐릭터 F·G(slot 4·5) 스킬 저장/복원");
     bool framesResolve = (c != nullptr);
     if (c) for (int m = 0; m < MO_COUNT; ++m) for (int fid : c->motions[m].frames)
         if (!p2.assets.find(fid)) framesResolve = false;
