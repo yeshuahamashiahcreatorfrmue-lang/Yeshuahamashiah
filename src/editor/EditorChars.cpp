@@ -186,6 +186,9 @@ void Editor::drawCharsTab() {
     float bx = 16, by = kToolbarH + 72, bw = area.width - 32, bh = 318;
     ui::panel({ bx, by, bw, bh }, ui::kPanel);
     ui::label("커스텀 캐릭터 빌더", (int)bx + 12, (int)by + 8, 17, ui::kAccent);
+    DrawTextU("순서:  1. 위 '내 이미지 불러오기'로 등록   2. '+ 새' 캐릭터   3. 모션 탭 선택   "
+              "4. 아래 라이브러리 클릭 = 프레임 추가   5. '플레이어로 설정'",
+              (int)bx + 170, (int)by + 11, 12, ui::kTextDim);
 
     // ---- [1] 캐릭터: 목록 + 새로 만들기 ----
     float cy = by + 32;

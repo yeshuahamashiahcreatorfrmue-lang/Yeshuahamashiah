@@ -153,6 +153,57 @@ static void testProjectIO() {
     fs::remove_all(tmp, ec);
 }
 
+// Mirrors the character-creation panel's full workflow with NO graphics:
+// register new image files -> create a new character -> build all six motions
+// (walk/attack/skill1/skill2/ultimate/death) from those images -> set it as the
+// driving player -> save -> reload, and verify every step persisted.
+static void testCharacterBuilder() {
+    std::printf("== Character builder (register images -> 6 motions -> new character) ==\n");
+    std::string tmp = (fs::temp_directory_path() / "tsukuru_charbuilder").string();
+    std::error_code ec; fs::remove_all(tmp, ec);
+    auto p = Project::createNew(tmp, "CharTest");
+
+    // 1) "내 이미지 불러오기": register NEW image files into the project.
+    fs::path srcdir = fs::path(tmp) / "_incoming"; fs::create_directories(srcdir, ec);
+    std::vector<int> imgIds;
+    for (int i = 0; i < MO_COUNT * 2; ++i) {
+        fs::path f = srcdir / ("frame_" + std::to_string(i) + ".png");
+        if (FILE* fp = std::fopen(f.string().c_str(), "wb")) { std::fputs("PNGDUMMY", fp); std::fclose(fp); }
+        imgIds.push_back(p->assets.registerAsset(p->dir, f.string(), AssetType::Image));
+    }
+    bool allReg = imgIds.size() == (size_t)MO_COUNT * 2;
+    for (int id : imgIds) if (id < 0 || !p->assets.find(id)) allReg = false;
+    CHECK(allReg, "register new images into the project (12 frames)");
+
+    // 2) "+새 캐릭터" + fill ALL six motion tabs from the registered images.
+    CharacterDef cd; cd.id = 1; cd.name = "테스트영웅";
+    for (int m = 0; m < MO_COUNT; ++m) {
+        cd.motions[m].frames = { imgIds[m*2], imgIds[m*2 + 1] };   // = clicking 2 library images
+        cd.motions[m].fps    = 6 + m;
+        cd.motions[m].loop   = (m == MO_Walk);
+    }
+    p->database.characters.push_back(cd);
+    p->playerCharId = cd.id;                                       // "플레이어로 설정"
+    CHECK(p->save(), "save new character + registered images");
+
+    // 3) reload and verify the whole chain survived a round-trip.
+    Project p2; CHECK(p2.load(tmp), "reload project");
+    const CharacterDef* c = p2.database.character(1);
+    CHECK(c != nullptr, "new custom character persisted");
+    bool motionsOk = (c != nullptr);
+    if (c) for (int m = 0; m < MO_COUNT; ++m)
+        if (c->motions[m].frames.size() != 2 || c->motions[m].fps != 6 + m) motionsOk = false;
+    CHECK(motionsOk, "all 6 motions (걷기/공격/스킬1/스킬2/궁극기/죽음) kept their image frames");
+    CHECK(c && c->motions[MO_Walk].loop && !c->motions[MO_Attack].loop, "per-motion loop flags persisted");
+    CHECK(p2.playerCharId == 1, "character is set as the driving player");
+    bool framesResolve = (c != nullptr);
+    if (c) for (int m = 0; m < MO_COUNT; ++m) for (int fid : c->motions[m].frames)
+        if (!p2.assets.find(fid)) framesResolve = false;
+    CHECK(framesResolve, "every motion frame resolves to a registered image asset");
+
+    fs::remove_all(tmp, ec);
+}
+
 int main() {
     std::printf("===== Tsukuru Engine Core Self-Test =====\n");
     testTilemap();
@@ -168,6 +219,7 @@ int main() {
     testGameStateAndSave(db);
     testBattle(db);
     testProjectIO();
+    testCharacterBuilder();
 
     std::printf("=========================================\n");
     if (g_failures == 0) { std::printf("ALL TESTS PASSED\n"); return 0; }
