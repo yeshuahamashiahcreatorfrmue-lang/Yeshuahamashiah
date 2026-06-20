@@ -41,7 +41,7 @@ void TitleScreen::update(float dt) {
 
     if (selection_ == 0) { // New Game
         Project& p = engine_.project();
-        engine_.state().newGame(p.database, p.startActor, p.startMap, p.startX, p.startY);
+        engine_.state().newGame(p.database, p.startActor, p.playerCharId, p.startMap, p.startX, p.startY);
         engine_.setMode(Mode::Play);
     } else if (selection_ == 1 && hasSave()) { // Continue
         std::ifstream f((fs::path(engine_.project().dir) / "save" / "slot1.json").string());

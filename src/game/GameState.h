@@ -28,6 +28,7 @@ struct PartyMember {
     bool alive() const { return hp > 0; }
 
     static PartyMember fromActor(const ActorDef& def);
+    void applyCharacter(const CharacterDef& c); // override stats from the player character (체력/기력/공격력…)
     void gainExp(int amount); // simple leveling
 
     nlohmann::json toJson() const;
@@ -54,7 +55,7 @@ public:
     }
 
     // Start a brand-new game from the database/start settings.
-    void newGame(const Database& db, int startActorId, int startMap, int sx, int sy);
+    void newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy);
 
     bool partyWiped() const;
 

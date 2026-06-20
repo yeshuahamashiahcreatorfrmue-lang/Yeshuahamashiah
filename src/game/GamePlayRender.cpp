@@ -264,7 +264,7 @@ void GamePlay::drawField() {
     DrawRectangle(0, 0, GetScreenWidth(), 32, Fade(BLACK, 0.55f));
     if (!gs.party.empty()) {
         PartyMember& m = gs.party[0];
-        DrawTextU(TextFormat("Lv %d   HP %d/%d   MP %d/%d   EXP %d   Gold %d",
+        DrawTextU(TextFormat("Lv %d   체력 %d/%d   기력 %d/%d   EXP %d   Gold %d",
                  m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold),
                  12, 8, 16, ui::kText);
     }

@@ -80,7 +80,7 @@ static void testInventory(Database& db) {
 static void testGameStateAndSave(Database& db) {
     std::printf("== GameState / Switches / Save ==\n");
     GameState gs;
-    gs.newGame(db, 1, 1, 5, 5);
+    gs.newGame(db, 1, -1, 1, 5, 5);
     gs.setSwitch(10, true);
     gs.setVar(3, 42);
     gs.inventory.addItem(1, 2);
@@ -103,7 +103,7 @@ static void testBattle(Database& db) {
     std::printf("== Battle ==\n");
     std::srand(12345);
     GameState gs;
-    gs.newGame(db, 1, 1, 0, 0);
+    gs.newGame(db, 1, -1, 1, 0, 0);
     gs.inventory.addItem(1, 1); // a potion
     Battle b(db, gs, {1, 1}); // two slimes
     CHECK(b.result() == BattleResult::Ongoing, "battle starts ongoing");
@@ -177,6 +177,7 @@ static void testCharacterBuilder() {
 
     // 2) "+새 캐릭터" + fill ALL six motion tabs from the registered images.
     CharacterDef cd; cd.id = 1; cd.name = "테스트영웅";
+    cd.maxHp = 250; cd.maxGp = 80; cd.atk = 40; cd.def = 12; cd.spd = 9;   // 캐릭터 데이터
     for (int m = 0; m < MO_COUNT; ++m) {
         cd.motions[m].frames = { imgIds[m*2], imgIds[m*2 + 1] };   // = clicking 2 library images
         cd.motions[m].fps    = 6 + m;
@@ -217,6 +218,19 @@ static void testCharacterBuilder() {
     if (c) for (int m = 0; m < MO_COUNT; ++m) for (int fid : c->motions[m].frames)
         if (!p2.assets.find(fid)) framesResolve = false;
     CHECK(framesResolve, "every motion frame resolves to a registered image asset");
+
+    // character battle data (체력/기력/공격력/방어력/속도) round-trips
+    CHECK(c && c->maxHp == 250 && c->maxGp == 80 && c->atk == 40 && c->def == 12 && c->spd == 9,
+          "character stats (체력/기력/공격력/방어력/속도) persisted");
+    // and those stats drive the live party + skill damage uses 공격력 before the multiplier
+    GameState gs; gs.newGame(p2.database, 1, p2.playerCharId, 1, 0, 0);
+    bool statApplied = !gs.party.empty() && gs.party[0].maxHp == 250 && gs.party[0].maxMp == 80
+                       && gs.party[0].atk == 40;
+    CHECK(statApplied, "player character data applied to the live party (기력=maxMp)");
+    if (c && c->skills.size() == 1) {
+        int dmg = std::max(1, gs.party[0].totalAtk(p2.database) * c->skills[0].powerPct / 100);
+        CHECK(dmg == 40 * 250 / 100, "skill damage = 공격력 × 위력배수 (배수 이전 공격력 공통 적용)");
+    }
 
     fs::remove_all(tmp, ec);
 }

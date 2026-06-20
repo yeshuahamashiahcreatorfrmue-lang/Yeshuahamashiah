@@ -25,6 +25,12 @@ PartyMember PartyMember::fromActor(const ActorDef& d) {
     return m;
 }
 
+void PartyMember::applyCharacter(const CharacterDef& c) {
+    maxHp = c.maxHp; maxMp = c.maxGp;      // 기력(GP) is stored in maxMp at runtime
+    atk = c.atk; def = c.def; spd = c.spd;
+    hp = maxHp; mp = maxMp;
+}
+
 void PartyMember::gainExp(int amount) {
     exp += amount;
     // Simple curve: level up every (level * 20) exp; stats grow each level.
@@ -55,7 +61,7 @@ PartyMember PartyMember::fromJson(const json& j) {
     return m;
 }
 
-void GameState::newGame(const Database& db, int startActorId, int startMap, int sx, int sy) {
+void GameState::newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy) {
     party.clear();
     switches_.clear();
     variables_.clear();
@@ -64,6 +70,13 @@ void GameState::newGame(const Database& db, int startActorId, int startMap, int 
         party.push_back(PartyMember::fromActor(*a));
     else if (!db.actors.empty())
         party.push_back(PartyMember::fromActor(db.actors.front()));
+    // The playable custom character's own stats (체력/기력/공격력/방어력/속도) take
+    // priority over the actor template when one is assigned as the player.
+    if (const CharacterDef* c = db.character(playerCharId)) {
+        if (party.empty()) party.push_back(PartyMember{});
+        party[0].applyCharacter(*c);
+    }
+    if (party.empty()) party.push_back(PartyMember{});   // never leave the party empty
     currentMap = startMap;
     playerX = sx; playerY = sy; playerDir = 0;
     objective.clear();

@@ -33,6 +33,7 @@ private:
     int  makeTransparentBg(int assetId); // remove a solid/white background -> new transparent asset
     void scrollbar(Rectangle region, int& scroll, float contentH); // wheel + middle-drag + draggable bar
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
+    void drawCharDataEditor();         // bulk editor: all of a character's stats + every skill
     void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
     void drawAssetsTab();
     void drawDatabaseTab();
@@ -112,6 +113,8 @@ private:
     bool  charLibRenameFocus_ = false;
     std::string charLibRenameBuf_;    // edit buffer for rename overlay
     bool charSkillEdit_ = false;      // per-character skill editor modal is open
+    bool charDataEdit_ = false;       // character data (stats + all skills) editor modal is open
+    int  charDataNameFocus_ = -1;     // -1 none / 0 char name / 1..4 skill name for slot 0..3
     int  charListScroll_ = 0;         // character list scroll (left column)
     int  charFrameScroll_ = 0;        // frame timeline scroll (center column)
     // Undo/redo (snapshots of the active map's tilemap) + rectangle drag

@@ -84,6 +84,14 @@ struct MotionClip {
 struct CharacterDef {
     int id = -1;
     std::string name = "캐릭터";
+    // Battle stats (shown/edited in the character data editor). 기력(GP) replaces
+    // the old MP; 공격력(atk) is applied to EVERY skill before its power multiplier
+    // (실제 데미지 = atk * skill.powerPct/100).
+    int maxHp = 100;   // 체력
+    int maxGp = 30;    // 기력 (구 MP)
+    int atk   = 12;    // 공격력 (모든 스킬 공통, 배수 이전)
+    int def   = 5;     // 방어력
+    int spd   = 5;     // 속도
     MotionClip motions[MO_COUNT]; // walk/attack/skill1/skill2/ultimate/death
     std::vector<FieldSkill> skills; // this character's own skills (by slot); override
                                     // the global field skills when it drives the player

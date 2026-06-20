@@ -53,7 +53,7 @@ void GamePlay::castFieldSkill(const FieldSkill& s, int slot) {
     GameState& gs = engine_.state();
     if (gs.party.empty()) return;
     if (s.mpCost > 0 && gs.party[0].mp < s.mpCost) {
-        toast_ = "MP가 부족합니다 (" + std::to_string(s.mpCost) + ")"; toastTimer_ = 1.1f;
+        toast_ = "기력이 부족합니다 (" + std::to_string(s.mpCost) + ")"; toastTimer_ = 1.1f;
         return;
     }
     gs.party[0].mp -= s.mpCost;
@@ -155,7 +155,7 @@ void GamePlay::drawSkillPanel() {
         DrawTextU(keys[slot], (int)r.x+17, (int)r.y+13, 22, BLACK);
         DrawTextU(s->name.c_str(), (int)r.x+46, (int)r.y+8, 18, ui::kText);
         if (s->mpCost > 0)
-            DrawTextU(TextFormat("MP %d", s->mpCost), (int)r.x+46, (int)r.y+32, 13,
+            DrawTextU(TextFormat("기력 %d", s->mpCost), (int)r.x+46, (int)r.y+32, 13,
                       mp >= s->mpCost ? ui::kGood : ui::kDanger);
         // short auto description (TextFormat's rotating static buffer — no heap alloc)
         const char* d = s->projectile ? TextFormat("원거리 %d칸", s->range)

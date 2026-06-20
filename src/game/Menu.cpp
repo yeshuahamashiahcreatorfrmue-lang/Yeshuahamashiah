@@ -142,7 +142,7 @@ void Menu::drawStatus() {
         DrawTextU(def ? def->name.c_str() : "용사", (int)r.x + 16, y, 22, ui::kText);
         DrawTextU(TextFormat("Lv %d   EXP %d", m.level, m.exp), (int)r.x + 220, y, 18, ui::kTextDim);
         y += 30;
-        DrawTextU(TextFormat("HP %d/%d   MP %d/%d", m.hp, m.maxHp, m.mp, m.maxMp),
+        DrawTextU(TextFormat("체력 %d/%d   기력 %d/%d", m.hp, m.maxHp, m.mp, m.maxMp),
                  (int)r.x + 24, y, 18, ui::kGood); y += 26;
         DrawTextU(TextFormat("공격 %d   방어 %d   속도 %d", m.totalAtk(db), m.totalDef(db), m.spd),
                  (int)r.x + 24, y, 18, ui::kText); y += 40;

@@ -30,7 +30,7 @@ void Engine::setMode(Mode m) {
 }
 
 void Engine::startPlaytest() {
-    state_.newGame(project_->database, project_->startActor,
+    state_.newGame(project_->database, project_->startActor, project_->playerCharId,
                    project_->startMap, project_->startX, project_->startY);
     setMode(Mode::Play);
 }
@@ -59,8 +59,8 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
 
     if (startModeSet_) {
         if (startMode_ == Mode::Play) {
-            state_.newGame(project_->database, project_->startActor,
-                           project_->startMap, project_->startX, project_->startY);
+            state_.newGame(project_->database, project_->startActor, project_->playerCharId,
+                   project_->startMap, project_->startX, project_->startY);
         }
         setMode(startMode_);
     }

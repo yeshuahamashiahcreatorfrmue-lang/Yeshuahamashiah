@@ -242,6 +242,7 @@ void Editor::scrollbar(Rectangle r, int& scroll, float contentH) {
 
 void Editor::drawCharsTab() {
     if (charSkillEdit_) { drawCharSkillEditor(); return; }   // modal: this character's skill
+    if (charDataEdit_)  { drawCharDataEditor();  return; }   // modal: this character's full data
     float W = (float)GetScreenWidth(), H = (float)GetScreenHeight();
     DrawRectangleRec({ 0, kToolbarH, W, H - kToolbarH }, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
@@ -272,7 +273,7 @@ void Editor::drawCharsTab() {
     {
         float x = leftX + 10, w = leftW - 20;
         ui::label("캐릭터", (int)x, (int)panelTop + 8, 15, ui::kAccent);
-        float listTop = panelTop + 32, listH = panelH - 252;
+        float listTop = panelTop + 32, listH = panelH - 290;
         Rectangle listReg = { leftX, listTop, leftW, listH };
         int rows = (int)db.characters.size();
         BeginScissorMode((int)leftX, (int)listTop, (int)leftW, (int)listH);
@@ -304,6 +305,8 @@ void Editor::drawCharsTab() {
             if (ui::mouseIn(nf) && lclick) charDefNameFocus_ = true;
             else if (lclick && !ui::mouseIn(nf)) charDefNameFocus_ = false;
             ui::textField(nf, cd.name, charDefNameFocus_, 20); by += 32;
+            if (ui::button({ x, by, w, 30 }, "⚙ 캐릭터 데이터 수정 (능력치·스킬)", false)) { charDataEdit_ = true; charDataNameFocus_ = -1; return; }
+            by += 36;
             bool isP = (p.playerCharId == cd.id);
             if (ui::button({ x, by, w, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
                 p.playerCharId = cd.id; p.save();
@@ -753,8 +756,8 @@ void Editor::drawCharSkillEditor() {
     dy += 30;
     ui::intStepper({ dx, dy, 260, 24 }, "사거리(발사체)", s.range, 1, 1, 20); dy += 27;
     ui::intStepper({ dx, dy, 260, 24 }, "순간이동 칸", s.blink, 1, 0, 10); dy += 27;
-    ui::intStepper({ dx, dy, 260, 24 }, "위력(%ATK)", s.powerPct, 10, 0, 1000); dy += 27;
-    ui::intStepper({ dx, dy, 260, 24 }, "MP 소모", s.mpCost, 1, 0, 99); dy += 27;
+    ui::intStepper({ dx, dy, 260, 24 }, "위력 배수(%공격력)", s.powerPct, 10, 0, 1000); dy += 27;
+    ui::intStepper({ dx, dy, 260, 24 }, "기력 소모", s.mpCost, 1, 0, 99); dy += 27;
     int cdTenths = (int)(s.cooldown * 10 + 0.5f);
     if (ui::intStepper({ dx, dy, 260, 24 }, "쿨다운(0.1초)", cdTenths, 1, 1, 200)) s.cooldown = cdTenths / 10.0f;
     dy += 32;
@@ -777,6 +780,94 @@ void Editor::drawCharSkillEditor() {
     DrawTextU("효과음 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
     static const char* sndName[5] = { "베기","마법","폭발","대시","회복" };
     for (int i = 0; i < 5; ++i) if (ui::button({ dx + 78 + i*38, dy, 36, 22 }, sndName[i])) s.soundAsset = generateSound(i);
+}
+
+
+// Bulk character-data editor: edit one character's whole data set in a single
+// screen — battle stats (체력/기력/공격력/방어력/속도) on the left, and every
+// skill (Z/X/C/V) with its numbers on the right, all visible & editable at once.
+void Editor::drawCharDataEditor() {
+    Project& p = engine_.project();
+    Database& db = p.database;
+    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
+    DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
+    if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charDataEdit_ = false; return; }
+    CharacterDef& cd = db.characters[charDefSel_];
+    bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    if (lclick) charDataNameFocus_ = -1;   // a click elsewhere drops text focus (set again below if on a field)
+
+    ui::label(TextFormat("캐릭터 데이터 — %s", cd.name.c_str()), 20, (int)kToolbarH + 10, 20, ui::kAccent);
+    if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 저장하고 닫기")) { p.save(); charDataEdit_ = false; return; }
+
+    // ===================== LEFT: 능력치 =====================
+    float lx = 24, ly = kToolbarH + 50, lw = 320;
+    ui::panel({ lx - 8, ly - 6, lw + 16, 360 }, ui::kPanel);
+    ui::label("능력치", (int)lx, (int)ly, 18, ui::kAccent); ly += 28;
+    ui::label("이름:", (int)lx, (int)ly, 13, ui::kTextDim); ly += 18;
+    Rectangle nf = { lx, ly, lw, 26 };
+    if (ui::mouseIn(nf) && lclick) charDataNameFocus_ = 0;
+    ui::textField(nf, cd.name, charDataNameFocus_ == 0, 24); ly += 34;
+    ui::intStepper({ lx, ly, lw, 26 }, "체력 (HP)",     cd.maxHp, 10, 1, 99999); ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "기력 (GP)",     cd.maxGp,  5, 0, 9999);  ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "공격력",        cd.atk,    1, 0, 9999);  ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "속도",          cd.spd,    1, 0, 999);   ly += 36;
+    DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
+    DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
+    bool isP = (p.playerCharId == cd.id);
+    if (ui::button({ lx, ly, lw, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
+        p.playerCharId = cd.id; p.save(); setStatus("이 캐릭터를 플레이어로 설정 (데이터 적용).");
+    }
+
+    // ===================== RIGHT: 스킬 일괄 =====================
+    static const char* slotKey[4]  = { "Z", "X", "C", "V" };
+    static const int   slotMot[4]  = { MO_Attack, MO_Skill1, MO_Skill2, MO_Ult };
+    float rx0 = lx + lw + 28, ry0 = kToolbarH + 50;
+    float rArea = area.width - rx0 - 16;
+    float cardW = (rArea - 12) / 2, cardH = 250;
+    ui::label("스킬 (Z·X·C·V 일괄 편집)", (int)rx0, (int)(ry0 - 24), 16, ui::kAccent);
+    for (int slot = 0; slot < 4; ++slot) {
+        float cx = rx0 + (slot % 2) * (cardW + 12);
+        float cy = ry0 + (slot / 2) * (cardH + 12);
+        ui::panel({ cx, cy, cardW, cardH }, ui::kPanelHi);
+        float ix = cx + 12, iy = cy + 10, iw = cardW - 24;
+        DrawTextU(TextFormat("[%s] %s 모션", slotKey[slot], kMotionNames[slotMot[slot]]), (int)ix, (int)iy, 15, ui::kAccent);
+        iy += 24;
+        FieldSkill* sp = nullptr;
+        for (auto& s : cd.skills) if (s.slot == slot) { sp = &s; break; }
+        if (!sp) {
+            DrawTextU("이 슬롯에 스킬 없음 (전역 기본 사용)", (int)ix, (int)iy + 6, 12, ui::kTextDim); iy += 30;
+            if (ui::button({ ix, iy, iw, 28 }, "+ 이 스킬 만들기")) {
+                FieldSkill ns; const FieldSkill* g = db.fieldSkillForSlot(slot);
+                if (g) ns = *g; else { ns.name = kMotionNames[slotMot[slot]]; applyShape(ns, 0, 1); }
+                ns.slot = slot; ns.id = (int)cd.skills.size() + 1;
+                cd.skills.push_back(ns); p.save();
+            }
+            continue;
+        }
+        FieldSkill& s = *sp;
+        Rectangle snf = { ix, iy, iw, 24 };
+        if (ui::mouseIn(snf) && lclick) charDataNameFocus_ = slot + 1;
+        ui::textField(snf, s.name, charDataNameFocus_ == (slot + 1), 24); iy += 30;
+        float colw = (iw - 8) / 2;
+        if (ui::button({ ix, iy, iw, 24 }, s.projectile ? "유형: 발사체(직선)" : "유형: 범위(타일)")) { s.projectile = !s.projectile; p.save(); }
+        iy += 28;
+        ui::intStepper({ ix, iy, colw, 24 }, "기력", s.mpCost, 1, 0, 99);
+        ui::intStepper({ ix + colw + 8, iy, colw, 24 }, "사거리", s.range, 1, 1, 20); iy += 28;
+        ui::intStepper({ ix, iy, colw, 24 }, "위력%", s.powerPct, 10, 0, 1000);
+        ui::intStepper({ ix + colw + 8, iy, colw, 24 }, "순간이동", s.blink, 1, 0, 10); iy += 28;
+        int cdT = (int)(s.cooldown * 10 + 0.5f);
+        if (ui::intStepper({ ix, iy, colw, 24 }, "쿨다운0.1초", cdT, 1, 1, 200)) { s.cooldown = cdT / 10.0f; }
+        DrawTextU(TextFormat("데미지 %d", std::max(1, cd.atk * s.powerPct / 100)),
+                  (int)(ix + colw + 12), (int)iy + 4, 14, ui::kGood); iy += 30;
+        if (ui::button({ ix, iy, colw, 26 }, "범위·이펙트 편집")) {
+            charMotionTab_ = slotMot[slot]; charSkillEdit_ = true; charDataEdit_ = false; return;
+        }
+        if (ui::button({ ix + colw + 8, iy, colw, 26 }, "스킬 삭제")) {
+            for (size_t k = 0; k < cd.skills.size(); ++k) if (cd.skills[k].slot == slot) { cd.skills.erase(cd.skills.begin()+k); break; }
+            p.save(); return;
+        }
+    }
 }
 
 
