@@ -42,6 +42,11 @@ private:
     void cycleAsset(int& cur, AssetType t);              // advance to the next asset id (wraps to -1)
     float drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesPattern); // -> grid bottom Y
     void drawSkillFxControls(FieldSkill& s, float dx, float& dy); // effect/sound assign + import + frames/loops
+    void drawEffectFrameStrip(FieldSkill& s, float x, float y);   // per-frame select/replace/add/remove panel
+    void pickAndImportEfxFrame();        // file picker -> replace one effect strip frame
+    void efxReplaceFrame(int assetId, int frame, const std::string& src); // composite an image into one cell
+    bool efxAddFrame(int assetId);       // append a blank cell to the strip
+    bool efxRemoveFrame(int assetId, int frame);
     void drawAssetsTab();
     void drawDatabaseTab();
     void drawTilePalette(Rectangle area);
@@ -115,6 +120,9 @@ private:
     bool pendingNpcCharImport_ = false;    // request the picker to assign an NPC sprite
     int  pendingNpcEventId_ = -1;          // event awaiting an imported NPC sprite
     bool pendingMapImport_ = false;        // request the picker to load a map .json
+    int  efxFrameSel_ = 0;                  // selected effect frame (per-frame editor)
+    bool pendingEfxFrameImport_ = false;    // request the picker to replace an effect frame
+    int  pendingEfxAsset_ = -1, pendingEfxFrame_ = -1;
     std::shared_ptr<Map> mapPreview_;      // a loaded-but-not-yet-added map (World tab preview)
     std::string mapPreviewName_;           // source filename of the preview map
     FieldSkill* pendingEffectSkill_ = nullptr; // skill awaiting an imported effect/sound (valid 1 frame)

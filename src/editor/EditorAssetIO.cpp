@@ -477,6 +477,95 @@ void Editor::pickAndImportMapFile() {
     }
 }
 
+// --- per-frame effect editing (strip = N equal cells side by side) ----------
+// Composite an external image into ONE cell of the effect strip (background
+// removed, scaled to fit, centred), then reload the texture.
+void Editor::efxReplaceFrame(int assetId, int frame, const std::string& src) {
+    Project& p = engine_.project();
+    const AssetEntry* ae = p.assets.find(assetId);
+    if (!ae) return;
+    int frames = ae->frames > 1 ? ae->frames : 1;
+    Image strip = LoadImage(p.assetFullPath(assetId).c_str());
+    if (!strip.data) { setStatus("이펙트 이미지를 열 수 없음"); return; }
+    ImageFormat(&strip, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int cellW = strip.width / frames, cellH = strip.height;
+    if (frame < 0 || frame >= frames || cellW <= 0) { UnloadImage(strip); return; }
+    Image nw = LoadImage(src.c_str());
+    if (!nw.data) { UnloadImage(strip); setStatus("교체 이미지를 열 수 없음"); return; }
+    ImageFormat(&nw, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    if (!aiCutout(nw)) autoRemoveBg(nw);          // transparent background
+    // clear the target cell to transparent
+    Color* px = (Color*)strip.data; int x0 = frame * cellW;
+    for (int y = 0; y < cellH; ++y) for (int x = 0; x < cellW; ++x) px[y*strip.width + (x0+x)] = Color{0,0,0,0};
+    // draw the new image scaled to fit the cell, centred
+    float sc = std::min((float)cellW / nw.width, (float)cellH / nw.height);
+    float dw = nw.width * sc, dh = nw.height * sc;
+    ImageDraw(&strip, nw, {0,0,(float)nw.width,(float)nw.height},
+              { x0 + (cellW-dw)/2, (cellH-dh)/2, dw, dh }, WHITE);
+    ExportImage(strip, p.assetFullPath(assetId).c_str());
+    UnloadImage(strip); UnloadImage(nw);
+    engine_.textures().invalidate(p.assetFullPath(assetId));   // force reload
+    p.save();
+    setStatus(TextFormat("이펙트 %d번 프레임 교체됨", frame + 1));
+}
+
+bool Editor::efxAddFrame(int assetId) {
+    Project& p = engine_.project();
+    const AssetEntry* ae = p.assets.find(assetId);
+    if (!ae) return false;
+    int frames = ae->frames > 1 ? ae->frames : 1;
+    Image strip = LoadImage(p.assetFullPath(assetId).c_str());
+    if (!strip.data) return false;
+    ImageFormat(&strip, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int cellW = strip.width / frames, cellH = strip.height;
+    Image wider = GenImageColor(cellW * (frames+1), cellH, BLANK);
+    ImageFormat(&wider, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    ImageDraw(&wider, strip, {0,0,(float)strip.width,(float)cellH}, {0,0,(float)strip.width,(float)cellH}, WHITE);
+    ExportImage(wider, p.assetFullPath(assetId).c_str());
+    UnloadImage(strip); UnloadImage(wider);
+    p.assets.setAnim(assetId, frames+1, ae->fps > 0 ? ae->fps : 12);
+    engine_.textures().invalidate(p.assetFullPath(assetId));
+    p.save();
+    setStatus(TextFormat("프레임 추가됨 (총 %d)", frames+1));
+    return true;
+}
+
+bool Editor::efxRemoveFrame(int assetId, int frame) {
+    Project& p = engine_.project();
+    const AssetEntry* ae = p.assets.find(assetId);
+    if (!ae) return false;
+    int frames = ae->frames > 1 ? ae->frames : 1;
+    if (frames <= 1) { setStatus("프레임이 1개뿐입니다."); return false; }
+    Image strip = LoadImage(p.assetFullPath(assetId).c_str());
+    if (!strip.data) return false;
+    ImageFormat(&strip, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int cellW = strip.width / frames, cellH = strip.height;
+    Image out = GenImageColor(cellW * (frames-1), cellH, BLANK);
+    ImageFormat(&out, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    int d = 0;
+    for (int i = 0; i < frames; ++i) {
+        if (i == frame) continue;
+        ImageDraw(&out, strip, {(float)i*cellW,0,(float)cellW,(float)cellH}, {(float)d*cellW,0,(float)cellW,(float)cellH}, WHITE);
+        ++d;
+    }
+    ExportImage(out, p.assetFullPath(assetId).c_str());
+    UnloadImage(strip); UnloadImage(out);
+    p.assets.setAnim(assetId, frames-1, ae->fps > 0 ? ae->fps : 12);
+    engine_.textures().invalidate(p.assetFullPath(assetId));
+    p.save();
+    setStatus(TextFormat("프레임 삭제됨 (총 %d)", frames-1));
+    return true;
+}
+
+void Editor::pickAndImportEfxFrame() {
+    int asset = pendingEfxAsset_, frame = pendingEfxFrame_;
+    pendingEfxAsset_ = -1; pendingEfxFrame_ = -1;
+    if (asset < 0) return;
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("프레임 교체 취소됨."); return; }
+    efxReplaceFrame(asset, frame, files.front());
+}
+
 // ============================ draw ============================
 
 } // namespace tsukuru

@@ -146,7 +146,44 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
         }
         DrawTextU(TextFormat("사운드: %s", assetName(s.soundAsset).c_str()),
                   (int)pvx, (int)(fxTop + 20 + pvh + 22), 11, ui::kTextDim);
+        drawEffectFrameStrip(s, pvx, fxTop + 20 + pvh + 44);   // per-frame select/replace panel
     }
+}
+
+// Per-frame editor for the effect strip: numbered thumbnails (click to select),
+// then replace/add/remove that single frame.
+void Editor::drawEffectFrameStrip(FieldSkill& s, float x, float y) {
+    if (s.effectAsset < 0) return;
+    Project& p = engine_.project();
+    const AssetEntry* ae = p.assets.find(s.effectAsset);
+    int frames = (ae && ae->frames > 1) ? ae->frames : 1;
+    const Texture2D& tex = engine_.assetTexture(s.effectAsset);
+    DrawTextU("프레임 (번호 클릭→선택, 아래서 교체)", (int)x, (int)y, 13, ui::kAccent); y += 20;
+    if (efxFrameSel_ >= frames) efxFrameSel_ = frames - 1;
+    if (efxFrameSel_ < 0) efxFrameSel_ = 0;
+    const float tw = 46, th = 46, gap = 4; const int perRow = 6;
+    float fw = tex.width / (float)frames, fh = (float)tex.height;
+    for (int i = 0; i < frames; ++i) {
+        float bx = x + (i % perRow) * (tw + gap), by = y + (i / perRow) * (th + 20);
+        Rectangle cell = { bx, by, tw, th };
+        DrawRectangleRec(cell, Color{ 20, 22, 30, 255 });
+        if (fw > 0 && fh > 0) {
+            float sc = std::min(tw / fw, th / fh);
+            DrawTexturePro(tex, { i*fw, 0, fw, fh },
+                           { bx + (tw-fw*sc)/2, by + (th-fh*sc)/2, fw*sc, fh*sc }, {0,0}, 0, WHITE);
+        }
+        DrawRectangleLinesEx(cell, efxFrameSel_==i ? 3 : 1, efxFrameSel_==i ? ui::kAccentHi : Fade(BLACK,0.6f));
+        DrawTextU(TextFormat("%d", i+1), (int)bx + 3, (int)(by + th + 1), 13,
+                  efxFrameSel_==i ? ui::kAccentHi : ui::kTextDim);
+        if (ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) efxFrameSel_ = i;
+    }
+    float by = y + ((frames + perRow - 1) / perRow) * (th + 20) + 4;
+    if (ui::button({ x, by, 200, 26 }, TextFormat("%d번 프레임 교체(불러오기)", efxFrameSel_ + 1), true)) {
+        pendingEfxAsset_ = s.effectAsset; pendingEfxFrame_ = efxFrameSel_; pendingEfxFrameImport_ = true;
+    }
+    by += 30;
+    if (ui::button({ x, by, 98, 26 }, "+ 프레임 추가")) { efxAddFrame(s.effectAsset); }
+    if (ui::button({ x + 102, by, 98, 26 }, "− 프레임 삭제")) { efxRemoveFrame(s.effectAsset, efxFrameSel_); }
 }
 
 // Fill a skill's damage (or effect, when toEfx) tiles from a shape preset

@@ -37,6 +37,13 @@ const Texture2D& TextureCache::get(const std::string& path) {
     return res.first->second;
 }
 
+void TextureCache::invalidate(const std::string& path) {
+    auto it = cache_.find(path);
+    if (it == cache_.end()) return;
+    if (it->second.id != placeholder_.id) UnloadTexture(it->second);
+    cache_.erase(it);   // next get() reloads from disk
+}
+
 void TextureCache::clear() {
     for (auto& kv : cache_) {
         // Don't double-free the shared placeholder.

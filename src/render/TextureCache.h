@@ -13,6 +13,7 @@ public:
     // Returns a cached texture for the path, loading it on first use.
     // An empty path or a missing file yields a procedural placeholder.
     const Texture2D& get(const std::string& path);
+    void invalidate(const std::string& path);  // drop one cached texture so it reloads (after editing the file)
     void clear();
 
 private:
