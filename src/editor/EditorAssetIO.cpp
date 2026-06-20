@@ -352,39 +352,43 @@ void Editor::pickAndImportEffect() {
 // Import an external image and use it as the ACTIVE MAP's tileset. Unlike the
 // sprite importer this does NOT remove a background or crop — the tile grid must
 // stay intact. Columns/rows are guessed from the image size (square tiles).
+// Copy an external image into the project's assets/ (UTF-8 safe, no crop/bg
+// removal so tile grids & character sheets stay intact) and register it.
+// Returns the new asset id, or -1 on failure. Shared by the tileset & NPC pickers.
+int Editor::stageImportImage(const std::string& src, const char* prefix) {
+    Project& p = engine_.project();
+    std::error_code ec;
+    std::string ext = fs::path(src).extension().string();
+    for (auto& c : ext) c = (char)tolower((unsigned char)c);
+    if (!isImageExt(ext)) return -1;
+    fs::create_directories(fs::path(p.dir) / "assets", ec);
+    int n = 1; fs::path dest;
+    do { dest = fs::path(p.dir)/"assets"/(std::string(prefix)+"_"+std::to_string(n++)+ext); } while (fs::exists(dest, ec));
+    if (!plat::copyFileUtf8(src, dest.string())) return -1;
+    std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+    return p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+}
+
 void Editor::pickAndImportTileset() {
     auto m = activeMap();
     if (!m) { setStatus("먼저 맵을 선택하세요."); return; }
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("타일셋 불러오기 취소됨."); return; }
+    int id = stageImportImage(files.front(), "tileset");
+    if (id < 0) { setStatus("타일셋 불러오기 실패 (이미지 아님)."); return; }
     Project& p = engine_.project();
-    std::error_code ec;
-    const std::string& src = files.front();
-    std::string ext = fs::path(src).extension().string();
-    for (auto& c : ext) c = (char)tolower((unsigned char)c);
-    if (!isImageExt(ext)) { setStatus("이미지 파일이 아닙니다."); return; }
-    try {
-        fs::create_directories(fs::path(p.dir) / "assets", ec);
-        int n = 1; fs::path dest;
-        do { dest = fs::path(p.dir)/"assets"/("tileset_"+std::to_string(n++)+ext); } while (fs::exists(dest, ec));
-        if (!plat::copyFileUtf8(src, dest.string())) { setStatus("타일셋 복사 실패."); return; }
-        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
-        int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
-        m->tileset.assetId = id;
-        // guess the grid from the image dimensions (assume square tiles)
-        Image probe = LoadImage(p.assetFullPath(id).c_str());
-        if (probe.data) {
-            int tw = m->tileset.tileWidth  > 0 ? m->tileset.tileWidth  : 32;
-            int th = m->tileset.tileHeight > 0 ? m->tileset.tileHeight : 32;
-            m->tileset.columns = std::max(1, probe.width  / tw);
-            m->tileset.rows    = std::max(1, probe.height / th);
-            UnloadImage(probe);
-        }
-        p.save();
-        setStatus(TextFormat("타일셋 적용됨 (%d×%d 칸)", m->tileset.columns, m->tileset.rows));
-    } catch (const std::exception& e) {
-        setStatus(std::string("타일셋 불러오기 실패: ") + e.what());
+    m->tileset.assetId = id;
+    // guess the grid from the image dimensions (assume square tiles)
+    Image probe = LoadImage(p.assetFullPath(id).c_str());
+    if (probe.data) {
+        int tw = m->tileset.tileWidth  > 0 ? m->tileset.tileWidth  : 32;
+        int th = m->tileset.tileHeight > 0 ? m->tileset.tileHeight : 32;
+        m->tileset.columns = std::max(1, probe.width  / tw);
+        m->tileset.rows    = std::max(1, probe.height / th);
+        UnloadImage(probe);
     }
+    p.save();
+    setStatus(TextFormat("타일셋 적용됨 (%d×%d 칸)", m->tileset.columns, m->tileset.rows));
 }
 
 // Import an external audio file and assign it as the pending skill's sound.
@@ -456,25 +460,11 @@ void Editor::pickAndImportNpcChar() {
     if (!ev) { setStatus("NPC를 찾지 못했습니다."); return; }
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("캐릭터 불러오기 취소됨."); return; }
-    Project& p = engine_.project();
-    std::error_code ec;
-    const std::string& src = files.front();
-    std::string ext = fs::path(src).extension().string();
-    for (auto& c : ext) c = (char)tolower((unsigned char)c);
-    if (!isImageExt(ext)) { setStatus("이미지 파일이 아닙니다."); return; }
-    try {
-        fs::create_directories(fs::path(p.dir) / "assets", ec);
-        int n = 1; fs::path dest;
-        do { dest = fs::path(p.dir)/"assets"/("npc_char_"+std::to_string(n++)+ext); } while (fs::exists(dest, ec));
-        if (!plat::copyFileUtf8(src, dest.string())) { setStatus("캐릭터 복사 실패."); return; }
-        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
-        int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
-        ev->graphicAsset = id;
-        p.save();
-        setStatus("NPC 캐릭터 적용됨: " + assetName(id));
-    } catch (const std::exception& e) {
-        setStatus(std::string("캐릭터 불러오기 실패: ") + e.what());
-    }
+    int id = stageImportImage(files.front(), "npc_char");
+    if (id < 0) { setStatus("캐릭터 불러오기 실패 (이미지 아님)."); return; }
+    ev->graphicAsset = id;
+    engine_.project().save();
+    setStatus("NPC 캐릭터 적용됨: " + assetName(id));
 }
 
 // Load a map .json from disk into mapPreview_ (World tab previews it before the

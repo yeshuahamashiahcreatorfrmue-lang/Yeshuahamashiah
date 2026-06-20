@@ -46,6 +46,8 @@ private:
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
     void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
+    void drawNpcStatRows(Event& ev, float x, float& y, float w); // 진영/AI/크기/전투 rows (shared)
+    int  stageImportImage(const std::string& src, const char* prefix); // copy ext image -> asset id, -1 fail
     void pickAndImportNpcChar();                     // file picker -> assign an NPC's character sprite
     void pickAndImportMapFile();                     // file picker -> load a map .json for preview/registration
     void handleAssetDrop();

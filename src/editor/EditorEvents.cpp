@@ -13,14 +13,40 @@
 namespace fs = std::filesystem;
 namespace tsukuru {
 
-// Shared NPC data panel: character sprite (cycle + import), faction (중립/아군/
-// 적군), AI behaviour, on-map size, combat stats, dialogue, delete. Used by the
-// Map tab's NPC mode (and mirrors the Events-tab NPC controls).
+// Shared faction / AI / size / combat-stat rows (one source of truth for the
+// Map-tab NPC inspector AND the Events-tab NPC block).
+void Editor::drawNpcStatRows(Event& ev, float x, float& y, float w) {
+    static const char* fac[3] = { "중립", "아군", "적군" };
+    static const Color fcol[3] = { Color{200,200,200,255}, Color{120,200,255,255}, Color{255,130,130,255} };
+    if (ui::button({ x, y, w, 24 }, TextFormat("진영: %s", fac[(int)ev.faction]))) {
+        ev.faction = (NpcFaction)(((int)ev.faction + 1) % 3);
+    }
+    DrawRectangle((int)(x + w - 16), (int)y + 6, 12, 12, fcol[(int)ev.faction]);
+    y += 28;
+    static const char* beh[5] = { "대기", "배회", "순찰", "추격", "도망" };
+    if (ui::button({ x, y, w, 24 }, TextFormat("AI 행동: %s", beh[(int)ev.behavior]))) {
+        ev.behavior = (NpcBehavior)(((int)ev.behavior + 1) % 5);
+    }
+    y += 28;
+    ui::intStepper({ x, y, w, 24 }, "크기(칸%, 100=1칸)", ev.drawPct, 25, 25, 400); y += 28;
+    if (ev.faction != NpcFaction::Neutral) {
+        ui::intStepper({ x, y, w, 24 }, "체력",   ev.npcHp,  5, 1, 9999); y += 26;
+        ui::intStepper({ x, y, w, 24 }, "공격력", ev.npcAtk, 1, 0, 999);  y += 26;
+        ui::intStepper({ x, y, w, 24 }, "방어력", ev.npcDef, 1, 0, 999);  y += 26;
+        DrawTextU(ev.faction == NpcFaction::Enemy ? "적군: 추격 시 플레이어를 공격"
+                                                  : "아군: 주변 적/몬스터와 싸움",
+                  (int)x, (int)y, 11, ui::kTextDim); y += 18;
+    } else {
+        DrawTextU("중립: 전투 없음 (대화·분위기용)", (int)x, (int)y, 11, ui::kTextDim); y += 18;
+    }
+}
+
+// NPC data panel: character sprite (cycle + import) + the shared stat rows +
+// dialogue + delete. Used by the Map tab's NPC mode.
 void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
     float x = panel.x + 12, y = panel.y + 10;
     ui::label("NPC 데이터", (int)x, (int)y, 22, ui::kAccent); y += 38;
 
-    // --- character sprite: cycle existing or import from a character asset ---
     if (ui::button({ x, y, 300, 26 }, std::string("캐릭터: ") + assetName(ev.graphicAsset), ev.graphicAsset >= 0))
         cycleAsset(ev.graphicAsset, AssetType::Image);
     y += 30;
@@ -28,35 +54,9 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
         pendingNpcEventId_ = ev.id; pendingNpcCharImport_ = true;
     }
     y += 28;
-    DrawTextU("4방향(세로4×가로4) 캐릭터 시트 권장.", (int)x, (int)y, 11, ui::kTextDim); y += 20;
+    DrawTextU("4방향(세로4×가로4) 캐릭터 시트 권장.", (int)x, (int)y, 11, ui::kTextDim); y += 22;
 
-    // --- faction ---
-    static const char* fac[3] = { "중립", "아군", "적군" };
-    Color fcol[3] = { Color{200,200,200,255}, Color{90,170,255,255}, ui::kDanger };
-    if (ui::button({ x, y, 300, 26 }, TextFormat("진영: %s", fac[(int)ev.faction])))
-        ev.faction = (NpcFaction)(((int)ev.faction + 1) % 3);
-    DrawRectangle((int)x + 282, (int)y + 7, 12, 12, fcol[(int)ev.faction]);
-    y += 30;
-    // --- AI behaviour ---
-    static const char* beh[5] = { "대기", "배회", "순찰", "추격", "도망" };
-    if (ui::button({ x, y, 300, 26 }, TextFormat("AI 행동: %s", beh[(int)ev.behavior])))
-        ev.behavior = (NpcBehavior)(((int)ev.behavior + 1) % 5);
-    y += 30;
-    // --- on-map size ---
-    ui::intStepper({ x, y, 300, 24 }, "크기(칸%, 100=1칸)", ev.drawPct, 25, 25, 400); y += 30;
-
-    // --- combat stats (Ally/Enemy only) ---
-    if (ev.faction != NpcFaction::Neutral) {
-        ui::intStepper({ x, y, 300, 24 }, "체력",   ev.npcHp,  5, 1, 9999); y += 26;
-        ui::intStepper({ x, y, 300, 24 }, "공격력", ev.npcAtk, 1, 0, 999);  y += 26;
-        ui::intStepper({ x, y, 300, 24 }, "방어력", ev.npcDef, 1, 0, 999);  y += 26;
-        DrawTextU(ev.faction == NpcFaction::Enemy ? "적군: 추격 시 플레이어를 공격"
-                                                  : "아군: 주변 적과 싸움",
-                  (int)x, (int)y, 11, ui::kTextDim);
-        y += 20;
-    } else {
-        DrawTextU("중립: 전투 없음 (대화·분위기용)", (int)x, (int)y, 11, ui::kTextDim); y += 20;
-    }
+    drawNpcStatRows(ev, x, y, 300); y += 6;
 
     // --- dialogue ---
     DrawTextU("대사:", (int)x, (int)y, 13, ui::kTextDim); y += 18;
@@ -221,35 +221,7 @@ void Editor::drawEventsTab() {
             pendingNpcEventId_ = ev->id; pendingNpcCharImport_ = true;
         }
         y += 26;
-        const char* facNames[] = { "중립", "아군", "적군" };
-        Color facCol[] = { ui::kTextDim, Color{120,200,255,255}, Color{255,130,130,255} };
-        if (ui::button({ panel.x + 12, y, 296, 24 },
-                       TextFormat("진영: %s", facNames[(int)ev->faction]))) {
-            ev->faction = (NpcFaction)(((int)ev->faction + 1) % 3);
-        }
-        DrawRectangle((int)panel.x + 290, (int)y + 6, 12, 12, facCol[(int)ev->faction]);
-        y += 28;
-        const char* behNames[] = { "대기", "배회", "순찰", "추격", "도망" };
-        if (ui::button({ panel.x + 12, y, 296, 24 },
-                       TextFormat("행동: %s", behNames[(int)ev->behavior]))) {
-            ev->behavior = (NpcBehavior)(((int)ev->behavior + 1) % 5);
-        }
-        y += 28;
-        ui::intStepper({ panel.x + 12, y, 296, 24 }, "크기(칸%, 100=1칸)", ev->drawPct, 25, 25, 400);
-        y += 28;
-        if (ev->faction != NpcFaction::Neutral) {
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "체력",   ev->npcHp,  5, 1, 9999); y += 26;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "공격력", ev->npcAtk, 1, 0, 999);  y += 26;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "방어력", ev->npcDef, 1, 0, 999);  y += 26;
-            DrawTextU(ev->faction == NpcFaction::Enemy
-                          ? "적군: 추격 시 플레이어를 공격합니다."
-                          : "아군: 주변 적/몬스터와 싸웁니다.",
-                      (int)panel.x + 12, (int)y, 11, ui::kTextDim);
-            y += 18;
-        } else {
-            DrawTextU("중립: 전투 없음 (대화·분위기용).", (int)panel.x + 12, (int)y, 11, ui::kTextDim);
-            y += 18;
-        }
+        drawNpcStatRows(*ev, panel.x + 12, y, 296);   // 진영/AI/크기/전투 (shared)
     }
     y += 8;
     DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
