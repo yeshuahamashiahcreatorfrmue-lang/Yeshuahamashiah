@@ -30,32 +30,65 @@ bool Editor::isAudioExt(const std::string& e) {
     return false;
 }
 
-// Auto-trim a single-colour border: if the four corners are the same solid
-// colour, key that colour to transparent; then crop away the fully-transparent
-// margins so only the picture remains. Returns true if it changed the image.
+static bool rgbClose(Color a, Color b, int t) {
+    return std::abs(a.r-b.r) + std::abs(a.g-b.g) + std::abs(a.b-b.b) <= t;
+}
+
+// Magic-wand style background removal: flood-fill from the image EDGES and make
+// only the background region that is CONNECTED to the border transparent. White
+// (or any bg-coloured) pixels enclosed by the subject — eyes, highlights — are
+// kept, because they are not reachable from the edge. `tol` is the colour
+// tolerance. Returns the number of pixels cleared.
+static int floodFillBorder(Color* px, int W, int H, Color bg, int tol) {
+    std::vector<unsigned char> vis(W * H, 0);
+    std::vector<int> stk; stk.reserve(W + H);
+    auto seed = [&](int x, int y) {
+        int i = y*W + x;
+        if (!vis[i] && px[i].a > 0 && rgbClose(px[i], bg, tol)) { vis[i] = 1; stk.push_back(i); }
+    };
+    for (int x = 0; x < W; ++x) { seed(x, 0); seed(x, H-1); }   // top + bottom edges
+    for (int y = 0; y < H; ++y) { seed(0, y); seed(W-1, y); }   // left + right edges
+    int cleared = 0;
+    while (!stk.empty()) {
+        int i = stk.back(); stk.pop_back();
+        px[i] = Color{ 0, 0, 0, 0 };
+        ++cleared;
+        int x = i % W, y = i / W;
+        if (x > 0)   seed(x-1, y);
+        if (x < W-1) seed(x+1, y);
+        if (y > 0)   seed(x, y-1);
+        if (y < H-1) seed(x, y+1);
+    }
+    return cleared;
+}
+
+// Crop an RGBA image to the bounding box of its opaque pixels.
+static void cropToOpaque(Image& img) {
+    int W = img.width, H = img.height;
+    Color* px = (Color*)img.data;
+    int minx=W, miny=H, maxx=-1, maxy=-1;
+    for (int y=0;y<H;++y) for (int x=0;x<W;++x)
+        if (px[y*W+x].a > 0) { if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; }
+    if (maxx < minx) return;
+    if (minx>0 || miny>0 || maxx<W-1 || maxy<H-1)
+        ImageCrop(&img, { (float)minx, (float)miny, (float)(maxx-minx+1), (float)(maxy-miny+1) });
+}
+
+// Auto-trim on import: if the four corners are the same solid colour, remove the
+// border-connected background (flood fill, like Photoshop's magic wand) and crop
+// the margins. Interior pixels of the same colour are preserved. Returns true if
+// it processed the image.
 static bool autoRemoveBg(Image& img) {
     if (!img.data || img.width < 3 || img.height < 3) return false;
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     int W = img.width, H = img.height;
     Color* px = (Color*)img.data;
     Color c0 = px[0], c1 = px[W-1], c2 = px[(H-1)*W], c3 = px[(H-1)*W + (W-1)];
-    auto rgbClose = [](Color a, Color b, int t){
-        return std::abs(a.r-b.r) + std::abs(a.g-b.g) + std::abs(a.b-b.b) <= t;
-    };
     bool transparentCorners = (c0.a==0 && c1.a==0 && c2.a==0 && c3.a==0);
     bool uniformColor = c0.a>0 && rgbClose(c0,c1,28) && rgbClose(c0,c2,28) && rgbClose(c0,c3,28);
     if (!transparentCorners && !uniformColor) return false;     // border isn't a single colour
-    if (uniformColor) {                                          // key the background colour out
-        const int tol = 42;
-        for (int i = 0; i < W*H; ++i)
-            if (px[i].a > 0 && rgbClose(px[i], c0, tol)) px[i] = Color{0,0,0,0};
-    }
-    int minx=W, miny=H, maxx=-1, maxy=-1;                        // bounding box of opaque pixels
-    for (int y=0;y<H;++y) for (int x=0;x<W;++x)
-        if (px[y*W+x].a > 0) { if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; }
-    if (maxx < minx) return true;                                // whole image was background
-    if (minx>0 || miny>0 || maxx<W-1 || maxy<H-1)
-        ImageCrop(&img, { (float)minx, (float)miny, (float)(maxx-minx+1), (float)(maxy-miny+1) });
+    if (uniformColor) floodFillBorder(px, W, H, c0, 50);        // remove only the connected border bg
+    cropToOpaque(img);
     return true;
 }
 
@@ -163,10 +196,10 @@ void Editor::pickAndImportImages() {
     else if (added == 0) setStatus("불러온 이미지가 없습니다.");
 }
 
-// Make a solid/single-colour (e.g. white) background transparent. The top-left
-// corner pixel is taken as the background colour; pixels within a tolerance of it
-// become transparent. Saves a NEW asset (non-destructive); animated strips keep
-// their frame metadata.
+// Make the BORDER background transparent (magic-wand flood-fill from the edges),
+// so interior same-colour pixels are kept. The top-left corner is the background
+// colour. Saves a NEW asset (non-destructive). Single images are cropped to the
+// subject; animated strips keep their size/frames so frames stay aligned.
 int Editor::makeTransparentBg(int assetId) {
     Project& p = engine_.project();
     const AssetEntry* e = p.assets.find(assetId);
@@ -174,16 +207,10 @@ int Editor::makeTransparentBg(int assetId) {
     Image img = LoadImage(p.assetFullPath(assetId).c_str());
     if (!img.data) { setStatus("배경 제거 실패: 이미지를 열 수 없음"); return -1; }
     ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    int N = img.width * img.height;
-    if (N <= 0) { UnloadImage(img); return -1; }
+    if (img.width <= 0 || img.height <= 0) { UnloadImage(img); return -1; }
     Color* px = (Color*)img.data;
-    Color bg = px[0];                                   // top-left = background
-    const int tol = 44;
-    for (int i = 0; i < N; ++i) {
-        if (px[i].a == 0) continue;
-        int d = std::abs(px[i].r - bg.r) + std::abs(px[i].g - bg.g) + std::abs(px[i].b - bg.b);
-        if (d <= tol) px[i] = Color{ 0, 0, 0, 0 };
-    }
+    floodFillBorder(px, img.width, img.height, px[0], 50);   // px[0] = corner = background
+    if (e->frames <= 1) cropToOpaque(img);                   // don't crop strips (keeps frame grid)
     fs::create_directories(fs::path(p.dir) / "assets");
     int n = 1; fs::path dest;
     do { dest = fs::path(p.dir) / "assets" / ("nobg_" + std::to_string(assetId) + "_" + std::to_string(n++) + ".png"); }
@@ -194,7 +221,7 @@ int Editor::makeTransparentBg(int assetId) {
     int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
     if (e->frames > 1) p.assets.setAnim(id, e->frames, e->fps);   // preserve strip frames
     p.save();
-    setStatus("배경 제거된 이미지 생성: " + dest.stem().string());
+    setStatus("배경(테두리) 제거 이미지 생성: " + dest.stem().string());
     return id;
 }
 
