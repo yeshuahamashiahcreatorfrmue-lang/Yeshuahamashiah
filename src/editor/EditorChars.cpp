@@ -181,6 +181,7 @@ void Editor::drawCharsTab() {
     handleAssetDrop();   // drag&drop still works anywhere on this tab
 
     ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
+    DrawTextU("빌드 0620-4방향  (이 글자가 보이면 최신 빌드입니다)", 168, (int)kToolbarH + 14, 13, ui::kGood);
 
     // ---- 3-column layout: [캐릭터] [모션·프레임·재생] [이미지 소스] ----
     float pad = 10;
@@ -278,6 +279,7 @@ void Editor::drawCharsTab() {
         // ---- direction sub-tabs: 상하좌우 each registered separately ----
         static const char* dirName[4] = { "아래", "왼쪽", "오른쪽", "위" };
         float dirY = tabsY + 32;
+        DrawRectangleRec({ midX + 4, dirY - 4, midW - 8, 34 }, Fade(ui::kAccent, 0.16f)); // highlight band
         DrawTextU("방향(상하좌우):", (int)x, (int)dirY + 6, 13, ui::kAccentHi);
         for (int d = 0; d < 4; ++d) {
             int cnt = (int)dirVecOf(clip, d).size();

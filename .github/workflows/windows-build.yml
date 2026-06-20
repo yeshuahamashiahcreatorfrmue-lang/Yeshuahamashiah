@@ -82,6 +82,20 @@ jobs:
           Write-Host "SUCCESS: engine ran, rendered, and the player moved on real Windows."
           Pop-Location
 
+      - name: Screenshot 캐릭터 tab on real Windows
+        shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
+          TSUKURU_TAB: chars
+        run: |
+          $dir = "${{ steps.find.outputs.dir }}"
+          $exe = "${{ steps.find.outputs.exe }}"
+          Push-Location $dir
+          $p = Start-Process -FilePath $exe -ArgumentList "--start","editor","--frames","24","--shot","shot_chars.png" -Wait -PassThru
+          Write-Host "chars-tab shot exit: $($p.ExitCode)"
+          if (-not (Test-Path shot_chars.png)) { throw "no chars screenshot" }
+          Pop-Location
+
       - name: Stage release package
         shell: pwsh
         run: |
