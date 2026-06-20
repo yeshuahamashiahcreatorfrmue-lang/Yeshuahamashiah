@@ -13,18 +13,23 @@ LONG WINAPI sehFilter(EXCEPTION_POINTERS* ep) {
         g_onCrash(ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0);
     return EXCEPTION_EXECUTE_HANDLER;
 }
-std::string toUtf8(const std::wstring& w) {
+// Paths flow through the engine as std::string in the system ANSI code page
+// (CP_ACP) — that is what argv, std::filesystem and raylib's fopen all use here.
+// So convert dialog paths to/from CP_ACP (NOT UTF-8); using UTF-8 made
+// std::filesystem throw "no mapping for the Unicode character" on machines whose
+// user name / path contains non-ASCII (e.g. a Korean Windows account).
+std::string toNarrow(const std::wstring& w) {
     if (w.empty()) return {};
-    int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    int n = WideCharToMultiByte(CP_ACP, 0, w.c_str(), (int)w.size(), nullptr, 0, nullptr, nullptr);
     std::string s(n, 0);
-    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), &s[0], n, nullptr, nullptr);
+    WideCharToMultiByte(CP_ACP, 0, w.c_str(), (int)w.size(), &s[0], n, nullptr, nullptr);
     return s;
 }
 std::wstring toWide(const std::string& s) {
     if (s.empty()) return {};
-    int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
+    int n = MultiByteToWideChar(CP_ACP, 0, s.c_str(), (int)s.size(), nullptr, 0);
     std::wstring w(n, 0);
-    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], n);
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), (int)s.size(), &w[0], n);
     return w;
 }
 }
@@ -52,11 +57,11 @@ std::vector<std::string> openImageFiles() {
     std::wstring first = buf;
     wchar_t* pp = buf + first.size() + 1;
     if (*pp == 0) {                                  // single file -> `first` is the full path
-        out.push_back(toUtf8(first));
+        out.push_back(toNarrow(first));
     } else {                                         // multi -> `first` is the dir, then file names
         while (*pp) {
             std::wstring fn = pp;
-            out.push_back(toUtf8(first + L"\\" + fn));
+            out.push_back(toNarrow(first + L"\\" + fn));
             pp += fn.size() + 1;
         }
     }

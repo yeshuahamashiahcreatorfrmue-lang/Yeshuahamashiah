@@ -138,24 +138,29 @@ void Editor::pickAndImportImages() {
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("불러오기 취소됨."); return; }
     Project& p = engine_.project();
-    fs::create_directories(fs::path(p.dir) / "assets");
     int added = 0;
-    std::error_code ec;
+    // Guard every file: a bad/unconvertible path must never crash the engine.
     for (const std::string& src : files) {
-        std::string ext = fs::path(src).extension().string();
-        for (auto& c : ext) c = (char)tolower((unsigned char)c);
-        if (!isImageExt(ext)) continue;
-        // Stage to an ASCII temp file (Unicode-safe), import it (importImageFile
-        // writes its own processed PNG asset), then delete the staging copy.
-        fs::path tmp = fs::path(p.dir) / "assets" / ("_staging" + ext);
-        int k = 1;
-        while (fs::exists(tmp)) tmp = fs::path(p.dir) / "assets" / ("_staging" + std::to_string(k++) + ext);
-        if (!plat::copyFileUtf8(src, tmp.string())) continue;
-        if (importImageFile(tmp.string()) >= 0) added++;
-        fs::remove(tmp, ec);
+        try {
+            std::error_code ec;
+            std::string ext = fs::path(src).extension().string();
+            for (auto& c : ext) c = (char)tolower((unsigned char)c);
+            if (!isImageExt(ext)) continue;
+            fs::create_directories(fs::path(p.dir) / "assets", ec);
+            // Stage to an ASCII temp file (in-project, system encoding), import it
+            // (importImageFile writes its own PNG asset), then delete the staging copy.
+            fs::path tmp = fs::path(p.dir) / "assets" / ("_staging" + ext);
+            int k = 1;
+            while (fs::exists(tmp, ec)) tmp = fs::path(p.dir) / "assets" / ("_staging" + std::to_string(k++) + ext);
+            if (!plat::copyFileUtf8(src, tmp.string())) continue;
+            if (importImageFile(tmp.string()) >= 0) added++;
+            fs::remove(tmp, ec);
+        } catch (const std::exception& e) {
+            setStatus(std::string("불러오기 실패: ") + e.what());
+        }
     }
     if (added > 0) { p.save(); setStatus(TextFormat("이미지 %d개 불러옴", added)); }
-    else setStatus("불러온 이미지가 없습니다.");
+    else if (added == 0) setStatus("불러온 이미지가 없습니다.");
 }
 
 // Make a solid/single-colour (e.g. white) background transparent. The top-left
