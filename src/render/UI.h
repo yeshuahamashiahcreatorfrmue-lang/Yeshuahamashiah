@@ -17,6 +17,13 @@ const Color kTextDim  = { 140, 146, 158, 255 };
 const Color kDanger   = { 214,  96,  96, 255 };
 const Color kGood     = { 120, 200, 120, 255 };
 
+// NPC/몹 faction tint shared by every view: 0 중립(gray) / 1 아군(blue) / 2 적(red).
+inline Color factionColor(int faction) {
+    return faction == 2 ? kDanger
+         : faction == 1 ? Color{ 90, 170, 255, 255 }
+                        : Color{ 210, 210, 210, 255 };
+}
+
 void panel(Rectangle r, Color c = kPanel);
 void label(const std::string& text, int x, int y, int size = 18, Color c = kText);
 void labelCentered(const std::string& text, Rectangle r, int size = 18, Color c = kText);

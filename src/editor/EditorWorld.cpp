@@ -507,10 +507,7 @@ void Editor::drawWorldPreviewOverlay() {
                 Color col;
                 if (entrance)                         col = ui::kGood;                       // 문(입구)
                 else if (e.type == EventType::StartBattle) col = ui::kDanger;                 // 몹 스폰
-                else if (e.graphicAsset >= 0)
-                    col = e.faction==NpcFaction::Enemy ? ui::kDanger
-                        : e.faction==NpcFaction::Ally  ? Color{90,170,255,255}
-                                                       : Color{215,215,215,255};              // NPC
+                else if (e.graphicAsset >= 0)         col = ui::factionColor((int)e.faction); // NPC
                 else                                   col = Color{240,210,80,255};            // 이벤트
                 DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
                 DrawCircleV(sp, r, col);
@@ -528,8 +525,8 @@ void Editor::drawWorldPreviewOverlay() {
         // ---- legend ----
         float ly = by + ph + 10, lx = bx;
         auto chip = [&](Color c, const char* t){ DrawCircle((int)lx+6,(int)ly+8,6,c); DrawTextU(t,(int)lx+16,(int)ly+1,13,ui::kText); lx += 18 + MeasureTextU(t,13) + 16; };
-        chip(ui::kGood, "문/입구(클릭=내부)"); chip(Color{215,215,215,255}, "NPC");
-        chip(Color{90,170,255,255}, "아군"); chip(ui::kDanger, "적/몹");
+        chip(ui::kGood, "문/입구(클릭=내부)"); chip(ui::factionColor(0), "NPC");
+        chip(ui::factionColor(1), "아군"); chip(ui::factionColor(2), "적/몹");
         chip(Color{240,210,80,255}, "이벤트");
     } else {
         DrawTextU("미리보기 생성 중…", sw/2 - 70, sh/2, 18, ui::kTextDim);

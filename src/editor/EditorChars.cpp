@@ -76,6 +76,19 @@ void Editor::drawFootprintGrid(Rectangle a, int& wT, int& hT, int previewAsset, 
     DrawRectangleLinesEx({ a.x, a.y, maxN*cs, maxN*cs }, 1, Fade(WHITE, 0.25f));
 }
 
+// Shared "차지 칸수" editor used by the character data editor, the NPC inspector,
+// and the player editor — keeps the three layouts identical.
+void Editor::drawFootprintControl(float x, float& y, float w, int& wT, int& hT, int& pct,
+                                  int previewAsset, bool sheet4dir) {
+    const float grid = 120.0f;
+    DrawTextU("차지 칸수 (드래그/클릭)", (int)x, (int)y, 13, ui::kTextDim);
+    y += 18;
+    drawFootprintGrid({ x, y, grid, grid }, wT, hT, previewAsset, sheet4dir);
+    DrawTextU(TextFormat("%d×%d칸", wT, hT), (int)x + (int)grid + 12, (int)y + 6, 16, ui::kAccentHi);
+    ui::intStepper({ x + grid + 12, y + 34, w - grid - 12, 24 }, "미세 %", pct, 5, 25, 400);
+    y += grid + 14;
+}
+
 void Editor::deleteAssets(const std::vector<int>& ids) {
     Project& p = engine_.project();
     for (int id : ids) engine_.invalidateAsset(id);   // free GPU texture + path cache first
@@ -814,12 +827,10 @@ void Editor::drawCharDataEditor() {
     ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 32;
     // tile footprint (칸): drag/click the grid; sprite fits the chosen block
-    DrawTextU("차지 칸수 (드래그/클릭)", (int)lx, (int)ly, 13, ui::kTextDim); ly += 18;
-    int prev = cd.motions[MO_Walk].frames.empty() ? -1 : cd.motions[MO_Walk].frames.front();
-    drawFootprintGrid({ lx, ly, 132, 132 }, cd.drawTilesW, cd.drawTilesH, prev, false);
-    DrawTextU(TextFormat("%d×%d칸", cd.drawTilesW, cd.drawTilesH), (int)lx + 142, (int)ly + 6, 18, ui::kAccentHi);
-    ui::intStepper({ lx + 142, ly + 34, lw - 142, 24 }, "미세 %", cd.drawPct, 5, 25, 400);
-    ly += 140;
+    {
+        int prev = cd.motions[MO_Walk].frames.empty() ? -1 : cd.motions[MO_Walk].frames.front();
+        drawFootprintControl(lx, ly, lw, cd.drawTilesW, cd.drawTilesH, cd.drawPct, prev, false);
+    }
     DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
     DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
     bool isP = (p.playerCharId == cd.id);

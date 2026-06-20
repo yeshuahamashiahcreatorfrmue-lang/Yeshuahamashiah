@@ -66,6 +66,8 @@ private:
     // many tiles (칸) the character/NPC occupies; the sprite is drawn filling the
     // chosen block as a live preview. Updates wTiles/hTiles in place.
     void drawFootprintGrid(Rectangle gridArea, int& wTiles, int& hTiles, int previewAsset, bool sheet4dir, int maxN = 4);
+    // Full "차지 칸수" block (label + grid + W×H readout + 미세% stepper). Advances y.
+    void drawFootprintControl(float x, float& y, float w, int& wTiles, int& hTiles, int& pct, int previewAsset, bool sheet4dir);
     void drawNpcInspector(Event& ev, Rectangle panel); // NPC data panel (sprite/진영/AI/stats)
     void drawNpcTab();                                 // NPC/몹/플레이어 통합 관리 탭
     void drawPlayerEditor(Rectangle panel);            // edit the player character's stats/footprint

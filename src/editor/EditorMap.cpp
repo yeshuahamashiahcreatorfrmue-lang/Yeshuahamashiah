@@ -122,8 +122,9 @@ void Editor::drawMapCanvas(Rectangle area) {
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     if (!m) { EndScissorMode(); return; }
     int TS = m->tileset.tileWidth;
-    // input region excludes the right scrollbar + bottom scrollbar/zoom-bar strip
-    Rectangle ia = { area.x, area.y, area.width - 14, area.height - 46 };
+    // input region: leave the top zoom-bar strip, the right scrollbar, and the
+    // bottom scrollbar clear so clicks there don't paint tiles.
+    Rectangle ia = { area.x, area.y + 38, area.width - 14, area.height - 38 - 48 };
 
     uiBeginWorld(cam_);
     const Texture2D& tex = engine_.assetTexture(m->tileset.assetId);
@@ -150,9 +151,12 @@ void Editor::drawMapCanvas(Rectangle area) {
                                { (float)x*TS,(float)y*TS,(float)TS,(float)TS }, {0,0}, 0, Fade(WHITE, a/255.0f));
             }
     }
-    // grid
-    for (int x = 0; x <= w; ++x) DrawLine(x*TS, 0, x*TS, h*TS, Fade(BLACK, 0.25f));
-    for (int y = 0; y <= h; ++y) DrawLine(0, y*TS, w*TS, y*TS, Fade(BLACK, 0.25f));
+    // grid — only the visible cells, and skipped when zoomed far out (avoids tens of
+    // thousands of off-screen DrawLine calls on huge 1742² maps + grid-noise).
+    if (cam_.zoom > 0.25f) {
+        for (int x = cx0; x <= cx1 + 1; ++x) DrawLine(x*TS, cy0*TS, x*TS, (cy1+1)*TS, Fade(BLACK, 0.25f));
+        for (int y = cy0; y <= cy1 + 1; ++y) DrawLine(cx0*TS, y*TS, (cx1+1)*TS, y*TS, Fade(BLACK, 0.25f));
+    }
     // collision overlay
     if (collisionMode_)
         for (int y = cy0; y <= cy1; ++y)
@@ -171,8 +175,7 @@ void Editor::drawMapCanvas(Rectangle area) {
             Rectangle src = { 0, 0, fw, fh };
             Rectangle dst = { e.x*(float)TS + (TS-sw)/2, e.y*(float)TS + (TS-sh), sw, sh };
             DrawTexturePro(nt, src, dst, {0,0}, 0, WHITE);
-            Color fc = e.faction==NpcFaction::Enemy ? ui::kDanger
-                     : e.faction==NpcFaction::Ally  ? Color{90,170,255,255} : Color{200,200,200,255};
+            Color fc = ui::factionColor((int)e.faction);
             DrawRectangleLinesEx({ (float)e.x*TS, (float)e.y*TS, (float)TS, (float)TS }, 2,
                                  e.id==editingEventId_ ? ui::kAccentHi : fc);
         }
@@ -282,7 +285,8 @@ void Editor::drawMapZoomBar(Rectangle canvas) {
     auto m = activeMap();
     if (!m) return;
     int TS = m->tileset.tileWidth > 0 ? m->tileset.tileWidth : 32;
-    float y = canvas.y + canvas.height - 28, x = canvas.x + 8;
+    // top-left of the canvas (the bottom is used by scrollbars + the global UI bar)
+    float y = canvas.y + 8, x = canvas.x + 8;
     DrawRectangle((int)x - 4, (int)y - 4, 360, 30, Fade(BLACK, 0.6f));
     DrawTextU("맵 배율", (int)x, (int)y + 5, 13, ui::kText);
     if (ui::button({ x + 58, y, 26, 22 }, "-"))   cam_.zoom = std::max(0.02f, cam_.zoom * 0.8f);

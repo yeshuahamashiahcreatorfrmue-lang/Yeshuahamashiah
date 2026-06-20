@@ -29,11 +29,7 @@ void Editor::drawNpcStatRows(Event& ev, float x, float& y, float w) {
     }
     y += 28;
     // tile footprint (칸): drag/click the grid; the sprite fits the chosen block
-    DrawTextU("차지 칸수 (드래그/클릭)", (int)x, (int)y, 12, ui::kTextDim); y += 16;
-    drawFootprintGrid({ x, y, 112, 112 }, ev.drawTilesW, ev.drawTilesH, ev.graphicAsset, true);
-    DrawTextU(TextFormat("%d×%d칸", ev.drawTilesW, ev.drawTilesH), (int)x + 120, (int)y + 4, 16, ui::kAccentHi);
-    ui::intStepper({ x + 120, y + 30, w - 120, 24 }, "미세 %", ev.drawPct, 5, 25, 400);
-    y += 120;
+    drawFootprintControl(x, y, w, ev.drawTilesW, ev.drawTilesH, ev.drawPct, ev.graphicAsset, true);
     if (ev.faction != NpcFaction::Neutral) {
         ui::intStepper({ x, y, w, 24 }, "체력",   ev.npcHp,  5, 1, 9999); y += 26;
         ui::intStepper({ x, y, w, 24 }, "공격력", ev.npcAtk, 1, 0, 999);  y += 26;
@@ -115,12 +111,10 @@ void Editor::drawPlayerEditor(Rectangle panel) {
     ui::intStepper({ x, y, 300, 26 }, "공격력",      cd->atk,    1, 0, 9999);  y += 32;
     ui::intStepper({ x, y, 300, 26 }, "방어력",      cd->def,    1, 0, 9999);  y += 32;
     ui::intStepper({ x, y, 300, 26 }, "속도 (이동)", cd->spd,    1, 0, 999);   y += 36;
-    DrawTextU("차지 칸수 (드래그/클릭)", (int)x, (int)y, 13, ui::kTextDim); y += 18;
-    int prev = cd->motions[MO_Walk].frames.empty() ? -1 : cd->motions[MO_Walk].frames.front();
-    drawFootprintGrid({ x, y, 120, 120 }, cd->drawTilesW, cd->drawTilesH, prev, false);
-    DrawTextU(TextFormat("%d×%d칸", cd->drawTilesW, cd->drawTilesH), (int)x + 132, (int)y + 6, 16, ui::kAccentHi);
-    ui::intStepper({ x + 132, y + 34, 168, 24 }, "미세 %", cd->drawPct, 5, 25, 400);
-    y += 130;
+    {
+        int prev = cd->motions[MO_Walk].frames.empty() ? -1 : cd->motions[MO_Walk].frames.front();
+        drawFootprintControl(x, y, 300, cd->drawTilesW, cd->drawTilesH, cd->drawPct, prev, false);
+    }
     if (ui::button({ x, y, 300, 28 }, "캐릭터 탭에서 모션·스킬 상세 편집")) {
         for (int i = 0; i < (int)db.characters.size(); ++i) if (db.characters[i].id == cd->id) charDefSel_ = i;
         charDataEdit_ = true; tab_ = Tab::Chars;
@@ -175,9 +169,7 @@ void Editor::drawNpcTab() {
             bool sel = (!npcTabPlayer_ && activeMapId_ == m->id && editingEventId_ == e.id);
             Rectangle r = { listR.x + 4, ry, listR.width - 8, 28 };
             if (ui::button(r, lbl, sel)) { npcTabPlayer_ = false; activeMapId_ = m->id; editingEventId_ = e.id; }
-            Color fc = e.faction == NpcFaction::Enemy ? ui::kDanger
-                     : e.faction == NpcFaction::Ally  ? Color{ 90,170,255,255 } : Color{ 200,200,200,255 };
-            DrawCircle((int)(r.x + r.width - 13), (int)(r.y + 14), 5, fc);
+            DrawCircle((int)(r.x + r.width - 13), (int)(r.y + 14), 5, ui::factionColor((int)e.faction));
         }
         ry += rowH;
     }
