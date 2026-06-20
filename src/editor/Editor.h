@@ -22,7 +22,7 @@ public:
     void draw();
 
 private:
-    enum class Tab { World, Map, Events, Chars, Assets, Database, Skills };
+    enum class Tab { World, Map, Events, Chars, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
@@ -36,15 +36,13 @@ private:
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void drawCharDataEditor();         // bulk editor: all of a character's stats + every skill
     void applyShape(FieldSkill& s, int shape, int size); // fill a skill pattern from a preset
-    // --- shared skill-editor widgets (used by the global Skills tab AND the
-    //     per-character skill editor, so both stay in lockstep) ---
+    // --- skill-editor widgets (used by the per-character skill editor) ---
     std::string assetName(int id) const;                 // asset display name, or "없음"
     void cycleAsset(int& cur, AssetType t);              // advance to the next asset id (wraps to -1)
     float drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesPattern); // -> grid bottom Y
     void drawSkillFxControls(FieldSkill& s, float dx, float& dy); // effect/sound assign + import + frames/loops
     void drawAssetsTab();
     void drawDatabaseTab();
-    void drawSkillsTab();
     void drawTilePalette(Rectangle area);
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
@@ -86,8 +84,7 @@ private:
     int  newMapTier_ = 0;           // standardized size tier for a new map (0..6)
     // Character generation
     int  charColor_ = 0;
-    // Skills tab (field-skill designer)
-    int  skillSel_ = -1;
+    // Per-character skill editor (range pattern + effect/sound)
     bool skillNameFocus_ = false;
     int  skillPatSize_ = 3;            // range/radius used by shape presets
     // Character builder (custom multi-motion characters)

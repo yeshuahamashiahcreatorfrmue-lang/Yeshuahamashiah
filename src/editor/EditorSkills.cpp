@@ -1,4 +1,5 @@
-// EditorSkills: field-skill / tile-pattern designer.
+// EditorSkills: shared skill-editor widgets (pattern grid, effect/sound row,
+// shape presets) used by the per-character skill editor in EditorChars.cpp.
 #include "editor/Editor.h"
 #include "editor/Prefabs.h"
 #include "editor/EditorInternal.h"
@@ -15,8 +16,7 @@ namespace tsukuru {
 
 // 9x9 player-relative hit-pattern grid (canonical facing = up). Draws the
 // "front" marker, every cell (toggled by click), and the summary line; returns
-// the Y just below the grid. Shared by the global Skills tab and the per-
-// character skill editor so the two never drift apart.
+// the Y just below the grid. Used by the per-character skill editor.
 float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesPattern) {
     const int GRID = 9, HALF = GRID/2; float cs = 30;
     DrawTriangle({ gx + HALF*cs + cs/2, gy }, { gx + HALF*cs + cs/2 - 7, gy + 11 },
@@ -49,7 +49,7 @@ float Editor::drawSkillPatternGrid(FieldSkill& s, float gx, float gy, bool usesP
 
 // Effect + sound row block: assign an existing asset, generate a built-in one,
 // import an external strip, and set its frame count / fps / replay count. `dy`
-// is advanced past the block. Shared by both skill editors.
+// is advanced past the block.
 void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     Project& p = engine_.project();
     if (ui::button({ dx, dy, 260, 24 }, std::string("이펙트: ") + assetName(s.effectAsset), s.effectAsset>=0))
@@ -94,97 +94,6 @@ void Editor::applyShape(FieldSkill& s, int shape, int size) {
         case 3: add(0,-1); add(-1,-1); add(1,-1); add(0,-2); add(-1,-2); add(1,-2); break; // cone
         case 4: for (int y=-size;y<=size;++y) for (int x=-size;x<=size;++x) add(x,y); break; // circle r
         default: for (int y=-1;y<=1;++y) for (int x=-1;x<=1;++x) add(x,y); break; // 3x3
-    }
-}
-
-void Editor::drawSkillsTab() {
-    Rectangle area = { 0, kToolbarH, (float)GetScreenWidth(), (float)GetScreenHeight() - kToolbarH };
-    DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
-    Project& p = engine_.project();
-    Database& db = p.database;
-
-    // ---- left: skill list ----
-    float lx = 12, ly = kToolbarH + 12, lw = 230;
-    ui::panel({ lx, ly, lw, area.height - 24 }, ui::kPanel);
-    ui::label("스킬 목록", (int)lx + 12, (int)ly + 10, 20, ui::kAccent);
-    float y = ly + 44;
-    if (ui::button({ lx + 10, y, lw - 20, 28 }, "+ 새 스킬")) {
-        FieldSkill s; s.id = (int)db.fieldSkills.size() + 1;
-        s.name = "새 스킬"; s.slot = -1; applyShape(s, 0, 1);
-        db.fieldSkills.push_back(s); skillSel_ = (int)db.fieldSkills.size() - 1; p.save();
-    }
-    y += 32;
-    if (db.fieldSkills.empty()) {
-        if (ui::button({ lx + 10, y, lw - 20, 28 }, "기본 스킬 4종 불러오기")) {
-            db.fieldSkills = Database::defaultFieldSkills(); skillSel_ = 0; p.save();
-        }
-        y += 32;
-    }
-    static const char* keyName[6] = { "Z","X","C","V","F","G" };
-    for (int i = 0; i < (int)db.fieldSkills.size(); ++i) {
-        const FieldSkill& s = db.fieldSkills[i];
-        std::string lbl = (s.slot >= 0 && s.slot < 6 ? std::string("[")+keyName[s.slot]+"] " : "[-] ") + s.name;
-        if (ui::button({ lx + 10, y, lw - 20, 26 }, lbl, skillSel_ == i)) { skillSel_ = i; skillNameFocus_ = false; }
-        y += 28;
-    }
-
-    if (skillSel_ < 0 && !db.fieldSkills.empty()) skillSel_ = 0; // auto-select first
-    if (skillSel_ < 0 || skillSel_ >= (int)db.fieldSkills.size()) {
-        ui::label("스킬을 선택하거나 추가하세요.", (int)lx + lw + 30, (int)ly + 20, 16, ui::kTextDim);
-        return;
-    }
-    FieldSkill& s = db.fieldSkills[skillSel_];
-
-    // ---- middle: tile pattern designer + shape presets ----
-    float gx = lx + lw + 22, gy = ly + 8;
-    bool usesPattern = !s.projectile;          // projectiles ignore the tile pattern
-    ui::label("효과 적용 범위 (플레이어 기준, 위=정면)", (int)gx, (int)gy, 16, ui::kAccent);
-    gy += 24;
-    // quick shape presets — only meaningful for range-type skills
-    ui::label("범위 프리셋:", (int)gx, (int)gy, 13, ui::kTextDim); gy += 18;
-    static const char* shapeName[6] = { "정면","직선","십자","부채꼴","원형","주변" };
-    for (int i = 0; i < 6; ++i)
-        if (ui::button({ gx + i*45, gy, 43, 24 }, shapeName[i], false) && usesPattern)
-            applyShape(s, i, skillPatSize_);
-    gy += 28;
-    ui::intStepper({ gx, gy, 200, 24 }, "범위/사거리", skillPatSize_, 1, 1, 4); gy += 28;
-
-    const int GRID = 9; float cs = 30;          // player-centred; canonical facing = up
-    float gridBottom = drawSkillPatternGrid(s, gx, gy, usesPattern);
-
-    // ---- right: parameters + one-click effect/sound creation ----
-    float dx = gx + GRID*cs + 28, dy = ly + 8, dw = area.width - dx - 16;
-    if (dw < 250) { dx = gx; dy = gridBottom + 30; dw = 320; } // wrap on narrow screens
-    ui::panel({ dx - 8, dy - 6, dw + 12, 568 }, ui::kPanel);
-    ui::label("스킬 설정", (int)dx, (int)dy, 18, ui::kAccent); dy += 28;
-
-    ui::label("이름:", (int)dx, (int)dy, 13, ui::kTextDim); dy += 18;
-    Rectangle nf = { dx, dy, std::min(280.0f, dw), 26 };
-    if (ui::mouseIn(nf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) skillNameFocus_ = true;
-    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(nf)) skillNameFocus_ = false;
-    ui::textField(nf, s.name, skillNameFocus_, 24); dy += 32;
-
-    static const char* slotLbl[7] = { "없음","Z","X","C","V","F","G" };
-    if (ui::button({ dx, dy, 260, 26 }, std::string("단축키: ") + slotLbl[s.slot+1]))
-        s.slot = (s.slot + 2) % 7 - 1;       // cycle -1..5
-    dy += 30;
-    if (ui::button({ dx, dy, 260, 26 }, s.projectile ? "유형: 발사체(전방 직선)" : "유형: 범위(타일 패턴)"))
-        s.projectile = !s.projectile;
-    dy += 30;
-    ui::intStepper({ dx, dy, 260, 24 }, "사거리(발사체)", s.range, 1, 1, 20); dy += 27;
-    ui::intStepper({ dx, dy, 260, 24 }, "순간이동 칸", s.blink, 1, 0, 10); dy += 27;
-    ui::intStepper({ dx, dy, 260, 24 }, "위력(%ATK)", s.powerPct, 10, 0, 1000); dy += 27;
-    ui::intStepper({ dx, dy, 260, 24 }, "MP 소모", s.mpCost, 1, 0, 99); dy += 27;
-    int cdTenths = (int)(s.cooldown * 10 + 0.5f);
-    if (ui::intStepper({ dx, dy, 260, 24 }, "쿨다운(0.1초)", cdTenths, 1, 1, 200)) s.cooldown = cdTenths / 10.0f;
-    dy += 32;
-
-    drawSkillFxControls(s, dx, dy);     // 이펙트·사운드 지정/생성/불러오기 + 프레임/반복
-
-    if (ui::button({ dx, dy, 125, 28 }, "저장")) { p.save(); setStatus("스킬 저장됨."); }
-    if (ui::button({ dx + 135, dy, 125, 28 }, "삭제", false)) {
-        db.fieldSkills.erase(db.fieldSkills.begin() + skillSel_);
-        skillSel_ = -1; p.save(); setStatus("스킬 삭제됨.");
     }
 }
 

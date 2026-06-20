@@ -34,7 +34,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         std::string s = t;
         if (s == "world") tab_ = Tab::World;     else if (s == "events") tab_ = Tab::Events;
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
-        else if (s == "db") tab_ = Tab::Database; else if (s == "skills") tab_ = Tab::Skills;
+        else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
 }
@@ -106,7 +106,6 @@ void Editor::draw() {
         case Tab::Chars:    drawCharsTab();    break;
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
-        case Tab::Skills:   drawSkillsTab();   break;
     }
     drawToolbar();
 
@@ -132,7 +131,6 @@ void Editor::drawToolbar() {
     tabBtn("캐릭터", Tab::Chars);
     tabBtn("에셋", Tab::Assets);
     tabBtn("DB", Tab::Database);
-    tabBtn("스킬", Tab::Skills);
 
     x += 12;
     if (ui::button({ x, 6, 90, 28 }, "저장")) { engine_.project().save(); setStatus("저장됨."); }
