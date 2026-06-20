@@ -69,7 +69,7 @@ private:
 
     Engine& engine_;
     Segmenter seg_;          // AI subject/background separation (loads u2netp.onnx if present)
-    Tab  tab_ = Tab::Map;
+    Tab  tab_ = Tab::World;   // open on the map list so all maps are visible at a glance
     Tool tool_ = Tool::Pencil;
     int  activeLayer_ = 0;
     bool collisionMode_ = false;
