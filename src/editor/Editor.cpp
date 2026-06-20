@@ -52,6 +52,7 @@ void Editor::update(float dt) {
     // and crashes. Deferring it here (update runs before BeginDrawing) is safe.
     if (pendingImport_) { pendingImport_ = false; pickAndImportImages(); }
     if (pendingEffectImport_) { pendingEffectImport_ = false; pickAndImportEffect(); }
+    if (pendingSoundImport_)  { pendingSoundImport_  = false; pickAndImportSound(); }
 
     // Global shortcuts
     bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_ || skillNameFocus_;

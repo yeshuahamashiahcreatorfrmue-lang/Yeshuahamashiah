@@ -47,7 +47,8 @@ private:
     void drawMapCanvas(Rectangle area);
     void handleAssetDrop();
     int  importImageFile(const std::string& path);   // GIF-aware image import -> asset id (-1 on fail)
-    void pickAndImportEffect();                       // file picker -> assign a skill effect strip
+    void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
+    void pickAndImportSound();                        // file picker -> assign a skill sound
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
     void deleteAssets(const std::vector<int>& ids);  // unregister assets + scrub character motion refs
     int  duplicateAsset(int id);                      // copy an image asset to a new file+entry
@@ -94,7 +95,8 @@ private:
     int  charDirTab_ = 0;             // edited direction: 0정면(아래)/1좌/2우/3위
     bool pendingImport_ = false;      // request the native file picker outside the draw frame
     bool pendingEffectImport_ = false;     // request the picker to assign a skill effect strip
-    FieldSkill* pendingEffectSkill_ = nullptr; // skill awaiting an imported effect (valid 1 frame)
+    bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
+    FieldSkill* pendingEffectSkill_ = nullptr; // skill awaiting an imported effect/sound (valid 1 frame)
     int* scrollDragTarget_ = nullptr; // which scroll offset the dragged scrollbar thumb controls
     float scrollDragGrab_ = 0;        // grab offset within the thumb while dragging
     bool charDefNameFocus_ = false;

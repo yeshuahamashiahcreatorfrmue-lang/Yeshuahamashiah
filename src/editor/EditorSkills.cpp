@@ -60,9 +60,11 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     for (int i = 0; i < 4; ++i)
         if (ui::button({ dx + 78 + i*46, dy, 44, 22 }, fxName[i])) s.effectAsset = generateEffect(i);
     dy += 28;
-    if (ui::button({ dx, dy, 260, 22 }, "이펙트 불러오기 (외부 이미지·움짤)"))
+    if (ui::button({ dx, dy, 260, 22 }, "이펙트 불러오기 (여러 장=연속 프레임)"))
         { pendingEffectSkill_ = &s; pendingEffectImport_ = true; }
-    dy += 26;
+    dy += 24;
+    DrawTextU("여러 이미지를 한번에 고르면 그 순서대로 프레임이 됩니다.",
+              (int)dx, (int)dy, 11, ui::kTextDim); dy += 18;
     if (s.effectAsset >= 0) {
         const AssetEntry* ae = p.assets.find(s.effectAsset);
         int fr = ae ? ae->frames : 1, fpsv = ae ? ae->fps : 12;
@@ -73,6 +75,9 @@ void Editor::drawSkillFxControls(FieldSkill& s, float dx, float& dy) {
     ui::intStepper({ dx, dy, 260, 24 }, "반복(회) 1·3·7…", s.effectLoops, 1, 1, 20); dy += 28;
     if (ui::button({ dx, dy, 260, 24 }, std::string("사운드: ") + assetName(s.soundAsset), s.soundAsset>=0))
         cycleAsset(s.soundAsset, AssetType::Audio);
+    dy += 26;
+    if (ui::button({ dx, dy, 260, 22 }, "사운드 불러오기 (외부 파일)"))
+        { pendingEffectSkill_ = &s; pendingSoundImport_ = true; }
     dy += 26;
     DrawTextU("효과음 생성:", (int)dx, (int)dy+4, 12, ui::kTextDim);
     static const char* sndName[5] = { "베기","마법","폭발","대시","회복" };

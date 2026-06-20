@@ -246,10 +246,13 @@ void Editor::pickAndImportImages() {
     else if (added == 0) setStatus("불러온 이미지가 없습니다.");
 }
 
-// Import a single external image and assign it as the pending skill's effect.
-// A horizontal sprite-strip's frame count is auto-detected (width is a whole
-// multiple of height → that many square frames), so a 7-cell strip becomes a
-// 7-frame animation that the panel's 반복(회) setting can then replay 1/3/7… times.
+// Import external image(s) and assign them as the pending skill's effect.
+//   • ONE file  → used as-is; a horizontal sprite-strip's frame count is auto-
+//     detected (width == N×height → N square frames). GIFs keep their frames.
+//   • MANY files → each picture becomes one consecutive frame, composited (with
+//     its background removed, centred) into a single horizontal strip — exactly
+//     like assembling a character's walk motion, but for a skill effect.
+// The 반복(회) panel setting then replays the finished strip 1/3/7… times.
 void Editor::pickAndImportEffect() {
     FieldSkill* s = pendingEffectSkill_;
     pendingEffectSkill_ = nullptr;
@@ -258,40 +261,113 @@ void Editor::pickAndImportEffect() {
     if (files.empty()) { setStatus("이펙트 불러오기 취소됨."); return; }
     Project& p = engine_.project();
     std::error_code ec;
-    const std::string& src = files.front();          // one strip per effect
-    std::string ext = fs::path(src).extension().string();
-    for (auto& c : ext) c = (char)tolower((unsigned char)c);
-    if (!isImageExt(ext)) { setStatus("이미지 파일이 아닙니다."); return; }
-    try {
-        fs::create_directories(fs::path(p.dir) / "assets", ec);
+
+    // keep only images, ordered by filename so frame_01, frame_02… line up
+    std::vector<std::string> imgs;
+    for (auto& f : files) {
+        std::string ext = fs::path(f).extension().string();
+        for (auto& c : ext) c = (char)tolower((unsigned char)c);
+        if (isImageExt(ext)) imgs.push_back(f);
+    }
+    if (imgs.empty()) { setStatus("이미지 파일이 아닙니다."); return; }
+    std::sort(imgs.begin(), imgs.end());
+
+    auto stagingPath = [&](const std::string& src) {
+        std::string ext = fs::path(src).extension().string();
         fs::path tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + ext);
         int k = 1;
-        while (fs::exists(tmp, ec)) tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + std::to_string(k++) + ext);
-        if (!plat::copyFileUtf8(src, tmp.string())) { setStatus("이펙트 복사 실패."); return; }
-        int id = importImageFile(tmp.string());
-        fs::remove(tmp, ec);
-        if (id < 0) { setStatus("이펙트 불러오기 실패."); return; }
-        // auto-detect a horizontal strip: a GIF is already multi-frame; a static
-        // strip with width == N×height is sliced into N square frames.
-        const AssetEntry* ae = p.assets.find(id);
-        if (ae && ae->frames <= 1) {
-            Image img = LoadImage(p.assetFullPath(id).c_str());
-            if (img.data) {
-                if (img.height > 0 && img.width % img.height == 0) {
-                    int n = img.width / img.height;
-                    if (n >= 2 && n <= 32) p.assets.setAnim(id, n, 12);
+        while (fs::exists(tmp, ec)) tmp = fs::path(p.dir)/"assets"/("_fxstaging"+std::to_string(k++)+ext);
+        return tmp;
+    };
+
+    try {
+        fs::create_directories(fs::path(p.dir) / "assets", ec);
+
+        // ---- single file: reuse the importer + strip auto-detect ----
+        if (imgs.size() == 1) {
+            fs::path tmp = stagingPath(imgs[0]);
+            if (!plat::copyFileUtf8(imgs[0], tmp.string())) { setStatus("이펙트 복사 실패."); return; }
+            int id = importImageFile(tmp.string());
+            fs::remove(tmp, ec);
+            if (id < 0) { setStatus("이펙트 불러오기 실패."); return; }
+            const AssetEntry* ae = p.assets.find(id);
+            if (ae && ae->frames <= 1) {
+                Image img = LoadImage(p.assetFullPath(id).c_str());
+                if (img.data) {
+                    if (img.height > 0 && img.width % img.height == 0) {
+                        int n = img.width / img.height;
+                        if (n >= 2 && n <= 32) p.assets.setAnim(id, n, 12);
+                    }
+                    UnloadImage(img);
                 }
-                UnloadImage(img);
             }
+            s->effectAsset = id; s->effectLoops = std::max(1, s->effectLoops);
+            const AssetEntry* fin = p.assets.find(id);
+            p.save();
+            setStatus(TextFormat("이펙트 적용됨 (%d프레임)", fin ? fin->frames : 1));
+            return;
         }
-        s->effectAsset = id;
-        s->effectLoops = std::max(1, s->effectLoops);
-        const AssetEntry* fin = p.assets.find(id);
+
+        // ---- many files: composite each picture into one frame strip ----
+        std::vector<Image> frames;
+        int cw = 0, ch = 0;
+        for (auto& f : imgs) {
+            fs::path tmp = stagingPath(f);
+            if (!plat::copyFileUtf8(f, tmp.string())) continue;
+            Image im = LoadImage(tmp.string().c_str());
+            fs::remove(tmp, ec);
+            if (!im.data) continue;
+            ImageFormat(&im, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+            if (!aiCutout(im)) autoRemoveBg(im);            // transparent bg per frame
+            frames.push_back(im);
+            cw = std::max(cw, im.width); ch = std::max(ch, im.height);
+        }
+        if (frames.empty()) { setStatus("이펙트 이미지를 읽지 못했습니다."); return; }
+        int N = (int)frames.size();
+        Image strip = GenImageColor(cw * N, ch, BLANK);
+        ImageFormat(&strip, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        for (int i = 0; i < N; ++i) {
+            Image& im = frames[i];
+            float ox = i*cw + (cw - im.width)/2.0f, oy = (ch - im.height)/2.0f;   // centre in cell
+            ImageDraw(&strip, im, {0,0,(float)im.width,(float)im.height},
+                      {ox, oy, (float)im.width, (float)im.height}, WHITE);
+            UnloadImage(im);
+        }
+        int n2 = 1; fs::path dest;
+        do { dest = fs::path(p.dir)/"assets"/("effect_"+std::to_string(n2++)+".png"); } while (fs::exists(dest, ec));
+        ExportImage(strip, dest.string().c_str());
+        UnloadImage(strip);
+        std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+        int id = p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+        p.assets.setAnim(id, N, 12);
+        s->effectAsset = id; s->effectLoops = std::max(1, s->effectLoops);
         p.save();
-        setStatus(TextFormat("이펙트 적용됨 (%d프레임)", fin ? fin->frames : 1));
+        setStatus(TextFormat("이펙트 %d프레임 연속 등록됨", N));
     } catch (const std::exception& e) {
         setStatus(std::string("이펙트 불러오기 실패: ") + e.what());
     }
+}
+
+// Import an external audio file and assign it as the pending skill's sound.
+void Editor::pickAndImportSound() {
+    FieldSkill* s = pendingEffectSkill_;
+    pendingEffectSkill_ = nullptr;
+    if (!s) return;
+    std::vector<std::string> files = plat::openAudioFiles();
+    if (files.empty()) { setStatus("사운드 불러오기 취소됨."); return; }
+    Project& p = engine_.project();
+    int id = -1;
+    for (auto& f : files) {
+        std::string ext = fs::path(f).extension().string();
+        for (auto& c : ext) c = (char)tolower((unsigned char)c);
+        if (!isAudioExt(ext)) continue;
+        id = p.assets.registerAsset(p.dir, f, AssetType::Audio);   // copies into the project
+        if (id >= 0) break;
+    }
+    if (id < 0) { setStatus("사운드 불러오기 실패 (오디오 파일이 아님)."); return; }
+    s->soundAsset = id;
+    p.save();
+    setStatus("사운드 적용됨: " + assetName(id));
 }
 
 // Make the BORDER background transparent (magic-wand flood-fill from the edges),

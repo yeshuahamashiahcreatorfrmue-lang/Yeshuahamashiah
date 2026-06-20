@@ -21,6 +21,9 @@ void installCrashHandler(void (*onCrash)(unsigned long code));
 // unsupported on this platform.
 std::vector<std::string> openImageFiles();
 
+// Same as openImageFiles() but filtered to audio files (wav/ogg/mp3/flac…).
+std::vector<std::string> openAudioFiles();
+
 // Copy a file using UTF-8 paths (Unicode-safe on Windows). Returns true on success.
 bool copyFileUtf8(const std::string& src, const std::string& dst);
 

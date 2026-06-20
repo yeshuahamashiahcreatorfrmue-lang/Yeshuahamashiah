@@ -42,16 +42,18 @@ void installCrashHandler(void (*onCrash)(unsigned long)) {
     g_onCrash = onCrash;
     SetUnhandledExceptionFilter(sehFilter);
 }
-std::vector<std::string> openImageFiles() {
+// Shared multi-select open dialog. `filter` is a Win32 double-NUL-terminated
+// filter spec; `title` is the dialog caption.
+static std::vector<std::string> openFiles(const wchar_t* filter, const wchar_t* title) {
     std::vector<std::string> out;
     static wchar_t buf[16384]; buf[0] = 0;
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner   = GetActiveWindow();
-    ofn.lpstrFilter = L"이미지 파일\0*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tga;*.qoi;*.psd;*.hdr\0모든 파일\0*.*\0";
+    ofn.lpstrFilter = filter;
     ofn.lpstrFile   = buf;
     ofn.nMaxFile    = 16384;
-    ofn.lpstrTitle  = L"이미지 불러오기";
+    ofn.lpstrTitle  = title;
     ofn.Flags = OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&ofn)) return out;        // cancelled
     std::wstring first = buf;
@@ -67,6 +69,14 @@ std::vector<std::string> openImageFiles() {
     }
     return out;
 }
+std::vector<std::string> openImageFiles() {
+    return openFiles(L"이미지 파일\0*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tga;*.qoi;*.psd;*.hdr\0모든 파일\0*.*\0",
+                     L"이미지 불러오기");
+}
+std::vector<std::string> openAudioFiles() {
+    return openFiles(L"오디오 파일\0*.wav;*.ogg;*.mp3;*.flac;*.qoa;*.xm;*.mod\0모든 파일\0*.*\0",
+                     L"사운드 불러오기");
+}
 bool copyFileUtf8(const std::string& src, const std::string& dst) {
     return CopyFileW(toWide(src).c_str(), toWide(dst).c_str(), FALSE) != 0;
 }
@@ -79,6 +89,7 @@ namespace plat {
 void popup(const char*, const char*) {}
 void installCrashHandler(void (*)(unsigned long)) {}
 std::vector<std::string> openImageFiles() { return {}; }   // native dialog is Windows-only
+std::vector<std::string> openAudioFiles() { return {}; }   // native dialog is Windows-only
 bool copyFileUtf8(const std::string& src, const std::string& dst) {
     std::error_code ec;
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
