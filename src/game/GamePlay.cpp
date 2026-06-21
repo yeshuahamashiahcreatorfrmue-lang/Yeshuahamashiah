@@ -4,6 +4,7 @@
 #include "render/UI.h"
 #include "core/Text.h"
 #include "database/Database.h"
+#include "core/Platform.h"
 #include <set>
 #include <cmath>
 #include <cstdlib>
@@ -162,6 +163,10 @@ void GamePlay::quickLoad() {
 }
 
 void GamePlay::update(float dt) {
+    // Play mode has no text input — keep the IME off so WASD/keys always register
+    // even if the user's input language is Korean (otherwise Hangul composition
+    // eats the keypresses and the player won't move).
+    plat::setImeEnabled(false);
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
     if (IsKeyPressed(KEY_F3)) debugVarsOpen_ = !debugVarsOpen_;   // switch/variable inspector
     if (IsKeyPressed(KEY_F1)) helpOpen_ = !helpOpen_;             // controls help

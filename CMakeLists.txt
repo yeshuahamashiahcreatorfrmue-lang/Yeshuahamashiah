@@ -161,7 +161,7 @@ if(BUILD_ENGINE)
     if(WIN32)
         enable_language(RC)
         target_sources(TsukuruEngine PRIVATE ${CMAKE_SOURCE_DIR}/src/win/TsukuruEngine.rc)
-        target_link_libraries(TsukuruEngine PRIVATE comdlg32)
+        target_link_libraries(TsukuruEngine PRIVATE comdlg32 imm32)   # imm32: IME enable/disable
     endif()
 
     if(APPLE)

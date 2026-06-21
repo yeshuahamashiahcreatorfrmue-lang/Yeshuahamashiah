@@ -60,8 +60,11 @@ void GamePlay::updateField(float dt) {
 
     // inventory (I) / equipment (C) windows freeze the field while open; they
     // handle their own clicks in draw(). Bottom HUD buttons toggle them too.
-    if (IsKeyPressed(KEY_I)) { invOpen_ = !invOpen_; equipOpen_ = false; questLogOpen_ = false; }
-    if (IsKeyPressed(KEY_C)) { equipOpen_ = !equipOpen_; invOpen_ = false; questLogOpen_ = false; }
+    // Inventory (I) and Character (O) open as side-by-side panels — they DON'T
+    // close each other, so both can be viewed at once. (C is no longer used: it
+    // clashed with skills.) Quest log (J) is a separate full overlay.
+    if (IsKeyPressed(KEY_I)) { invOpen_ = !invOpen_; questLogOpen_ = false; }
+    if (IsKeyPressed(KEY_O)) { equipOpen_ = !equipOpen_; questLogOpen_ = false; }
     if (IsKeyPressed(KEY_J)) { questLogOpen_ = !questLogOpen_; invOpen_ = equipOpen_ = false; }
     if (invOpen_ || equipOpen_ || questLogOpen_) {
         if (IsKeyPressed(KEY_ESCAPE)) { invOpen_ = equipOpen_ = questLogOpen_ = false; }
@@ -87,11 +90,11 @@ void GamePlay::updateField(float dt) {
 
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
 
-    // Skills: Z/Space slot0, X slot1, C slot2, V slot3, F slot4, G slot5.
+    // Skills: Z/Space slot0, X slot1, V slot3, F slot4, G slot5. (slot2 = 패널 클릭)
     if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_LEFT_CONTROL))
         castSlot(0);
     if (IsKeyPressed(KEY_X)) castSlot(1);
-    if (IsKeyPressed(KEY_V)) castSlot(3);   // (C는 장비창 단축키로 사용 — 스킬은 패널 클릭)
+    if (IsKeyPressed(KEY_V)) castSlot(3);
     if (IsKeyPressed(KEY_F)) castSlot(4);
     if (IsKeyPressed(KEY_G)) castSlot(5);
     handleSkillClicks();                 // touch / mouse click on the skill panel

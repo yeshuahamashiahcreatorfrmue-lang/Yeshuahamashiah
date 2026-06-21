@@ -4,6 +4,7 @@
 #include "core/Engine.h"
 #include "render/UI.h"
 #include "core/Text.h"
+#include "core/Platform.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -64,6 +65,8 @@ std::shared_ptr<Map> Editor::activeMap() {
     if (!p.maps.empty()) { activeMapId_ = p.maps.front()->id; return p.maps.front(); }
     return nullptr;
 }
+bool Editor::wantsCtrlWheel() const { return tab_ == Tab::WorldView; }
+
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
     { static bool dbg = getenv("TSUKURU_CONFIRM") != nullptr, shown = false;   // debug: preview confirm dialog
@@ -81,6 +84,14 @@ void Editor::update(float dt) {
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
     if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
     if (pendingEfxFrameImport_){ pendingEfxFrameImport_= false; pickAndImportEfxFrame(); }
+
+    // Enable the OS IME only while a text field is focused, so Korean names can be
+    // typed there; everywhere else the IME is off so tool hotkeys/arrows aren't
+    // swallowed by Hangul composition.
+    bool anyFieldFocused = eventTextFocus_ || eventFieldFocus_ != 0 || dbNameFocus_ >= 0 ||
+        dbDescFocus_ >= 0 || mapNameFocus_ || mapSearchFocus_ || skillNameFocus_ ||
+        charDefNameFocus_ || charLibRenameFocus_ || charDataNameFocus_ >= 0;
+    plat::setImeEnabled(anyFieldFocused);
 
     // Global shortcuts
     bool typingNow = eventTextFocus_ || dbNameFocus_ >= 0 || mapNameFocus_ || skillNameFocus_;

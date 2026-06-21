@@ -2,6 +2,7 @@
 #include "rlgl.h"
 #include <vector>
 #include <algorithm>
+#include <unordered_set>
 
 namespace tsukuru {
 
@@ -17,23 +18,32 @@ void LoadUIFont(const std::string& ttfPath, const std::string& glyphSourceUtf8) 
         TraceLog(LOG_WARNING, "UI font not found: %s (using ASCII fallback)", ttfPath.c_str());
         return;
     }
-    // Start with printable ASCII so English/numbers/symbols always render.
+    // Build a de-duplicated codepoint set (unordered_set keeps it O(n), important
+    // now that we bake the whole Hangul block — ~11k glyphs).
     std::vector<int> cps;
-    for (int c = 32; c < 127; ++c) cps.push_back(c);
+    std::unordered_set<int> seen;
+    auto add = [&](int cp) { if (cp >= 32 && seen.insert(cp).second) cps.push_back(cp); };
 
-    // Add the unique codepoints used by the localized UI strings.
+    // Printable ASCII so English/numbers/symbols always render.
+    for (int c = 32; c < 127; ++c) add(c);
+
+    // Every distinct codepoint used by the baked-in UI/data strings (covers the
+    // non-Hangul symbols: ·, →, ★, ─, box-drawing, etc.).
     int count = 0;
     int* found = LoadCodepoints(glyphSourceUtf8.c_str(), &count);
-    for (int i = 0; i < count; ++i) {
-        int cp = found[i];
-        if (cp < 32) continue;
-        if (std::find(cps.begin(), cps.end(), cp) == cps.end()) cps.push_back(cp);
-    }
+    for (int i = 0; i < count; ++i) add(found[i]);
     UnloadCodepoints(found);
 
-    // Bake at a high resolution so glyphs stay sharp at the larger UI sizes and
-    // when the whole UI is scaled up; DrawTextEx samples this atlas crisply.
-    const int kBaseSize = 72;
+    // The FULL modern Hangul syllable block (가–힣) + Hangul Compatibility Jamo, so
+    // the user can type ANY Korean name in editor fields and it renders correctly
+    // (item/character/event/effect names, etc.).
+    for (int c = 0xAC00; c <= 0xD7A3; ++c) add(c);   // 11,172 완성형 음절
+    for (int c = 0x3131; c <= 0x3163; ++c) add(c);   // 호환 자모 (ㄱ–ㅣ)
+
+    // Bake at a resolution that stays sharp at UI sizes and when the whole UI is
+    // scaled up. With the full Hangul set this produces a large atlas; 48px keeps
+    // it within a widely-supported texture size while remaining crisp.
+    const int kBaseSize = 48;
     Font f = LoadFontEx(ttfPath.c_str(), kBaseSize, cps.data(), (int)cps.size());
     if (f.texture.id == 0 || f.glyphCount == 0) {
         TraceLog(LOG_WARNING, "UI font failed to bake: %s", ttfPath.c_str());

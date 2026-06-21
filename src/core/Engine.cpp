@@ -94,8 +94,10 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
 
         // --- global UI zoom: logical size = window / uiScale ---
         int winW = GetScreenWidth(), winH = GetScreenHeight();
-        // Ctrl + wheel zooms the whole UI like a web page.
-        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) {
+        // Ctrl + wheel zooms the whole UI like a web page — unless the active view
+        // claims Ctrl+wheel for its own zoom (the All-Map Viewer).
+        bool ctrlWheelClaimed = (mode_ == Mode::Editor && editor_ && editor_->wantsCtrlWheel());
+        if ((IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) && !ctrlWheelClaimed) {
             float wheel = GetMouseWheelMove();
             if (wheel != 0) setUiScale(uiScale() + wheel * 0.1f);
         }

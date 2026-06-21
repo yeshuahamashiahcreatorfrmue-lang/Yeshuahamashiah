@@ -44,11 +44,21 @@ bool textField(Rectangle r, std::string& text, bool focused, int maxLen) {
     if (focused && g_inputEnabled) {
         int key = GetCharPressed();
         while (key > 0) {
-            if (key >= 32 && key <= 125 && (int)text.size() < maxLen)
-                text.push_back((char)key);
+            // Accept ANY printable codepoint (Korean/CJK/accented Latin…) and store
+            // it UTF-8 encoded. maxLen is a byte budget (Korean ≈ 3 bytes/char).
+            if (key >= 32 && key != 127) {
+                int n = 0;
+                const char* enc = CodepointToUTF8(key, &n);
+                if ((int)text.size() + n <= maxLen) text.append(enc, (size_t)n);
+            }
             key = GetCharPressed();
         }
-        if (IsKeyPressed(KEY_BACKSPACE) && !text.empty()) text.pop_back();
+        // Backspace removes a whole UTF-8 codepoint (drop trailing continuation bytes).
+        if (IsKeyPressed(KEY_BACKSPACE) && !text.empty()) {
+            size_t i = text.size();
+            do { --i; } while (i > 0 && ((unsigned char)text[i] & 0xC0) == 0x80);
+            text.erase(i);
+        }
     }
     std::string shown = text;
     if (focused && ((int)(GetTime() * 2) % 2 == 0)) shown += "_";

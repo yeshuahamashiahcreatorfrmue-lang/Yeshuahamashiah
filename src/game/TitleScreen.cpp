@@ -3,6 +3,7 @@
 #include "render/UI.h"
 #include "core/Text.h"
 #include "game/SaveMeta.h"
+#include "core/Platform.h"
 #include <vector>
 #include <filesystem>
 #include <fstream>
@@ -52,6 +53,9 @@ void TitleScreen::update(float dt) {
     // refresh the continue-save cache immediately, then every 0.5s
     metaTimer_ -= dt;
     if (metaTimer_ <= 0) { refreshContinueMeta(); metaTimer_ = 0.5f; }
+
+    // IME on only while typing the MMO connect IP; off otherwise so menu keys work.
+    plat::setImeEnabled(ipFocus_);
 
     if (IsKeyPressed(KEY_ESCAPE)) { engine_.setMode(Mode::Editor); return; }
 

@@ -5,6 +5,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <commdlg.h>
+#include <imm.h>
 
 namespace {
 void (*g_onCrash)(unsigned long) = nullptr;
@@ -83,6 +84,23 @@ std::vector<std::string> openMapFiles() {
 bool copyFileUtf8(const std::string& src, const std::string& dst) {
     return CopyFileW(toWide(src).c_str(), toWide(dst).c_str(), FALSE) != 0;
 }
+void setImeEnabled(bool enabled) {
+    static bool s_state = true;          // windows start with IME associated
+    static HIMC s_saved = nullptr;       // detached context to restore on enable
+    if (enabled == s_state) return;      // cheap: only act on a real change
+    HWND hwnd = GetActiveWindow();
+    if (!hwnd) return;
+    if (enabled) {
+        // Re-attach the IME so composition works again (e.g. focusing a text box).
+        ImmAssociateContext(hwnd, s_saved ? s_saved : ImmGetContext(hwnd));
+        s_saved = nullptr;
+    } else {
+        // Detach the IME from the window: keys flow as normal WM_KEYDOWN events.
+        HIMC prev = ImmAssociateContext(hwnd, NULL);
+        if (prev) s_saved = prev;
+    }
+    s_state = enabled;
+}
 } // namespace plat
 
 #else  // non-Windows: harmless stubs
@@ -99,6 +117,7 @@ bool copyFileUtf8(const std::string& src, const std::string& dst) {
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
     return !ec;
 }
+void setImeEnabled(bool) {}   // IME control is Windows-only
 } // namespace plat
 
 #endif

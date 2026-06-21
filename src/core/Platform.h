@@ -30,4 +30,12 @@ std::vector<std::string> openMapFiles();
 // Copy a file using UTF-8 paths (Unicode-safe on Windows). Returns true on success.
 bool copyFileUtf8(const std::string& src, const std::string& dst);
 
+// Enable/disable the OS text IME (Korean/Japanese/Chinese composition) for the
+// game window. When DISABLED, key presses (WASD, hotkeys) are delivered straight
+// to the app instead of being swallowed by the IME for composition — so movement
+// works even if the user left their input language set to Korean. We enable it
+// only while an editor text field is focused (so names can be typed), and disable
+// it everywhere else. No-op off Windows. Cheap to call every frame (state-cached).
+void setImeEnabled(bool enabled);
+
 } // namespace plat

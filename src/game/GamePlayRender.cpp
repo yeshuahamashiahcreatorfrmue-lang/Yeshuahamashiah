@@ -369,14 +369,14 @@ void GamePlay::drawField() {
     if (engine_.net().active())
         DrawTextU(TextFormat("MMO %d/%d명 · %s", engine_.net().playerCount(), engine_.net().maxPlayers(),
                   engine_.net().status().c_str()), 12, 58, 14, ui::kGood);
-    DrawTextU("Z/X/V:스킬  I:인벤토리  C:장비  J:퀘스트  Enter:대화  ESC:메뉴",
+    DrawTextU("Z/X/V:스킬  I:인벤토리  O:캐릭터  J:퀘스트  M:지도  Enter:대화  ESC:메뉴",
              12, screenH() - 24, 14, Fade(ui::kText, 0.7f));
     // bottom buttons: inventory (I) / equipment (C) / quests (J)
     invBtn_   = { 12,  (float)screenH() - 58, 116, 28 };
     equipBtn_ = { 134, (float)screenH() - 58, 96,  28 };
     Rectangle questBtn = { 236, (float)screenH() - 58, 112, 28 };
-    if (ui::button(invBtn_,   "인벤토리 (I)", invOpen_))   { invOpen_ = !invOpen_; equipOpen_ = false; questLogOpen_ = false; }
-    if (ui::button(equipBtn_, "장비 (C)",     equipOpen_)) { equipOpen_ = !equipOpen_; invOpen_ = false; questLogOpen_ = false; }
+    if (ui::button(invBtn_,   "인벤토리 (I)", invOpen_))   { invOpen_ = !invOpen_; questLogOpen_ = false; }
+    if (ui::button(equipBtn_, "캐릭터 (O)",   equipOpen_)) { equipOpen_ = !equipOpen_; questLogOpen_ = false; }
     if (ui::button(questBtn,  "퀘스트 (J)",   questLogOpen_)) { questLogOpen_ = !questLogOpen_; invOpen_ = equipOpen_ = false; }
 
     drawSkillPanel();
@@ -422,22 +422,28 @@ void GamePlay::unequipSlot(int slot) {
 }
 
 // ---- I: rectangular inventory grid (식품 / 장비 / 기타) ----
+// Compact LEFT-side inventory panel. Designed to sit side-by-side with the
+// character (O) panel so both are visible at once without covering the screen.
 void GamePlay::drawInventoryOverlay() {
     GameState& gs = engine_.state();
     const Database& db = engine_.project().database;
     int sw = screenW(), sh = screenH();
-    DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 240 });
-    DrawTextU("인벤토리   (I 또는 ESC 로 닫기)", 20, 40, 20, ui::kAccent);
-    DrawTextU(TextFormat("Gold: %d", gs.inventory.gold), sw - 160, 40 + 2, 16, Color{230,200,90,255});
-    if (ui::button({ (float)sw - 56, (float)40, 46, 30 }, "X")) invOpen_ = false;
+    float pw = (sw - 48) / 2.0f, ph = (float)sh - 100;
+    Rectangle box = { 16, 70, pw, ph };
+    ui::panel(box, Color{ 14, 16, 22, 236 });
+    DrawRectangleLinesEx(box, 1, Fade(ui::kAccent, 0.5f));
+    DrawTextU("인벤토리 (I)", (int)box.x + 12, (int)box.y + 10, 18, ui::kAccent);
+    DrawTextU(TextFormat("Gold %d", gs.inventory.gold), (int)(box.x + box.width - 150), (int)box.y + 12, 15, Color{230,200,90,255});
+    if (ui::button({ box.x + box.width - 38, box.y + 8, 30, 24 }, "X")) invOpen_ = false;
 
     const char* cats[4] = { "전체", "식품", "장비", "기타" };
+    float tw = (box.width - 24) / 4;
     for (int i = 0; i < 4; ++i)
-        if (ui::button({ 20.0f + i*86, (float)40 + 34, 80, 26 }, cats[i], invCat_ == i)) invCat_ = i;
+        if (ui::button({ box.x + 12 + i*tw, box.y + 38, tw - 4, 24 }, cats[i], invCat_ == i)) invCat_ = i;
 
-    // grid
-    float gx0 = 20, gy0 = 40 + 74, cell = 92, pad = 8;
-    int cols = std::max(1, (int)((sw - 40) / (cell + pad)));
+    float gx0 = box.x + 12, gy0 = box.y + 70, cell = 70, pad = 6;
+    int cols = std::max(1, (int)((box.width - 24) / (cell + pad)));
+    float gridBottom = box.y + box.height - 64;   // leave room for the tooltip footer
     int idx = 0;
     const Item* hovItem = nullptr;
     for (auto& pr : gs.inventory.list()) {
@@ -448,26 +454,27 @@ void GamePlay::drawInventoryOverlay() {
         if (invCat_ == 3 && it->kind != 0) continue;
         int cx = idx % cols, cy = idx / cols;
         Rectangle r = { gx0 + cx*(cell+pad), gy0 + cy*(cell+pad), cell, cell };
+        ++idx;
+        if (r.y + cell > gridBottom) continue;    // clip overflow to the panel
         bool hov = CheckCollisionPointRec(GetMousePosition(), r);
         if (hov) hovItem = it;
         DrawRectangleRec(r, hov ? Color{40,46,60,255} : Color{26,30,40,255});
         DrawRectangleLinesEx(r, 1, it->kind==1?Color{225,170,75,255}:it->kind==2?ui::kAccent:Fade(WHITE,0.3f));
         if (it->iconAsset >= 0) {
             const Texture2D& tx = engine_.assetTexture(it->iconAsset);
-            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {r.x+8,r.y+6,cell-16,cell-34}, {0,0},0,WHITE);
+            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {r.x+6,r.y+5,cell-12,cell-28}, {0,0},0,WHITE);
         }
-        DrawTextU(it->name.c_str(), (int)r.x+6, (int)r.y+cell-24, 13, ui::kText);
-        DrawTextU(TextFormat("x%d", pr.second), (int)r.x+cell-30, (int)r.y+6, 13, ui::kAccentHi);
+        DrawTextU(it->name.c_str(), (int)r.x+5, (int)r.y+cell-20, 12, ui::kText);
+        DrawTextU(TextFormat("x%d", pr.second), (int)r.x+cell-26, (int)r.y+5, 12, ui::kAccentHi);
         if (hov && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) useOrEquipItem(pr.first);
         if (hov && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {   // 우클릭: 1개 버리기
             gs.inventory.removeItem(pr.first, 1);
             toast_ = (it->name + " 1개 버림"); toastTimer_ = 1.0f;
         }
-        ++idx;
     }
-    if (idx == 0) DrawTextU("이 분류에 아이템이 없습니다. (DB 탭의 아이템에서 식품/장비를 만들고 획득)",
-                            (int)gx0, (int)gy0, 15, ui::kTextDim);
-    // hovered item: name, effect summary, and description (설명)
+    if (idx == 0) DrawTextU("아이템이 없습니다.", (int)gx0, (int)gy0, 14, ui::kTextDim);
+    // hovered item: name + effect + description (in the panel footer)
+    float fy = box.y + box.height - 50;
     if (hovItem) {
         std::string eff;
         if (hovItem->kind == 2) {
@@ -482,92 +489,75 @@ void GamePlay::drawInventoryOverlay() {
             if (hovItem->bonusAtk)  eff += TextFormat("공+%d ", hovItem->bonusAtk);
             if (hovItem->bonusDef)  eff += TextFormat("방+%d ", hovItem->bonusDef);
             if (hovItem->bonusSpd)  eff += TextFormat("속+%d ", hovItem->bonusSpd);
-            if (hovItem->buffSecs && (hovItem->bonusAtk||hovItem->bonusDef||hovItem->bonusSpd))
-                eff += TextFormat("(%d초) ", hovItem->buffSecs);
         }
-        DrawTextU(TextFormat("%s   %s", hovItem->name.c_str(), eff.c_str()), 20, sh - 70, 16, ui::kAccentHi);
+        DrawTextU(TextFormat("%s  %s", hovItem->name.c_str(), eff.c_str()), (int)box.x+12, (int)fy, 14, ui::kAccentHi);
         if (!hovItem->description.empty())
-            DrawTextU(hovItem->description.c_str(), 20, sh - 48, 14, ui::kText);
+            DrawTextU(hovItem->description.c_str(), (int)box.x+12, (int)fy+18, 12, ui::kText);
+    } else {
+        DrawTextU("좌클릭: 먹기/장착 · 우클릭: 버리기", (int)box.x+12, (int)fy+18, 12, ui::kTextDim);
     }
-    DrawTextU("좌클릭: 식품=먹기 · 장비=장착   |   우클릭: 1개 버리기",
-              20, sh - 26, 14, ui::kTextDim);
 }
 
-// ---- C: body-part equipment window ----
+// Compact RIGHT-side character panel (O): stats + body-part equipment. Opens
+// alongside the inventory so the player sees gear and stats together. Equip items
+// by clicking them in the inventory panel; click a worn slot here to take it off.
 void GamePlay::drawEquipOverlay() {
     GameState& gs = engine_.state();
     const Database& db = engine_.project().database;
     int sw = screenW(), sh = screenH();
-    DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 240 });
-    DrawTextU("장비   (C 또는 ESC 로 닫기)", 20, 40, 20, ui::kAccent);
-    if (ui::button({ (float)sw - 56, (float)40, 46, 30 }, "X")) equipOpen_ = false;
+    float pw = (sw - 48) / 2.0f, ph = (float)sh - 100;
+    Rectangle box = { 32 + pw, 70, pw, ph };
+    ui::panel(box, Color{ 14, 16, 22, 236 });
+    DrawRectangleLinesEx(box, 1, Fade(ui::kAccent, 0.5f));
+    DrawTextU("캐릭터 (O)", (int)box.x + 12, (int)box.y + 10, 18, ui::kAccent);
+    if (ui::button({ box.x + box.width - 38, box.y + 8, 30, 24 }, "X")) equipOpen_ = false;
 
-    // human silhouette on the left
-    float cxm = 230, top = 40 + 70;
-    DrawRectangleRounded({ cxm-26, top, 52, 52 }, 0.4f, 8, Color{60,66,82,255});     // head
-    DrawRectangle((int)cxm-34, (int)top+58, 68, 96, Color{60,66,82,255});             // torso
-    DrawRectangle((int)cxm-58, (int)top+58, 24, 90, Color{55,60,75,255});             // L arm
-    DrawRectangle((int)cxm+34, (int)top+58, 24, 90, Color{55,60,75,255});             // R arm
-    DrawRectangle((int)cxm-30, (int)top+156, 26, 96, Color{55,60,75,255});            // L leg
-    DrawRectangle((int)cxm+4,  (int)top+156, 26, 96, Color{55,60,75,255});            // R leg
+    // stat block (top)
+    float sy = box.y + 40;
+    if (!gs.party.empty()) {
+        PartyMember& m = gs.party[0];
+        DrawTextU(TextFormat("Lv %d    EXP %d", m.level, m.exp), (int)box.x+12, (int)sy, 15, ui::kText);
+        DrawTextU(TextFormat("체력 %d/%d   기력 %d/%d", m.hp, m.maxHp, m.mp, m.maxMp), (int)box.x+12, (int)sy+20, 14, ui::kText);
+        DrawTextU(TextFormat("공격 %d   방어 %d   이동 %d", m.atk, m.def, m.spd), (int)box.x+12, (int)sy+40, 15, ui::kAccentHi);
+    }
 
-    // slots: {name, slotId, x, y}
+    // human silhouette + slots (centered, scaled to the panel)
+    float cxm = box.x + box.width * 0.5f, top = box.y + 120;
+    DrawRectangleRounded({ cxm-22, top, 44, 44 }, 0.4f, 8, Color{60,66,82,255});
+    DrawRectangle((int)cxm-28, (int)top+48, 56, 80, Color{60,66,82,255});
+    DrawRectangle((int)cxm-48, (int)top+48, 18, 74, Color{55,60,75,255});
+    DrawRectangle((int)cxm+30, (int)top+48, 18, 74, Color{55,60,75,255});
+    DrawRectangle((int)cxm-24, (int)top+130, 22, 78, Color{55,60,75,255});
+    DrawRectangle((int)cxm+2,  (int)top+130, 22, 78, Color{55,60,75,255});
+
     struct S { const char* n; int id; float x, y; };
     S slots[7] = {
-        { "머리",   1, cxm - 24,  top - 4 },
-        { "몸통",   2, cxm - 24,  top + 78 },
-        { "손",     3, cxm + 64,  top + 70 },
-        { "다리",   4, cxm - 24,  top + 178 },
-        { "발",     5, cxm - 24,  top + 250 },
-        { "무기",   6, cxm - 112, top + 70 },
-        { "장신구", 7, cxm + 64,  top + 160 },
+        { "머리",   1, cxm - 24,  top - 6 },
+        { "몸통",   2, cxm - 24,  top + 64 },
+        { "손",     3, cxm + 56,  top + 58 },
+        { "다리",   4, cxm - 24,  top + 138 },
+        { "발",     5, cxm - 24,  top + 198 },
+        { "무기",   6, cxm - 104, top + 58 },
+        { "장신구", 7, cxm + 56,  top + 138 },
     };
     for (auto& s : slots) {
-        Rectangle r = { s.x, s.y, 64, 64 };
+        Rectangle r = { s.x, s.y, 48, 48 };
         bool hov = CheckCollisionPointRec(GetMousePosition(), r);
         DrawRectangleRec(r, hov ? Color{42,48,62,255} : Color{24,28,38,255});
         DrawRectangleLinesEx(r, 2, ui::kAccent);
-        DrawTextU(s.n, (int)r.x + 2, (int)r.y - 16, 13, ui::kTextDim);
+        DrawTextU(s.n, (int)r.x, (int)r.y - 14, 12, ui::kTextDim);
         auto e = gs.equipped.find(s.id);
         if (e != gs.equipped.end() && e->second >= 0) {
             const Item* it = db.item(e->second);
             if (it && it->iconAsset >= 0) {
                 const Texture2D& tx = engine_.assetTexture(it->iconAsset);
-                DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {r.x+4,r.y+4,56,56}, {0,0},0,WHITE);
-            } else if (it) DrawTextU(it->name.c_str(), (int)r.x+4, (int)r.y+24, 11, ui::kText);
+                DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {r.x+3,r.y+3,42,42}, {0,0},0,WHITE);
+            } else if (it) DrawTextU(it->name.c_str(), (int)r.x+3, (int)r.y+16, 10, ui::kText);
             if (hov && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) unequipSlot(s.id);   // click=벗기
         }
     }
-
-    // totals
-    if (!gs.party.empty()) {
-        PartyMember& m = gs.party[0];
-        DrawTextU(TextFormat("공격 %d   방어 %d   이동 %d", m.atk, m.def, m.spd),
-                  (int)cxm - 100, (int)top + 320, 16, ui::kAccentHi);
-    }
-
-    // right: equippable items in the inventory
-    float lx = 480, ly = 40 + 60;
-    DrawTextU("장착 가능한 장비 (클릭=장착)", (int)lx, (int)ly, 16, ui::kAccent); ly += 28;
-    int shown = 0;
-    for (auto& pr : gs.inventory.list()) {
-        const Item* it = db.item(pr.first);
-        if (!it || it->kind != 2) continue;
-        Rectangle r = { lx, ly, 360, 30 };
-        bool hov = CheckCollisionPointRec(GetMousePosition(), r);
-        DrawRectangleRec(r, hov ? Color{40,46,60,255} : Color{26,30,40,255});
-        DrawRectangleLinesEx(r, 1, Fade(WHITE,0.25f));
-        const char* bn[8] = { "-","머리","몸통","손","다리","발","무기","장신구" };
-        DrawTextU(TextFormat("%s  [%s]  공%d 방%d 속%d  x%d", it->name.c_str(),
-                  bn[(it->bodySlot>=0&&it->bodySlot<=7)?it->bodySlot:0],
-                  it->bonusAtk, it->bonusDef, it->bonusSpd, pr.second),
-                  (int)r.x+8, (int)r.y+7, 14, ui::kText);
-        if (hov && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) useOrEquipItem(pr.first);
-        ly += 34; ++shown;
-        if (ly > sh - 40) break;
-    }
-    if (shown == 0) DrawTextU("장비 아이템이 없습니다. (DB 탭에서 분류=장비로 만들고 획득)",
-                              (int)lx, (int)ly, 14, ui::kTextDim);
+    DrawTextU("슬롯 클릭=장착 해제 · 인벤토리에서 장비 클릭=장착",
+              (int)box.x + 12, (int)(box.y + box.height - 24), 12, ui::kTextDim);
 }
 
 } // namespace tsukuru

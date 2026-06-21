@@ -22,6 +22,9 @@ public:
 
     void update(float dt);
     void draw();
+    // The All-Map Viewer uses Ctrl+wheel for its own zoom, so the global UI-scale
+    // Ctrl+wheel handler must yield while that tab is open.
+    bool wantsCtrlWheel() const;
 
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Assets, Database };

@@ -326,9 +326,23 @@ void Editor::drawWorldViewTab() {
     DrawRectangleRec(canvas, Color{ 26, 28, 38, 255 });
     if (!worldCamInit_) { worldCam_.zoom = 0.7f; worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 }; worldCam_.target = { cell, cell }; worldCamInit_ = true; }
     worldCam_.offset = { canvas.x + canvas.width/2, canvas.y + canvas.height/2 };
+    // Fit ALL placed maps into the canvas (also the initial framing helper).
+    auto fitAll = [&]() {
+        int minx=1<<30, miny=1<<30, maxx=-(1<<30), maxy=-(1<<30); bool any=false;
+        for (auto& m : p.maps) if (m->placed) { any=true;
+            minx=std::min(minx,m->worldX); miny=std::min(miny,m->worldY);
+            maxx=std::max(maxx,m->worldX); maxy=std::max(maxy,m->worldY); }
+        if (!any) { worldCam_.zoom = 0.7f; worldCam_.target = { cell, cell }; return; }
+        float wpx = (maxx-minx+1)*cell, hpx = (maxy-miny+1)*cell;
+        worldCam_.target = { (minx*cell + wpx/2), (miny*cell + hpx/2) };
+        float z = std::min(canvas.width/(wpx+cell), canvas.height/(hpx+cell));
+        worldCam_.zoom = std::max(0.02f, std::min(3.0f, z));
+    };
     if (ui::mouseIn(canvas)) {
+        // wheel (plain OR Ctrl+wheel) zooms the viewer; wide range so a full
+        // 1742-tile world or every placed map can be seen at once.
         float wheel = GetMouseWheelMove();
-        if (wheel != 0) worldCam_.zoom = std::max(0.2f, std::min(2.0f, worldCam_.zoom + wheel*0.1f));
+        if (wheel != 0) worldCam_.zoom = std::max(0.02f, std::min(3.0f, worldCam_.zoom * (1.0f + wheel*0.12f)));
         if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) { Vector2 dd = GetMouseDelta(); worldCam_.target.x -= dd.x/worldCam_.zoom; worldCam_.target.y -= dd.y/worldCam_.zoom; }
     }
 
@@ -352,7 +366,14 @@ void Editor::drawWorldViewTab() {
     for (int i = 0; i < (int)p.maps.size(); ++i) {
         auto& m = p.maps[i];
         if (!m->placed) continue;
-        Rectangle box = { m->worldX*cell+6, m->worldY*cell+6, cell-12, cell-12 };
+        // Box size reflects the map's REAL tile dimensions: a 1742×1742 map fills
+        // the cell (100%), smaller maps are proportionally smaller (min 18% so a
+        // 30×30 map is still clickable).
+        int dim = std::max(m->tilemap.width(), m->tilemap.height());
+        float frac = std::min(1.0f, std::max(0.18f, dim / 1742.0f));
+        float side = (cell - 12) * frac;
+        float bx = m->worldX*cell + (cell - side)/2, by = m->worldY*cell + (cell - side)/2;
+        Rectangle box = { bx, by, side, side };
         if (const RenderTexture2D* th = mapThumb(m->id)) {     // real map thumbnail
             DrawRectangleRec(box, Color{ 20, 22, 30, 255 });
             DrawTexturePro(th->texture, { 0,0,(float)th->texture.width,-(float)th->texture.height }, box, {0,0}, 0, WHITE);
@@ -457,7 +478,17 @@ void Editor::drawWorldViewTab() {
         }
     }
     EndScissorMode();
-    DrawTextU("맵 드래그=이동/교환 · 좌클릭=배치/복제 · 우클릭=제거 · 휠=확대/축소 · 가운데드래그=화면이동", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 12, ui::kTextDim);
+
+    // zoom readout + controls (top-right of the canvas). 100% = a 1742×1742 map
+    // shown at its full cell size; Ctrl+휠 또는 휠로 확대/축소.
+    float zx = canvas.x + canvas.width - 250, zy = canvas.y + 8;
+    DrawRectangle((int)zx-6, (int)zy-4, 250, 34, Fade(BLACK, 0.5f));
+    if (ui::button({ zx, zy, 28, 26 }, "-")) worldCam_.zoom = std::max(0.02f, worldCam_.zoom*0.85f);
+    DrawTextU(TextFormat("%d%%", (int)(worldCam_.zoom*100+0.5f)), (int)zx+36, (int)zy+5, 16, ui::kAccentHi);
+    if (ui::button({ zx + 90, zy, 28, 26 }, "+")) worldCam_.zoom = std::min(3.0f, worldCam_.zoom*1.18f);
+    if (ui::button({ zx + 126, zy, 110, 26 }, "전체 보기")) fitAll();
+
+    DrawTextU("맵 드래그=이동/교환 · 좌클릭=배치/복제 · 우클릭=제거 · Ctrl+휠/휠=확대축소 · 가운데드래그=이동 · 전체보기=다 보이기", (int)canvas.x+10, (int)(canvas.y+canvas.height-24), 12, ui::kTextDim);
     DrawTextU(kBuildTag, 12, screenH()-22, 13, ui::kGood);
 }
 
