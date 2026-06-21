@@ -233,6 +233,19 @@ void GamePlay::drawField() {
         drawCharacter(proj.playerSprite, dir_, col, pxX_, pxY_, ptint, total);
     }
 
+    // remote players (MMO): everyone standing in this same map/zone
+    if (engine_.net().active() && map_) {
+        const Database& rdb = proj.database;
+        for (const NetPlayer& rp : engine_.net().remotesInMap(map_->id)) {
+            int spr = proj.playerSprite, frames = std::max(1, proj.playerFrames);
+            if (const CharacterDef* rc = rdb.character(rp.charId)) {
+                const auto& fl = rc->motions[MO_Walk].dirFrames(rp.dir);
+                if (!fl.empty()) { spr = fl[0]; frames = 1; }
+            }
+            drawCharacter(spr, rp.dir, 0, (float)rp.x*TS, (float)rp.y*TS, Color{180,255,180,255}, frames);
+        }
+    }
+
     drawProjectiles();
     drawFx();
     // overhead layer (treetops, roof edges) on top of the player
@@ -288,6 +301,9 @@ void GamePlay::drawField() {
         DrawRectangle(0, 32, MeasureTextU(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
         DrawTextU(TextFormat("목표: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
     }
+    if (engine_.net().active())
+        DrawTextU(TextFormat("MMO %d/%d명 · %s", engine_.net().playerCount(), engine_.net().maxPlayers(),
+                  engine_.net().status().c_str()), 12, 58, 14, ui::kGood);
     DrawTextU("Z/X/V:스킬  I:인벤토리  C:장비  방향키/WASD:이동  Enter:대화  ESC:메뉴",
              12, screenH() - 24, 14, Fade(ui::kText, 0.7f));
     // bottom buttons: inventory (I) / equipment (C)

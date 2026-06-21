@@ -60,10 +60,14 @@ file(GLOB_RECURSE CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/Inventory.cpp
     ${CMAKE_SOURCE_DIR}/src/game/GameState.cpp
     ${CMAKE_SOURCE_DIR}/src/battle/Battle.cpp
+    ${CMAKE_SOURCE_DIR}/src/net/Net.cpp
 )
 add_library(tsukuru_core STATIC ${CORE_SOURCES})
 target_include_directories(tsukuru_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tsukuru_core PUBLIC nlohmann_json::nlohmann_json)
+if(WIN32)
+    target_link_libraries(tsukuru_core PUBLIC ws2_32)   # TCP sockets (Net) on Windows
+endif()
 
 # =====================================================================
 #  Self-test executable (headless, core only)

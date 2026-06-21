@@ -11,6 +11,7 @@
 #include "game/GameState.h"
 #include "render/TextureCache.h"
 #include "core/Audio.h"
+#include "net/Net.h"
 
 namespace tsukuru {
 
@@ -43,6 +44,7 @@ public:
     GameState&    state()    { return state_; }
     TextureCache& textures() { return textures_; }
     Audio&        audio()    { return audio_; }
+    Net&          net()      { return net_; }
 
     const Texture2D& assetTexture(int assetId); // convenience: asset id -> texture
     std::string assetPath(int assetId) const { return project_->assetFullPath(assetId); }
@@ -62,6 +64,7 @@ private:
     GameState                state_;
     TextureCache             textures_;
     Audio                    audio_;
+    Net                      net_;
     Mode                     mode_ = Mode::Editor;
     bool                     quit_ = false;
     Mode                     startMode_ = Mode::Editor;

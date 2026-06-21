@@ -1,5 +1,6 @@
 #include "core/Engine.h"
 #include "core/Text.h"
+#include <cstdlib>
 #include "core/GlyphSet.h"
 #include "editor/Editor.h"
 #include "game/GamePlay.h"
@@ -148,6 +149,27 @@ void Engine::drawUiScaleBar() {
 }
 
 void Engine::update(float dt) {
+    // One-time multiplayer auto-start via env (handy for testing/headless):
+    //   TSUKURU_HOST=7777            -> host an MMO server (up to 42)
+    //   TSUKURU_JOIN=1.2.3.4:7777    -> join a host
+    static bool netEnvDone = false;
+    if (!netEnvDone) {
+        netEnvDone = true;
+        if (const char* h = getenv("TSUKURU_HOST")) net_.startHost(atoi(h), 42);
+        else if (const char* j = getenv("TSUKURU_JOIN")) {
+            std::string s = j; auto c = s.find(':');
+            std::string ip = c == std::string::npos ? s : s.substr(0, c);
+            int port = c == std::string::npos ? 7777 : atoi(s.c_str() + c + 1);
+            net_.startClient(ip, port);
+        }
+    }
+    // sync the local player to the network every frame (zone = current map)
+    if (net_.active()) {
+        NetPlayer lp; lp.id = net_.myId();
+        lp.mapId = state_.currentMap; lp.x = state_.playerX; lp.y = state_.playerY;
+        lp.dir = state_.playerDir; lp.charId = project_ ? project_->playerCharId : -1;
+        net_.update(dt, lp);
+    }
     switch (mode_) {
         case Mode::Editor: editor_->update(dt); break;
         case Mode::Title:  title_->update(dt);  break;

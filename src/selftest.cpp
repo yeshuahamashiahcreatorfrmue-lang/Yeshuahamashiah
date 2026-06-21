@@ -11,6 +11,8 @@
 #include "game/GameState.h"
 #include "game/Inventory.h"
 #include "battle/Battle.h"
+#include "net/Net.h"
+#include <memory>
 
 namespace fs = std::filesystem;
 using namespace tsukuru;
@@ -358,6 +360,56 @@ static void testResidueStress() {
     fs::remove_all(tmp, ec);
 }
 
+// MMO capacity: a host must accept 42 external clients concurrently, and food/
+// hunger data must round-trip. Verifies the "42명 동시 접속" requirement locally
+// (42 real loopback TCP connections — NOT 42 separate external Windows machines,
+// which can't be spun up in this environment).
+static void testNetCapacity() {
+    std::printf("== Multiplayer (42-client capacity) ==\n");
+    const int port = 7801;
+    Net host;
+    CHECK(host.startHost(port, 42), "MMO 호스트 시작 (포트 7801, 최대 42)");
+    std::vector<std::unique_ptr<Net>> clients;
+    int connected = 0;
+    for (int i = 0; i < 42; ++i) {
+        auto c = std::make_unique<Net>();
+        if (c->startClient("127.0.0.1", port)) ++connected;
+        clients.push_back(std::move(c));
+    }
+    CHECK(connected == 42, "외부 클라이언트 42개 소켓 접속 성공");
+    NetPlayer lp; lp.mapId = 1; lp.x = 5; lp.y = 5;
+    for (int t = 0; t < 80; ++t) {
+        host.update(0.05f, lp);
+        for (auto& c : clients) { lp.x = (t % 7); c->update(0.05f, lp); }
+    }
+    CHECK(host.playerCount() >= 43, "호스트가 42명 동시 수용 (호스트 포함 43)");
+    int withId = 0; for (auto& c : clients) if (c->myId() > 0) ++withId;
+    CHECK(withId == 42, "42개 클라이언트 모두 서버에서 ID 부여받음");
+    // zone sync: everyone is in map 1, so each side sees the others there
+    CHECK((int)host.remotesInMap(1).size() == 42, "호스트가 같은 존(맵1)의 42명 인식");
+    CHECK(clients[0]->remotesInMap(1).size() >= 1, "클라이언트가 같은 존의 다른 플레이어 인식");
+    for (auto& c : clients) c->stop();
+    host.stop();
+}
+
+static void testFoodAndSurvival() {
+    std::printf("== Survival / food item round-trip ==\n");
+    Database db;
+    Item food; food.id = 7; food.name = "물병"; food.kind = 1;
+    food.satiety = 500; food.hydration = 9000; food.healHp = 20; food.bonusSpd = 1;
+    db.items.push_back(food);
+    Item gear; gear.id = 8; gear.name = "강철투구"; gear.kind = 2; gear.bodySlot = 1; gear.bonusDef = 12;
+    db.items.push_back(gear);
+    Database d2; d2.fromJson(db.toJson());
+    const Item* f = d2.item(7); const Item* g = d2.item(8);
+    CHECK(f && f->kind == 1 && f->satiety == 500 && f->hydration == 9000 && f->healHp == 20,
+          "식품 아이템(포만/수분/HP 회복) 직렬화");
+    CHECK(g && g->kind == 2 && g->bodySlot == 1 && g->bonusDef == 12, "장비 아이템(부위/방어보너스) 직렬화");
+    PartyMember m; m.maxHunger = m.hunger = 42000; m.maxThirst = m.thirst = 42000;
+    PartyMember m2 = PartyMember::fromJson(m.toJson());
+    CHECK(m2.maxHunger == 42000 && m2.thirst == 42000, "포만/수분(42000) 직렬화");
+}
+
 int main() {
     std::printf("===== Tsukuru Engine Core Self-Test =====\n");
     testTilemap();
@@ -375,6 +427,8 @@ int main() {
     testProjectIO();
     testCharacterBuilder();
     testResidueStress();
+    testFoodAndSurvival();
+    testNetCapacity();
 
     std::printf("=========================================\n");
     if (g_failures == 0) { std::printf("ALL TESTS PASSED\n"); return 0; }
