@@ -46,6 +46,7 @@ enum class NpcBehavior {
 struct Event {
     int         id = -1;
     int         x = 0, y = 0;
+    std::string label;       // optional author note shown in the event list
     EventType   type    = EventType::Message;
     TriggerType trigger = TriggerType::ActionButton;
     int         graphicAsset = -1; // optional sprite shown on the map
@@ -71,8 +72,9 @@ struct Event {
     // --- Message extras (speaker name plate, portrait, yes/no choice) ---
     std::string speakerName;     // name shown above the message box
     int  faceAsset = -1;         // portrait image drawn in the message box
-    std::string choiceA, choiceB;// if both non-empty, show a 2-way choice
-    int  choiceSwitch = -1;      // set true if A chosen, false if B chosen
+    std::string choiceA, choiceB, choiceC, choiceD; // up to 4 options (A/B min for a choice)
+    int  choiceSwitch = -1;      // 2-way compat: set true if A chosen, false otherwise
+    int  choiceVar = -1;         // stores the chosen option index (0..3) into this variable
 
     // --- GiveItem extras: also give/remove gold; amount<0 removes items ---
     int  giveGold = 0;
@@ -87,6 +89,7 @@ struct Event {
 
     // --- StartBattle extra: true = 즉시 턴제 전투(아니면 필드 스폰) ---
     bool battleTurnBased = false;
+    std::vector<int> battleEnemies;   // mixed troop (enemy ids); falls back to itemId×amount
 
     // --- Shop extra: multiple wares (falls back to itemId when empty) ---
     std::vector<int> shopItems;

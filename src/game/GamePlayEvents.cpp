@@ -75,15 +75,17 @@ static std::vector<std::string> wrapToWidth(const std::string& s, int maxW, int 
 }
 
 void GamePlay::showMessage(const std::string& text) {
-    showMessageEx(text, "", -1, "", "", -1);
+    showMessageEx(text, "", -1, {}, -1, -1);
 }
 
 void GamePlay::showMessageEx(const std::string& text, const std::string& speaker, int faceAsset,
-                             const std::string& choiceA, const std::string& choiceB, int choiceSwitch) {
+                             const std::vector<std::string>& choices, int choiceSwitch, int choiceVar) {
     msgSpeaker_ = speaker; msgFace_ = faceAsset;
-    msgChoiceA_ = choiceA; msgChoiceB_ = choiceB;
-    // a choice is pending only when both options are provided
-    msgChoiceSwitch_ = (!choiceA.empty() && !choiceB.empty()) ? choiceSwitch : -2; // -2 = no choice
+    msgChoices_.clear();
+    for (const auto& c : choices) if (!c.empty()) msgChoices_.push_back(c);
+    bool hasChoice = msgChoices_.size() >= 2;           // need at least 2 options
+    msgChoiceSwitch_ = hasChoice ? choiceSwitch : -2;   // -2 = no choice
+    msgChoiceVar_ = hasChoice ? choiceVar : -1;
 
     // Build pages: split on explicit '|', then word-wrap each segment to the box
     // width and group wrapped lines into pages of at most 3 lines.
@@ -111,20 +113,18 @@ void GamePlay::showMessageEx(const std::string& text, const std::string& speaker
     engine_.audio().playSfx("select", 0.5f);
 }
 
-// true while the player must still pick a choice (last page + both options set)
-static bool choicePending(int sw, const std::string& a, const std::string& b) {
-    return sw != -2 && !a.empty() && !b.empty();
-}
-
 void GamePlay::runEvent(Event& e) {
     GameState& gs = engine_.state();
     if (!eventConditionMet(gs, e)) return;
     long key = ((long)map_->id << 16) | (e.id & 0xffff);
     if (e.once && firedOnce_.count(key)) return;
+    gs.addTalkProgress(e.id);   // "NPC와 대화" 퀘스트 진행 (말 건 이벤트 기준)
+    refreshQuestObjective();
 
     switch (e.type) {
         case EventType::Message:
-            showMessageEx(e.text, e.speakerName, e.faceAsset, e.choiceA, e.choiceB, e.choiceSwitch);
+            showMessageEx(e.text, e.speakerName, e.faceAsset,
+                          { e.choiceA, e.choiceB, e.choiceC, e.choiceD }, e.choiceSwitch, e.choiceVar);
             break;
         case EventType::Teleport: {
             loadMap(e.targetMap);
@@ -158,17 +158,16 @@ void GamePlay::runEvent(Event& e) {
             if (!e.text.empty()) showMessage(e.text);
             break;
         case EventType::StartBattle: {
-            if (e.battleTurnBased) {                                // 즉시 턴제 전투
-                std::vector<int> ids(std::max(1, e.amount), e.itemId);
-                startBattleWith(ids);
-                break;
-            }
-            // Otherwise: spawn live monsters on the field near the event.
+            // Troop: explicit mixed list if given, else itemId repeated `amount` times.
+            std::vector<int> troop = e.battleEnemies;
+            if (troop.empty()) for (int i = 0; i < std::max(1, e.amount); ++i) troop.push_back(e.itemId);
+            if (e.battleTurnBased) { startBattleWith(troop); break; }   // 즉시 턴제 전투
+            // Otherwise: spawn the troop as live monsters on the field near the event.
             const Database& db = engine_.project().database;
-            const EnemyDef* def = db.enemy(e.itemId);
             int TS = map_->tileset.tileWidth;
-            int n = std::max(1, e.amount);
-            for (int i = 0; i < n && def; ++i) {
+            for (int i = 0; i < (int)troop.size(); ++i) {
+                const EnemyDef* def = db.enemy(troop[i]);
+                if (!def) continue;
                 FieldMonster m;
                 m.enemyId = def->id; m.name = def->name; m.spriteAsset = def->spriteAsset;
                 m.x = m.destX = std::min(map_->tilemap.width()-1, e.x + 1 + i);
@@ -274,6 +273,7 @@ bool GamePlay::questObjectiveMet(const Event& e, const QuestState& q) const {
         case 1: return q.count >= e.questCount;                                       // 처치
         case 2: return engine_.state().inventory.count(e.questTarget) >= e.questCount;// 수집
         case 3: return q.count >= 1;                                                  // 도달
+        case 4: return q.count >= 1;                                                  // NPC 대화
         default: return true;                                                         // 즉시
     }
 }
@@ -288,6 +288,7 @@ std::string GamePlay::questProgressText(const Event& e, const QuestState& q) con
                               engine_.state().inventory.count(e.questTarget), e.questCount); }
         case 3: { std::shared_ptr<Map> m = engine_.project().map(e.questTarget);
             return std::string("목표 지역 도달: ") + (m ? m->name : "?") + (q.count >= 1 ? " (완료)" : ""); }
+        case 4: return std::string("NPC와 대화") + (q.count >= 1 ? " (완료)" : "");
         default: return "보상 받기";
     }
 }
@@ -358,6 +359,7 @@ void GamePlay::refreshQuestObjective() {
             s = TextFormat("%s %d/%d 수집", it ? it->name.c_str() : "아이템", gs.inventory.count(q.target), q.need); }
         else if (q.objective == 3) { std::shared_ptr<Map> m = engine_.project().map(q.target);
             s = std::string("목표 지역 도달: ") + (m ? m->name : "?"); }
+        else if (q.objective == 4) s = q.title.empty() ? std::string("NPC와 대화") : q.title;
         else s = q.title;
         gs.objective = s;
         return;
@@ -392,6 +394,7 @@ void GamePlay::drawQuestLog() {
                 p = TextFormat("- %s 수집 %d/%d", it ? it->name.c_str() : "아이템", gs.inventory.count(q.target), q.need); }
             else if (q.objective == 3) { std::shared_ptr<Map> m = engine_.project().map(q.target);
                 p = std::string("- 목표 지역 도달: ") + (m ? m->name : "?") + (q.count >= 1 ? " (완료)" : ""); }
+            else if (q.objective == 4) p = std::string("- NPC와 대화") + (q.count >= 1 ? " (완료)" : "");
             else p = "- 보상 받기";
             DrawTextU(p.c_str(), (int)box.x + 36, y, 14, ui::kTextDim); y += 24;
         }
@@ -502,7 +505,7 @@ void GamePlay::drawMessage() {
     int sw = screenW(), sh = screenH();
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };
     bool lastPage = msgPage_ + 1 >= (int)msgPages_.size();
-    bool choice = lastPage && choicePending(msgChoiceSwitch_, msgChoiceA_, msgChoiceB_);
+    bool choice = lastPage && (int)msgChoices_.size() >= 2;
     float textX = box.x + 20;
     // portrait
     if (msgFace_ >= 0) {
@@ -532,16 +535,16 @@ void GamePlay::drawMessage() {
         }
     }
     if (choice) {
-        // two-way choice buttons
-        Rectangle bA = { box.x + box.width - 360, box.y + box.height - 44, 168, 34 };
-        Rectangle bB = { box.x + box.width - 184, box.y + box.height - 44, 168, 34 };
-        if (ui::button(bA, msgChoiceA_, false)) {
-            if (msgChoiceSwitch_ >= 0) engine_.state().setSwitch(msgChoiceSwitch_, true);
-            phase_ = Phase::Field; message_.clear();
-        }
-        if (ui::button(bB, msgChoiceB_, false)) {
-            if (msgChoiceSwitch_ >= 0) engine_.state().setSwitch(msgChoiceSwitch_, false);
-            phase_ = Phase::Field; message_.clear();
+        // up to 4 choice buttons laid out right-to-left
+        int n = (int)msgChoices_.size();
+        float bw = 168, gap = 8;
+        for (int i = 0; i < n; ++i) {
+            Rectangle b = { box.x + box.width - (bw + gap) * (n - i), box.y + box.height - 44, bw, 34 };
+            if (ui::button(b, msgChoices_[i], false)) {
+                if (msgChoiceVar_ >= 0)    engine_.state().setVar(msgChoiceVar_, i);
+                if (msgChoiceSwitch_ >= 0) engine_.state().setSwitch(msgChoiceSwitch_, i == 0);
+                phase_ = Phase::Field; message_.clear();
+            }
         }
     } else {
         DrawTextU("[Enter]", (int)(box.x + box.width - 96), (int)(box.y + box.height - 28), 16, ui::kTextDim);

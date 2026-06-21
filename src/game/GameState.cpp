@@ -189,6 +189,14 @@ void GameState::markReached(int mapId) {
     }
 }
 
+void GameState::addTalkProgress(int eventId) {
+    for (auto& kv : quests) {
+        QuestState& q = kv.second;
+        if (q.status == 1 && q.objective == 4 && q.target == eventId)
+            q.count = std::max(q.count, q.need);
+    }
+}
+
 bool GameState::partyWiped() const {
     for (const auto& m : party) if (m.alive()) return false;
     return true;

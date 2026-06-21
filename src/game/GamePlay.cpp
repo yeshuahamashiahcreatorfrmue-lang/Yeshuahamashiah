@@ -55,11 +55,12 @@ void GamePlay::onEnter() {
         startEncounterBattle();   // debug: jump straight into a turn-based battle
     if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop (item ids "1,2,3")
         openShop({ atoi(s), 2, 8 }, "무기·도구 상점");
-    if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a choice message
-        showMessageEx("정말 마을을 떠나시겠어요?", "촌장", -1, "예, 떠납니다", "아니오", 10);
+    if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a 4-way choice message
+        showMessageEx("어디로 가시겠어요?", "촌장", -1,
+                      { "북쪽 숲", "동쪽 마을", "남쪽 항구", "그냥 머문다" }, -1, 1);
     if (getenv("TSUKURU_MSGLONG"))                // debug: long message (auto-wrap test)
         showMessageEx("이 마을은 오랜 옛날부터 윌로우브룩이라 불렸으며, 북쪽 산맥의 동굴 깊은 곳에는 마을을 지키는 신비한 크리스탈이 잠들어 있다고 전해진다. 자네가 그것을 되찾아 준다면 온 마을이 자네를 영웅으로 기릴 것이네.",
-                      "마을 장로", -1, "", "", -1);
+                      "마을 장로", -1, {}, -1, -1);
     if (getenv("TSUKURU_HELP")) helpOpen_ = true; // debug: open F1 help overlay
     if (getenv("TSUKURU_DEBUGVARS")) {            // debug: seed some flags + open F3 inspector
         GameState& g = engine_.state();
@@ -114,8 +115,7 @@ void GamePlay::update(float dt) {
         case Phase::Message: {
             static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
             bool lastPage = msgPage_ + 1 >= (int)msgPages_.size();
-            bool choicePend = lastPage && msgChoiceSwitch_ != -2 &&
-                              !msgChoiceA_.empty() && !msgChoiceB_.empty();
+            bool choicePend = lastPage && (int)msgChoices_.size() >= 2;
             if (choicePend) break;   // wait for the player to click a choice (drawMessage)
             if (autodismiss || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
                 if (!lastPage) {

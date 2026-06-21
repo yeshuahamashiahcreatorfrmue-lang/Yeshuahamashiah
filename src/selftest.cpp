@@ -489,6 +489,18 @@ static void testEventFields() {
     CHECK(r.conditionVar == 4 && r.conditionVarMin == 2, "변수 발동조건 직렬화");
     Event h; h.type = EventType::Heal;
     CHECK(Event::fromJson(h.toJson()).type == EventType::Heal, "회복 이벤트 타입 직렬화");
+    // event label, 4-way choices, mixed battle troop
+    Event ev2; ev2.label = "슬라임 의뢰"; ev2.choiceC = "선택C"; ev2.choiceD = "선택D";
+    ev2.choiceVar = 7; ev2.battleEnemies = { 1, 2, 3 };
+    Event rr = Event::fromJson(ev2.toJson());
+    CHECK(rr.label == "슬라임 의뢰", "이벤트 이름표 직렬화");
+    CHECK(rr.choiceC == "선택C" && rr.choiceD == "선택D" && rr.choiceVar == 7, "4지선다/선택변수 직렬화");
+    CHECK(rr.battleEnemies.size() == 3 && rr.battleEnemies[2] == 3, "혼합 전투 적 목록 직렬화");
+    // talk-quest progress
+    GameState tg; long tk = GameState::questKey(1, 9);
+    { QuestState& q = tg.quests[tk]; q.status = 1; q.objective = 4; q.target = 12; q.need = 1; }
+    tg.addTalkProgress(5); CHECK(tg.quests[tk].count == 0, "다른 NPC 대화는 무시");
+    tg.addTalkProgress(12); CHECK(tg.quests[tk].count >= 1, "대상 NPC와 대화 시 완료");
     // enemy item drops
     Database edb; EnemyDef en; en.id = 1; en.name = "슬라임"; en.dropItemId = 5; en.dropRate = 30;
     edb.enemies.push_back(en);

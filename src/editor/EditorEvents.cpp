@@ -293,6 +293,7 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             ev->trigger = (TriggerType)i;
     y += 32;
 
+    textF("이벤트 이름표(메모):", ev->label, 5, 24);
     const char* txtLbl = ev->type == EventType::Quest ? "안내문 (말 걸 때 대사):"
                        : ev->type == EventType::Shop  ? "상점 이름:" : "텍스트 / 대사:";
     textF(txtLbl, ev->text, 1, 120);
@@ -302,10 +303,13 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             if (ui::button({ panel.x + 12, y, 296, 24 }, std::string("초상화: ") + (ev->faceAsset >= 0 ? assetName(ev->faceAsset) : "없음"), ev->faceAsset >= 0))
                 cycleImg(ev->faceAsset);
             y += 30;
-            DrawTextU("─ 선택지(둘 다 입력 시 분기) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            DrawTextU("─ 선택지(2개 이상 입력 시 분기) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             textF("선택 A:", ev->choiceA, 3, 24);
             textF("선택 B:", ev->choiceB, 4, 24);
-            stepN("선택→스위치(A=ON/B=OFF, -1없음)", ev->choiceSwitch, 1, -1, 999);
+            textF("선택 C:", ev->choiceC, 6, 24);
+            textF("선택 D:", ev->choiceD, 7, 24);
+            stepN("선택→변수(선택번호 0~3 저장, -1없음)", ev->choiceVar, 1, -1, 999);
+            stepN("선택→스위치(A=ON/그외 OFF, -1없음)", ev->choiceSwitch, 1, -1, 999);
             break;
         case EventType::Teleport: {
             stepN("대상맵", ev->targetMap, 1, -1, 999);
@@ -341,15 +345,28 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
                 stepN("값", ev->varValue, 1, -99999, 99999);
             }
             break;
-        case EventType::StartBattle:
+        case EventType::StartBattle: {
             if (ui::button({ panel.x + 12, y, 296, 24 }, ev->battleTurnBased ? "방식: 턴제 전투(즉시)" : "방식: 필드 몹 소환"))
                 ev->battleTurnBased = !ev->battleTurnBased;
             y += 28;
-            stepN("적ID", ev->itemId, 1, -1, 999);
-            { const EnemyDef* en = db.enemy(ev->itemId); nameHint(en ? en->name : "(없는 적)", en ? ui::kAccentHi : ui::kDanger); }
-            stepN(ev->battleTurnBased ? "적 수" : "소환 수", ev->amount, 1, 1, 6);
+            DrawTextU("─ 적 구성 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            if (ev->battleEnemies.empty()) {   // simple mode: one enemy × count
+                stepN("적ID", ev->itemId, 1, -1, 999);
+                const EnemyDef* en = db.enemy(ev->itemId); nameHint(en ? en->name : "(없는 적)", en ? ui::kAccentHi : ui::kDanger);
+                stepN("수", ev->amount, 1, 1, 6);
+            } else {                            // mixed troop: explicit list
+                for (int i = 0; i < (int)ev->battleEnemies.size(); ++i) {
+                    ui::intStepper({ panel.x + 12, y, 232, 24 }, TextFormat("적 %d", i + 1), ev->battleEnemies[i], 1, 0, 999);
+                    if (ui::button({ panel.x + 248, y, 60, 24 }, "삭제")) { ev->battleEnemies.erase(ev->battleEnemies.begin() + i); --i; y += 26; continue; }
+                    const EnemyDef* en = db.enemy(ev->battleEnemies[i]);
+                    y += 26; nameHint(en ? en->name : "(없는 적)", en ? ui::kAccentHi : ui::kDanger);
+                }
+            }
+            if (ui::button({ panel.x + 12, y, 296, 24 }, "+ 적 추가(혼합 구성)")) ev->battleEnemies.push_back(1);
+            y += 28;
             if (!ev->battleTurnBased) stepN("처치 스위치(-1없음)", ev->switchId, 1, -1, 999);
             break;
+        }
         case EventType::Shop: {
             DrawTextU("─ 판매 품목 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             for (int i = 0; i < (int)ev->shopItems.size(); ++i) {
@@ -365,9 +382,9 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         }
         case EventType::Quest: {
             DrawTextU("─ 완료 조건 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
-            const char* objs[4] = { "즉시 지급(대화)", "몬스터 처치", "아이템 수집", "지역 도달" };
-            if (ui::button({ panel.x + 12, y, 296, 24 }, TextFormat("조건: %s", objs[ev->questObjective % 4])))
-                ev->questObjective = (ev->questObjective + 1) % 4;
+            const char* objs[5] = { "즉시 지급(대화)", "몬스터 처치", "아이템 수집", "지역 도달", "NPC와 대화" };
+            if (ui::button({ panel.x + 12, y, 296, 24 }, TextFormat("조건: %s", objs[ev->questObjective % 5])))
+                ev->questObjective = (ev->questObjective + 1) % 5;
             y += 28;
             if (ev->questObjective == 1) {            // 처치
                 stepN("대상 적ID(-1=아무거나)", ev->questTarget, 1, -1, 999);
@@ -387,6 +404,9 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
                 stepN("대상 맵ID", ev->questTarget, 1, -1, 999);
                 std::shared_ptr<Map> tm = engine_.project().map(ev->questTarget);
                 nameHint(tm ? tm->name : "(없는 맵)", tm ? ui::kAccentHi : ui::kDanger);
+            } else if (ev->questObjective == 4) {     // NPC와 대화
+                stepN("대상 NPC 이벤트ID", ev->questTarget, 1, 0, 999);
+                DrawTextU("→ 해당 이벤트에 말 걸면 완료", (int)panel.x + 16, (int)y, 12, ui::kTextDim); y += 18;
             }
             DrawTextU("─ 보상 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             stepN("골드", ev->rewardGold, 10, 0, 999999);
@@ -486,7 +506,9 @@ void Editor::drawEventsTab() {
             if (ly + 26 >= rows.y && ly <= rows.y + rows.height) {
                 int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
                 Rectangle r = { listP.x + 6, ly, listP.width - 12, 24 };
-                std::string lbl = TextFormat("#%d %s @%d,%d", e.id, tShort[ti], e.x, e.y);
+                std::string lbl = e.label.empty()
+                    ? std::string(TextFormat("#%d %s @%d,%d", e.id, tShort[ti], e.x, e.y))
+                    : std::string(TextFormat("#%d %s", e.id, e.label.c_str()));
                 if (ui::button(r, lbl, e.id == editingEventId_)) {
                     editingEventId_ = e.id;
                     cam_.target = { (e.x + 0.5f) * m->tileset.tileWidth, (e.y + 0.5f) * m->tileset.tileHeight };

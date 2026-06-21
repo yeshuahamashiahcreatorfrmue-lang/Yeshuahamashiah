@@ -57,9 +57,9 @@ private:
     Event* actionEventAt(int x, int y);
     void runEvent(Event& e);
     void showMessage(const std::string& text); // splits on '|' into pages
-    // rich message: speaker name plate, portrait, and an optional 2-way choice.
+    // rich message: speaker name plate, portrait, and an optional 2..4-way choice.
     void showMessageEx(const std::string& text, const std::string& speaker, int faceAsset,
-                       const std::string& choiceA, const std::string& choiceB, int choiceSwitch);
+                       const std::vector<std::string>& choices, int choiceSwitch, int choiceVar);
     void drawMessage();
 
     // --- field monsters (GamePlayMonsters.cpp) ---
@@ -211,8 +211,9 @@ private:
     // rich-message extras
     std::string msgSpeaker_;
     int  msgFace_ = -1;
-    std::string msgChoiceA_, msgChoiceB_;
-    int  msgChoiceSwitch_ = -1;   // >=0 while an unanswered choice is pending
+    std::vector<std::string> msgChoices_;  // 2..4 options when a choice is pending
+    int  msgChoiceSwitch_ = -1;            // 2-way compat switch
+    int  msgChoiceVar_ = -1;               // variable receiving the chosen index
 
     std::unique_ptr<Menu> menu_;
 };

@@ -100,6 +100,7 @@ public:
     static long questKey(int mapId, int evId) { return ((long)mapId << 16) | (evId & 0xffff); }
     void addKillProgress(int enemyId);   // bump active 처치 quests targeting enemyId (or any)
     void markReached(int mapId);         // satisfy active 도달 quests for mapId
+    void addTalkProgress(int eventId);   // satisfy active 대화 quests targeting an NPC event id
 
     void setSwitch(int id, bool value) { switches_[id] = value; }
     bool getSwitch(int id) const {

@@ -45,7 +45,7 @@ static TriggerType triggerFrom(const std::string& s) {
 
 json Event::toJson() const {
     return {
-        {"id", id}, {"x", x}, {"y", y},
+        {"id", id}, {"x", x}, {"y", y}, {"label", label},
         {"type", eventTypeName(type)}, {"trigger", triggerName(trigger)},
         {"graphicAsset", graphicAsset},
         {"text", text},
@@ -65,10 +65,11 @@ json Event::toJson() const {
         {"questTakeItems", questTakeItems},
         {"conditionVar", conditionVar}, {"conditionVarMin", conditionVarMin},
         {"speakerName", speakerName}, {"faceAsset", faceAsset},
-        {"choiceA", choiceA}, {"choiceB", choiceB}, {"choiceSwitch", choiceSwitch},
+        {"choiceA", choiceA}, {"choiceB", choiceB}, {"choiceC", choiceC}, {"choiceD", choiceD},
+        {"choiceSwitch", choiceSwitch}, {"choiceVar", choiceVar},
         {"giveGold", giveGold},
         {"varId", varId}, {"varOp", varOp}, {"varValue", varValue},
-        {"faceDir", faceDir}, {"battleTurnBased", battleTurnBased},
+        {"faceDir", faceDir}, {"battleTurnBased", battleTurnBased}, {"battleEnemies", battleEnemies},
         {"shopItems", shopItems}, {"rewardSwitch", rewardSwitch}
     };
 }
@@ -78,6 +79,7 @@ Event Event::fromJson(const json& j) {
     e.id              = j.value("id", -1);
     e.x               = j.value("x", 0);
     e.y               = j.value("y", 0);
+    e.label           = j.value("label", "");
     e.type            = eventTypeFrom(j.value("type", "message"));
     e.trigger         = triggerFrom(j.value("trigger", "action"));
     e.graphicAsset    = j.value("graphicAsset", -1);
@@ -118,13 +120,17 @@ Event Event::fromJson(const json& j) {
     e.faceAsset       = j.value("faceAsset", -1);
     e.choiceA         = j.value("choiceA", "");
     e.choiceB         = j.value("choiceB", "");
+    e.choiceC         = j.value("choiceC", "");
+    e.choiceD         = j.value("choiceD", "");
     e.choiceSwitch    = j.value("choiceSwitch", -1);
+    e.choiceVar       = j.value("choiceVar", -1);
     e.giveGold        = j.value("giveGold", 0);
     e.varId           = j.value("varId", -1);
     e.varOp           = j.value("varOp", 0);
     e.varValue        = j.value("varValue", 0);
     e.faceDir         = j.value("faceDir", -1);
     e.battleTurnBased = j.value("battleTurnBased", false);
+    e.battleEnemies   = j.value("battleEnemies", std::vector<int>{});
     e.shopItems       = j.value("shopItems", std::vector<int>{});
     e.rewardSwitch    = j.value("rewardSwitch", -1);
     return e;
