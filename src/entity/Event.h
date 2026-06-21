@@ -94,8 +94,7 @@ struct Event {
     // --- Teleport extra: facing after arrival (-1 = keep) ---
     int  faceDir = -1;
 
-    // --- StartBattle extra: true = 즉시 턴제 전투(아니면 필드 스폰) ---
-    bool battleTurnBased = false;
+    // --- StartBattle: spawn a troop on the field (real-time combat) ---
     std::vector<int> battleEnemies;   // mixed troop (enemy ids); falls back to itemId×amount
 
     // --- Shop extra: multiple wares (falls back to itemId when empty) ---

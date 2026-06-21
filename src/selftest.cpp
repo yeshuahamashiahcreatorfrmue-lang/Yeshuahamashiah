@@ -10,7 +10,6 @@
 #include "database/Database.h"
 #include "game/GameState.h"
 #include "game/Inventory.h"
-#include "battle/Battle.h"
 #include "net/Net.h"
 #include <memory>
 
@@ -54,23 +53,18 @@ static void testDatabase() {
     std::printf("== Database ==\n");
     Database db;
     db.items.push_back({1, "Potion", "Heals 50 HP", 50, -1, ItemEffect::HealHP, 50, true});
-    db.equipment.push_back({1, "Sword", EquipSlot::Weapon, 100, -1, 8, 0});
-    db.equipment.push_back({2, "Shield", EquipSlot::Armor, 80, -1, 0, 6});
-    db.skills.push_back({1, "Fireball", 5, 20, false});
-    db.actors.push_back({1, "Hero", -1, 120, 30, 14, 7, 6, {1}});
-    db.enemies.push_back({1, "Slime", -1, 30, 0, 8, 3, 4, 12, 8});
+    db.actors.push_back({1, "Hero", -1, 120, 30, 14, 7, 6});
+    db.enemies.push_back({1, "Slime", -1, 30, 8, 3, 4, 12, 8});
 
     Database db2;
     db2.fromJson(db.toJson());
     CHECK(db2.item(1) && db2.item(1)->power == 50, "item round-trip");
-    CHECK(db2.equip(1) && db2.equip(1)->atk == 8, "weapon round-trip");
-    CHECK(db2.skill(1) && db2.skill(1)->power == 20, "skill round-trip");
     CHECK(db2.actor(1) && db2.actor(1)->maxHp == 120, "actor round-trip");
     CHECK(db2.enemy(1) && db2.enemy(1)->goldReward == 8, "enemy round-trip");
 }
 
 static void testInventory(Database& db) {
-    std::printf("== Inventory & Equipment ==\n");
+    std::printf("== Inventory ==\n");
     Inventory inv;
     inv.gold = 100;
     inv.addItem(1, 3);
@@ -78,12 +72,14 @@ static void testInventory(Database& db) {
     CHECK(inv.removeItem(1, 2) && inv.count(1) == 1, "remove item");
     CHECK(!inv.removeItem(1, 5), "cannot over-remove");
 
-    PartyMember m = PartyMember::fromActor(*db.actor(1));
-    int baseAtk = m.totalAtk(db);
-    m.weaponId = 1; // Sword +8
-    CHECK(m.totalAtk(db) == baseAtk + 8, "equipment raises attack");
-    m.armorId = 2;  // Shield +6
-    CHECK(m.totalDef(db) == m.def + 6, "equipment raises defense");
+    // body-slot equipment (Item kind==2) folds bonuses into the live stats
+    GameState gs; gs.party.push_back(PartyMember::fromActor(*db.actor(1)));
+    int baseAtk = gs.party[0].atk;
+    Database d2 = db;
+    Item gear; gear.id = 9; gear.name = "검"; gear.kind = 2; gear.bodySlot = 6; gear.bonusAtk = 8;
+    d2.items.push_back(gear);
+    gs.inventory.addItem(9, 1); gs.equipItem(d2, 9);
+    CHECK(gs.party[0].atk == baseAtk + 8, "body-slot 장비가 공격력을 올림");
 
     Inventory inv2;
     inv2.fromJson(inv.toJson());
@@ -112,29 +108,6 @@ static void testGameStateAndSave(Database& db) {
     CHECK(pm.level > lv, "exp gain levels up");
 }
 
-static void testBattle(Database& db) {
-    std::printf("== Battle ==\n");
-    std::srand(12345);
-    GameState gs;
-    gs.newGame(db, 1, -1, 1, 0, 0);
-    gs.inventory.addItem(1, 1); // a potion
-    Battle b(db, gs, {1, 1}); // two slimes
-    CHECK(b.result() == BattleResult::Ongoing, "battle starts ongoing");
-
-    int guard = 0;
-    while (b.result() == BattleResult::Ongoing && guard++ < 100) {
-        BattleAction a;
-        a.kind = ActionKind::Attack;
-        a.targetIndex = b.firstAliveEnemy();
-        b.submit(a);
-    }
-    CHECK(b.result() == BattleResult::Victory || b.result() == BattleResult::Defeat,
-          "battle reaches a terminal state");
-    CHECK(guard < 100, "battle terminates (no infinite loop)");
-    if (b.result() == BattleResult::Victory)
-        CHECK(gs.inventory.gold > 0, "victory grants gold");
-}
-
 static void testProjectIO() {
     std::printf("== Project save/load ==\n");
     std::string tmp = (fs::temp_directory_path() / "tsukuru_selftest_proj").string();
@@ -142,7 +115,7 @@ static void testProjectIO() {
 
     auto p = Project::createNew(tmp, "TestGame");
     p->database.items.push_back({1, "Potion", "", 50, -1, ItemEffect::HealHP, 50, true});
-    p->database.actors.push_back({1, "Hero", -1, 100, 20, 10, 5, 5, {}});
+    p->database.actors.push_back({1, "Hero", -1, 100, 20, 10, 5, 5});
     auto m = p->maps.front();
     m->name = "Town";
     m->tilemap.setTile(0, 2, 2, 5);
@@ -337,7 +310,7 @@ static void testResidueStress() {
     auto rm = p->addMap("RefMap", 12, 12);
     rm->tileset.assetId = rid; rm->bgmAsset = rid;
     Event rev; rev.id = 1; rev.x = 1; rev.y = 1; rev.graphicAsset = rid; rm->events.push_back(rev);
-    p->database.actors.push_back({99, "RefHero", rid, 100, 20, 10, 5, 5, {}});
+    p->database.actors.push_back({99, "RefHero", rid, 100, 20, 10, 5, 5});
     CharacterDef rcd; rcd.id = 99; rcd.motions[MO_Walk].frames = { rid }; rcd.skills.push_back({});
     rcd.skills.back().effectAsset = rid; rcd.skills.back().soundAsset = rid;
     p->database.characters.push_back(rcd);
@@ -486,7 +459,7 @@ static void testEventFields() {
     e.id = 7; e.type = EventType::Message; e.speakerName = "촌장"; e.faceAsset = 6;
     e.choiceA = "예"; e.choiceB = "아니오"; e.choiceSwitch = 10;
     e.giveGold = 100; e.varId = 3; e.varOp = 1; e.varValue = 5;
-    e.faceDir = 2; e.battleTurnBased = true; e.shopItems = { 1, 2, 8 };
+    e.faceDir = 2; e.shopItems = { 1, 2, 8 };
     e.rewardSwitch = 41; e.conditionVar = 4; e.conditionVarMin = 2;
     Event r = Event::fromJson(e.toJson());
     CHECK(r.speakerName == "촌장" && r.faceAsset == 6, "메시지 화자/초상화 직렬화");
@@ -494,7 +467,6 @@ static void testEventFields() {
     CHECK(r.giveGold == 100, "골드 지급 직렬화");
     CHECK(r.varId == 3 && r.varOp == 1 && r.varValue == 5, "변수 설정 직렬화");
     CHECK(r.faceDir == 2, "이동 도착방향 직렬화");
-    CHECK(r.battleTurnBased, "전투 방식(턴제) 직렬화");
     CHECK(r.shopItems.size() == 3 && r.shopItems[2] == 8, "상점 다품목 직렬화");
     CHECK(r.rewardSwitch == 41, "퀘스트 완료 스위치 직렬화");
     CHECK(r.conditionVar == 4 && r.conditionVarMin == 2, "변수 발동조건 직렬화");
@@ -547,15 +519,11 @@ int main() {
     testTilemap();
     Database db;
     db.items.push_back({1, "Potion", "Heals 50 HP", 50, -1, ItemEffect::HealHP, 50, true});
-    db.equipment.push_back({1, "Sword", EquipSlot::Weapon, 100, -1, 8, 0});
-    db.equipment.push_back({2, "Shield", EquipSlot::Armor, 80, -1, 0, 6});
-    db.skills.push_back({1, "Fireball", 5, 20, false});
-    db.actors.push_back({1, "Hero", -1, 120, 30, 14, 7, 6, {1}});
-    db.enemies.push_back({1, "Slime", -1, 30, 0, 8, 3, 4, 12, 8});
+    db.actors.push_back({1, "Hero", -1, 120, 30, 14, 7, 6});
+    db.enemies.push_back({1, "Slime", -1, 30, 8, 3, 4, 12, 8});
     testDatabase();
     testInventory(db);
     testGameStateAndSave(db);
-    testBattle(db);
     testProjectIO();
     testCharacterBuilder();
     testResidueStress();

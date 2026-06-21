@@ -91,7 +91,6 @@ void Project::deleteAssets(const std::vector<int>& ids) {
     for (auto& a  : database.actors)      clr(a.spriteAsset);
     for (auto& e  : database.enemies)     clr(e.spriteAsset);
     for (auto& it : database.items)       clr(it.iconAsset);
-    for (auto& eq : database.equipment)   clr(eq.iconAsset);
     for (auto& m  : maps) {
         clr(m->tileset.assetId);
         clr(m->bgmAsset);

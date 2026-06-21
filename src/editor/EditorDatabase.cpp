@@ -18,9 +18,9 @@ void Editor::drawDatabaseTab() {
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Database& db = engine_.project().database;
 
-    // category tabs
-    const char* cats[] = { "아이템", "장비", "스킬", "액터", "적" };
-    for (int i = 0; i < 5; ++i)
+    // category tabs (equipment & skills are now Items(kind=장비) / FieldSkills)
+    const char* cats[] = { "아이템", "액터", "적" };
+    for (int i = 0; i < 3; ++i)
         if (ui::button({ 12.0f + i*120, kToolbarH + 10, 112, 28 }, cats[i], dbCategory_ == i)) {
             dbCategory_ = i; dbSelected_ = -1; dbNameFocus_ = -1; dbScroll_ = 0;
         }
@@ -32,10 +32,8 @@ void Editor::drawDatabaseTab() {
     if (ui::button({ listX + 8, listY + 8, listW - 16, 28 }, "+ 새로 추가")) {
         switch (dbCategory_) {
             case 0: { Item it; it.id = (int)db.items.size()+1; db.items.push_back(it); dbSelected_=(int)db.items.size()-1; } break;
-            case 1: { Equipment e; e.id = (int)db.equipment.size()+1; db.equipment.push_back(e); dbSelected_=(int)db.equipment.size()-1; } break;
-            case 2: { Skill s; s.id = (int)db.skills.size()+1; db.skills.push_back(s); dbSelected_=(int)db.skills.size()-1; } break;
-            case 3: { ActorDef a; a.id = (int)db.actors.size()+1; db.actors.push_back(a); dbSelected_=(int)db.actors.size()-1; } break;
-            case 4: { EnemyDef en; en.id = (int)db.enemies.size()+1; db.enemies.push_back(en); dbSelected_=(int)db.enemies.size()-1; } break;
+            case 1: { ActorDef a; a.id = (int)db.actors.size()+1; db.actors.push_back(a); dbSelected_=(int)db.actors.size()-1; } break;
+            case 2: { EnemyDef en; en.id = (int)db.enemies.size()+1; db.enemies.push_back(en); dbSelected_=(int)db.enemies.size()-1; } break;
         }
     }
 
@@ -49,10 +47,8 @@ void Editor::drawDatabaseTab() {
     int count = 0;
     switch (dbCategory_) {
         case 0: count=(int)db.items.size();     for (int i=0;i<count;++i) listEntry(i, db.items[i].name); break;
-        case 1: count=(int)db.equipment.size(); for (int i=0;i<count;++i) listEntry(i, db.equipment[i].name); break;
-        case 2: count=(int)db.skills.size();    for (int i=0;i<count;++i) listEntry(i, db.skills[i].name); break;
-        case 3: count=(int)db.actors.size();    for (int i=0;i<count;++i) listEntry(i, db.actors[i].name); break;
-        case 4: count=(int)db.enemies.size();   for (int i=0;i<count;++i) listEntry(i, db.enemies[i].name); break;
+        case 1: count=(int)db.actors.size();    for (int i=0;i<count;++i) listEntry(i, db.actors[i].name); break;
+        case 2: count=(int)db.enemies.size();   for (int i=0;i<count;++i) listEntry(i, db.enemies[i].name); break;
     }
 
     if (dbSelected_ < 0 || dbSelected_ >= count) return;
@@ -130,43 +126,17 @@ void Editor::drawDatabaseTab() {
                 dy+=36;
             }
             break; }
-        case 1: { Equipment& e = db.equipment[dbSelected_]; nameField(e.name);
-            if (ui::button({dx,dy,200,26}, e.slot==EquipSlot::Weapon?"슬롯: 무기":"슬롯: 방어구"))
-                e.slot = e.slot==EquipSlot::Weapon?EquipSlot::Armor:EquipSlot::Weapon;
-            dy+=32;
-            step("가격", e.price, 10, 0, 99999);
-            step("공격+", e.atk, 1, 0, 999);
-            step("방어+", e.def, 1, 0, 999);
-            break; }
-        case 2: { Skill& s = db.skills[dbSelected_]; nameField(s.name);
-            step("MP 소모", s.mpCost, 1, 0, 999);
-            step("위력", s.power, 5, 0, 9999);
-            if (ui::button({dx,dy,200,26}, s.healing?"종류: 회복":"종류: 데미지")) s.healing=!s.healing;
-            dy+=36;
-            break; }
-        case 3: { ActorDef& a = db.actors[dbSelected_]; nameField(a.name);
+        case 1: { ActorDef& a = db.actors[dbSelected_]; nameField(a.name);
             if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(a.spriteAsset), a.spriteAsset>=0))
                 cycleAsset(a.spriteAsset, AssetType::Image);
             dy+=32;
             step("최대 HP", a.maxHp, 10, 1, 9999);
-            step("최대 MP", a.maxMp, 5, 0, 9999);
+            step("최대 GP", a.maxMp, 5, 0, 9999);
             step("공격", a.atk, 1, 0, 999);
             step("방어", a.def, 1, 0, 999);
             step("속도", a.spd, 1, 0, 999);
-            // turn-based battle skills this actor can use (the battle "스킬" menu reads these)
-            DrawTextU("─ 전투 스킬 (턴제 전투에서 사용) ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=20;
-            if (db.skills.empty())
-                DrawTextU("(스킬 탭에서 스킬을 먼저 만드세요)", (int)dx, (int)dy, 13, ui::kTextDim), dy+=22;
-            for (auto& sk : db.skills) {
-                bool on = std::find(a.skills.begin(), a.skills.end(), sk.id) != a.skills.end();
-                if (ui::button({dx,dy,260,24}, (on?"[O] ":"[ - ] ")+sk.name, on)) {
-                    if (on) a.skills.erase(std::remove(a.skills.begin(),a.skills.end(),sk.id), a.skills.end());
-                    else    a.skills.push_back(sk.id);
-                }
-                dy+=27;
-            }
             break; }
-        case 4: { EnemyDef& e = db.enemies[dbSelected_]; nameField(e.name);
+        case 2: { EnemyDef& e = db.enemies[dbSelected_]; nameField(e.name);
             if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(e.spriteAsset), e.spriteAsset>=0))
                 cycleAsset(e.spriteAsset, AssetType::Image);
             dy+=32;
@@ -187,9 +157,7 @@ void Editor::drawDatabaseTab() {
     }
     DrawTextU(TextFormat("id: %d   (Ctrl+S로 프로젝트 저장)",
              dbCategory_==0?db.items[dbSelected_].id:
-             dbCategory_==1?db.equipment[dbSelected_].id:
-             dbCategory_==2?db.skills[dbSelected_].id:
-             dbCategory_==3?db.actors[dbSelected_].id:db.enemies[dbSelected_].id),
+             dbCategory_==1?db.actors[dbSelected_].id:db.enemies[dbSelected_].id),
              (int)dx, (int)dy + 6, 14, ui::kTextDim);
     EndScissorMode();
     // clamp scroll so you can't scroll past the content (uses this frame's end dy)

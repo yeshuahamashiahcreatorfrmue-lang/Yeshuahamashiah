@@ -4,17 +4,6 @@ using nlohmann::json;
 
 namespace tsukuru {
 
-int PartyMember::totalAtk(const Database& db) const {
-    int t = atk;
-    if (const Equipment* w = db.equip(weaponId)) t += w->atk;
-    return t;
-}
-int PartyMember::totalDef(const Database& db) const {
-    int t = def;
-    if (const Equipment* a = db.equip(armorId)) t += a->def;
-    return t;
-}
-
 PartyMember PartyMember::fromActor(const ActorDef& d) {
     PartyMember m;
     m.actorId = d.id;
@@ -49,8 +38,7 @@ json PartyMember::toJson() const {
     return {{"actorId", actorId}, {"level", level}, {"exp", exp},
             {"hp", hp}, {"mp", mp}, {"maxHp", maxHp}, {"maxMp", maxMp},
             {"hunger", hunger}, {"thirst", thirst}, {"maxHunger", maxHunger}, {"maxThirst", maxThirst},
-            {"atk", atk}, {"def", def}, {"spd", spd},
-            {"weaponId", weaponId}, {"armorId", armorId}};
+            {"atk", atk}, {"def", def}, {"spd", spd}};
 }
 
 PartyMember PartyMember::fromJson(const json& j) {
@@ -62,7 +50,6 @@ PartyMember PartyMember::fromJson(const json& j) {
     m.atk = j.value("atk", 0); m.def = j.value("def", 0); m.spd = j.value("spd", 0);
     m.hunger = j.value("hunger", 42000); m.thirst = j.value("thirst", 42000);
     m.maxHunger = j.value("maxHunger", 42000); m.maxThirst = j.value("maxThirst", 42000);
-    m.weaponId = j.value("weaponId", -1); m.armorId = j.value("armorId", -1);
     return m;
 }
 

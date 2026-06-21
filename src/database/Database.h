@@ -31,25 +31,9 @@ struct Item {
     int         buffSecs = 0;    // 식품 버프 지속(초); 0 = 즉시효과만
 };
 
-enum class EquipSlot { Weapon, Armor };
-
-struct Equipment {
-    int         id = -1;
-    std::string name = "Gear";
-    EquipSlot   slot = EquipSlot::Weapon;
-    int         price = 0;
-    int         iconAsset = -1;
-    int         atk = 0;        // bonus attack (weapon)
-    int         def = 0;        // bonus defense (armor)
-};
-
-struct Skill {
-    int         id = -1;
-    std::string name = "Skill";
-    int         mpCost = 0;
-    int         power = 0;       // base damage / heal
-    bool        healing = false;
-};
+// NOTE: equipment is modelled as Items with kind==2 (body-slot gear); the old
+// Equipment/EquipSlot and the turn-based Skill struct were removed with the
+// turn-based battle system. Field skills live in FieldSkill (below).
 
 // A real-time field skill: a player-relative tile pattern + behaviour, fully
 // data-driven so users can design new skills (pattern, effect, sound) in the
@@ -127,14 +111,13 @@ struct ActorDef {
     int         spriteAsset = -1;
     int         maxHp = 100, maxMp = 20;
     int         atk = 10, def = 5, spd = 5;
-    std::vector<int> skills;     // skill ids
 };
 
 struct EnemyDef {
     int         id = -1;
     std::string name = "Slime";
     int         spriteAsset = -1;
-    int         maxHp = 30, maxMp = 0;
+    int         maxHp = 30;
     int         atk = 8, def = 3, spd = 4;
     int         expReward = 10;
     int         goldReward = 5;
@@ -145,8 +128,6 @@ struct EnemyDef {
 class Database {
 public:
     std::vector<Item>       items;
-    std::vector<Equipment>  equipment;
-    std::vector<Skill>      skills;
     std::vector<ActorDef>   actors;
     std::vector<EnemyDef>   enemies;
     std::vector<FieldSkill> fieldSkills;
@@ -154,8 +135,6 @@ public:
 
     const Item*      item(int id) const;
     const CharacterDef* character(int id) const;
-    const Equipment* equip(int id) const;
-    const Skill*     skill(int id) const;
     const ActorDef*  actor(int id) const;
     const EnemyDef*  enemy(int id) const;
     const FieldSkill* fieldSkillForSlot(int slot) const; // first bound skill for a key

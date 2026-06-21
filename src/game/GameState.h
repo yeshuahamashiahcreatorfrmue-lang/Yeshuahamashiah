@@ -20,13 +20,12 @@ struct PartyMember {
     int maxHp = 0, maxMp = 0;      // effective (base + level growth)
     int hunger = 42000, thirst = 42000;   // current 포만치 / 수분치 (허기·목마름)
     int maxHunger = 42000, maxThirst = 42000;
-    int atk = 0, def = 0, spd = 0; // base (equipment added on top)
-    int weaponId = -1;             // equipped equipment ids (-1 none)
-    int armorId  = -1;
+    int atk = 0, def = 0, spd = 0; // effective (body-slot equipment & food buffs fold into these)
 
-    // Effective stats including equipment bonuses (looked up via Database).
-    int totalAtk(const Database& db) const;
-    int totalDef(const Database& db) const;
+    // Effective stats. Equipment/buffs are already folded into atk/def on equip,
+    // so these just return the current values (db kept for call-site compatibility).
+    int totalAtk(const Database&) const { return atk; }
+    int totalDef(const Database&) const { return def; }
     bool alive() const { return hp > 0; }
 
     static PartyMember fromActor(const ActorDef& def);

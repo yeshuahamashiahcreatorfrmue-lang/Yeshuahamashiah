@@ -98,22 +98,12 @@ int main(int argc, char** argv) {
         {2,"Hi-Potion","Restores 150 HP.",100,-1,ItemEffect::HealHP,150,true},
         {3,"Ether","Restores 30 MP.",80,-1,ItemEffect::HealMP,30,true},
     };
-    db.equipment = {
-        {1,"Bronze Sword",EquipSlot::Weapon,50,-1,8,0},
-        {2,"Iron Sword",EquipSlot::Weapon,200,-1,18,0},
-        {3,"Leather Armor",EquipSlot::Armor,60,-1,0,6},
-        {4,"Chain Mail",EquipSlot::Armor,220,-1,0,14},
-    };
-    db.skills = {
-        {1,"Fireball",5,20,false},
-        {2,"Heal",8,40,true},
-    };
-    db.actors = { {1,"Hero",hero,120,30,14,7,6,{1,2}} };
+    db.actors = { {1,"Hero",hero,120,30,14,7,6} };
     db.enemies = {
-        {1,"Slime", slimeS,30,0,8,3,4,8,6},
-        {2,"Bat",   batS, 22,0,10,2,6,10,8},
-        {3,"Orc",   slimeS,70,0,18,9,5,35,28},
-        {4,"Dragon",batS, 240,0,34,16,7,400,500},
+        {1,"Slime", slimeS,30,8,3,4,8,6},
+        {2,"Bat",   batS, 22,10,2,6,10,8},
+        {3,"Orc",   slimeS,70,18,9,5,35,28},
+        {4,"Dragon",batS, 240,34,16,7,400,500},
     };
 
     auto tset = [&](Map& m){ m.tileset.assetId = tileset; m.tileset.tileWidth=32;

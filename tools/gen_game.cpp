@@ -244,15 +244,11 @@ int main(int argc,char**argv){
     db.items.push_back({2,"하이포션","HP를 200 회복합니다.",120,-1,ItemEffect::HealHP,200,true});
     db.items.push_back({3,"에테르","MP를 40 회복합니다.",80,-1,ItemEffect::HealMP,40,true});
     db.items.push_back({4,"크리스탈","마을의 신성한 크리스탈.",0,-1,ItemEffect::None,0,false});
-    db.equipment.push_back({1,"철검",EquipSlot::Weapon,140,-1,12,0});
-    db.equipment.push_back({2,"가죽 갑옷",EquipSlot::Armor,120,-1,0,8});
-    db.skills.push_back({1,"베기",4,18,false});
-    db.skills.push_back({2,"치유",6,40,true});
-    db.actors.push_back({1,"용사",A_hero,140,30,15,8,7,{1,2}});
-    db.enemies.push_back({1,"슬라임",A_sl,34,0,9,4,4,9,7});
-    db.enemies.push_back({2,"박쥐",A_bat,26,0,12,3,7,11,9});
-    db.enemies.push_back({3,"멧돼지",A_boar,60,0,15,6,5,22,18});
-    db.enemies.push_back({4,"동굴 수호자",A_guard,220,0,18,9,4,150,120});
+    db.actors.push_back({1,"용사",A_hero,140,30,15,8,7});
+    db.enemies.push_back({1,"슬라임",A_sl,34,9,4,4,9,7});
+    db.enemies.push_back({2,"박쥐",A_bat,26,12,3,7,11,9});
+    db.enemies.push_back({3,"멧돼지",A_boar,60,15,6,5,22,18});
+    db.enemies.push_back({4,"동굴 수호자",A_guard,220,18,9,4,150,120});
     // ---- field skills: 6 demo skills bound to Z/X/C/V/F/G with varied effect
     //      regions (front / projectile / dash / AoE / cross / line) + FX + sound.
     auto mkSkill=[&](int id,const char*nm,int slot,bool proj,int blink,int range,

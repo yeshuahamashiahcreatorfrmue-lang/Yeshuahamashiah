@@ -59,7 +59,6 @@ file(GLOB_RECURSE CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/entity/Event.cpp
     ${CMAKE_SOURCE_DIR}/src/game/Inventory.cpp
     ${CMAKE_SOURCE_DIR}/src/game/GameState.cpp
-    ${CMAKE_SOURCE_DIR}/src/battle/Battle.cpp
     ${CMAKE_SOURCE_DIR}/src/net/Net.cpp
 )
 add_library(tsukuru_core STATIC ${CORE_SOURCES})

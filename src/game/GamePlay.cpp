@@ -52,7 +52,7 @@ void GamePlay::onEnter() {
     spawnMonsters();
     runAutoruns();
     if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
-        startEncounterBattle();   // debug: jump straight into a turn-based battle
+        startEncounterBattle();   // debug: spawn an encounter troop on the field
     if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop (item ids "1,2,3")
         openShop({ atoi(s), 2, 8 }, "무기·도구 상점");
     if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a 4-way choice message
@@ -134,7 +134,6 @@ void GamePlay::update(float dt) {
         case Phase::Menu:
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
-        case Phase::Battle: updateBattle(dt); break;
         case Phase::Shop:   updateShop(dt); break;
         case Phase::GameOver:
         case Phase::GameClear:
@@ -168,7 +167,6 @@ void GamePlay::draw() {
         DrawTextU(sub, screenW()/2 - sw2/2, screenH()/2 + 20, 22, ui::kTextDim);
         return;
     }
-    if (phase_ == Phase::Battle) { drawBattle(); return; }
     if (phase_ == Phase::Shop)   { drawField(); drawShop(); return; }
     drawField();
     if (invOpen_)   drawInventoryOverlay();

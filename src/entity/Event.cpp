@@ -73,7 +73,7 @@ json Event::toJson() const {
         {"choiceSwitch", choiceSwitch}, {"choiceVar", choiceVar},
         {"giveGold", giveGold},
         {"varId", varId}, {"varOp", varOp}, {"varValue", varValue},
-        {"faceDir", faceDir}, {"battleTurnBased", battleTurnBased}, {"battleEnemies", battleEnemies},
+        {"faceDir", faceDir}, {"battleEnemies", battleEnemies},
         {"shopItems", shopItems}, {"rewardSwitch", rewardSwitch}
     };
 }
@@ -141,7 +141,6 @@ Event Event::fromJson(const json& j) {
     e.varOp           = j.value("varOp", 0);
     e.varValue        = j.value("varValue", 0);
     e.faceDir         = j.value("faceDir", -1);
-    e.battleTurnBased = j.value("battleTurnBased", false);
     e.battleEnemies   = j.value("battleEnemies", std::vector<int>{});
     e.shopItems       = j.value("shopItems", std::vector<int>{});
     e.rewardSwitch    = j.value("rewardSwitch", -1);
