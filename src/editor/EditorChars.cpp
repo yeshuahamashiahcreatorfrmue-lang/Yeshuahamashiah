@@ -685,7 +685,9 @@ void Editor::drawCharsTab() {
                                              charLibRenameBuf_ = e ? e->name : ""; charLibRenameFocus_ = true; } break;
                     case 5: charLibSel_.clear(); for (auto* a : vis) charLibSel_.push_back(a->id); break;
                     case 6: charLibSel_.clear(); break;
-                    case 7: deleteAssets(ids); charLibSel_.clear(); setStatus(TextFormat("%d개 삭제됨", (int)ids.size())); return;
+                    case 7: askConfirm(TextFormat("에셋 %d개를 삭제할까요? 맵/DB의 참조도 함께 정리됩니다.", (int)ids.size()),
+                                [this, ids]() { deleteAssets(ids); charLibSel_.clear();
+                                                setStatus(TextFormat("%d개 삭제됨", (int)ids.size())); }); return;
                 }
             }
         }

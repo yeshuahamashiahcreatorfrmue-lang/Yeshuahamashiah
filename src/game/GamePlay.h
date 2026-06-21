@@ -86,6 +86,8 @@ private:
 
     // --- projectiles & visual effects (GamePlayFx.cpp) ---
     void spawnFx(int type, float px, float py, int dir, int assetId, float dur, float radius = 0, int loops = 1, float sizePx = 0);
+    void spawnPopup(float px, float py, const std::string& text, Color color); // floating combat number
+    void drawPopups();
     void updateProjectiles(float dt);
     void updateFx(float dt);
     void drawProjectiles();
@@ -197,6 +199,7 @@ private:
     std::vector<NpcInst>      npcs_;
     std::vector<Projectile>   projectiles_;
     std::vector<SkillFx>      fx_;
+    std::vector<FloatingText> popups_;     // floating damage/heal numbers
     std::vector<Particle>     weatherP_;
     Texture2D minimapTex_{};    // cached minimap terrain (rebuilt once per map)
     bool minimapValid_ = false;

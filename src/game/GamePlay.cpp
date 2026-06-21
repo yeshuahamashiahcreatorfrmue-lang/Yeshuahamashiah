@@ -97,6 +97,9 @@ void GamePlay::loadMap(int id) {
     if (map_) { engine_.state().markReached(map_->id); refreshQuestObjective(); } // 도달형 퀘스트
     if (map_ && !map_->name.empty()) { areaBanner_ = map_->name; areaBannerT_ = 2.5f; } // 지역명 배너
     monsters_.clear();
+    popups_.clear();
+    fx_.clear();
+    projectiles_.clear();
     weatherP_.clear();
     if (minimapValid_) { UnloadTexture(minimapTex_); minimapValid_ = false; }
     // Cache the map's animated-tile ids once so drawField() doesn't rebuild a

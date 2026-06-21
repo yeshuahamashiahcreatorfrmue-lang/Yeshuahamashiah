@@ -297,6 +297,7 @@ void GamePlay::drawField() {
     drawFx();
     // overhead layer (treetops, roof edges) on top of the player
     drawLayer(kLayerCount - 1);
+    drawPopups();   // floating damage numbers sit above everything in the world
     uiEndWorld();
 
     // darkness + torch-light (cave / night atmosphere)
@@ -330,8 +331,9 @@ void GamePlay::drawField() {
     DrawRectangle(0, 0, screenW(), 32, Fade(BLACK, 0.55f));
     if (!gs.party.empty()) {
         PartyMember& m = gs.party[0];
-        DrawTextU(TextFormat("Lv %d   체력 %d/%d   기력 %d/%d   EXP %d   Gold %d",
-                 m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold),
+        DrawTextU(TextFormat("Lv %d   체력 %d/%d   기력 %d/%d   EXP %d   Gold %d   공 %d 방 %d 속 %d",
+                 m.level, m.hp, m.maxHp, m.mp, m.maxMp, m.exp, gs.inventory.gold,
+                 m.atk, m.def, m.spd),
                  12, 8, 16, ui::kText);
         // 포만/수분 bars (top-right) — drain 1/sec, refilled by 식품
         auto bar = [&](int x, float frac, Color c, const char* lbl) {

@@ -71,6 +71,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
     }
 
     audio_.init();
+    audio_.loadSettings("settings.json");   // persisted volume preferences (app-dir relative)
     audio_.loadSfxFolder((std::filesystem::path(project_->dir) / "assets" / "sfx").string());
 
     editor_ = std::make_unique<Editor>(*this);

@@ -50,8 +50,10 @@ NpcInst* GamePlay::hostileNpcAt(int x, int y) {
 
 bool GamePlay::damageNpc(NpcInst& n, int dmg) {
     if (!n.combatant() || !n.alive()) return false;
-    n.hp -= std::max(1, dmg);
+    int d = std::max(1, dmg);
+    n.hp -= d;
     n.hurtFlash = 0.18f;
+    spawnPopup(n.px, n.py, std::to_string(d), Color{ 255, 220, 90, 255 });
     if (n.hp <= 0) { onNpcKilled(n); return true; }
     return false;
 }
@@ -211,6 +213,7 @@ void GamePlay::updateNpcs(float dt) {
                     PartyMember& hero = gs.party[0];
                     hero.hp = std::max(0, hero.hp - dmg);
                     playerHurt_ = 0.22f;
+                    spawnPopup(pxX_, pxY_, "-" + std::to_string(dmg), Color{ 255, 110, 110, 255 });
                     engine_.audio().playSfx("hurt", 0.7f);
                     if (gs.partyWiped()) {
                         const CharacterDef* cd = customChar();

@@ -259,12 +259,17 @@ void Editor::drawWorldTab() {
     if ((int)p.maps.size() > 1) {
         if (ui::button({ dx, dy, 220, 30 }, "맵 삭제", false)) {
             int delId = m->id;
-            dropMapThumb(delId);                 // free its cached thumbnail (no GPU leak)
-            p.deleteMap(delId);                  // erase map + on-disk .json (no orphan file)
-            if (activeMapId_ == delId) activeMapId_ = p.maps.front()->id;
-            worldSelected_ = 0;
-            p.save();
-            setStatus("맵 삭제됨.");
+            std::string nm = m->name;
+            askConfirm("맵 '" + nm + "' 을(를) 삭제할까요? 되돌릴 수 없습니다.", [this, delId]() {
+                Project& pr = engine_.project();
+                if ((int)pr.maps.size() <= 1) { setStatus("마지막 맵은 삭제할 수 없습니다."); return; }
+                dropMapThumb(delId);                 // free its cached thumbnail (no GPU leak)
+                pr.deleteMap(delId);                 // erase map + on-disk .json (no orphan file)
+                if (activeMapId_ == delId) activeMapId_ = pr.maps.front()->id;
+                worldSelected_ = 0;
+                pr.save();
+                setStatus("맵 삭제됨.");
+            });
             return;
         }
     }
@@ -429,19 +434,22 @@ void Editor::drawWorldViewTab() {
     // right-click: remove the map under the cursor. A viewer-made copy is deleted
     // outright (map + .json + thumbnail) so repeated add/remove leaves no residue;
     // an original map is only un-placed (kept in the World list).
-    if (ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+    if (ui::g_inputEnabled && ui::mouseIn(canvas) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
         Vector2 w = GetScreenToWorld2D(GetMousePosition(), worldCam_);
         int cx = (int)std::floor(w.x/cell), cy = (int)std::floor(w.y/cell);
         if (auto occ = p.mapAtWorld(cx, cy)) {
             std::string nm = occ->name;
             if (occ->viewerCopy && (int)p.maps.size() > 1) {
                 int delId = occ->id;
-                dropMapThumb(delId);
-                if (activeMapId_ == delId) activeMapId_ = -1;
-                p.deleteMap(delId);
-                worldViewSel_ = -1;
-                p.save();
-                setStatus(nm + " 복제본 삭제");
+                askConfirm("복제본 '" + nm + "' 을(를) 완전히 삭제할까요?", [this, delId, nm]() {
+                    Project& pr = engine_.project();
+                    dropMapThumb(delId);
+                    if (activeMapId_ == delId) activeMapId_ = -1;
+                    pr.deleteMap(delId);
+                    worldViewSel_ = -1;
+                    pr.save();
+                    setStatus(nm + " 복제본 삭제");
+                });
             } else {
                 occ->placed = false; p.save();
                 setStatus(nm + " 배치 제거");

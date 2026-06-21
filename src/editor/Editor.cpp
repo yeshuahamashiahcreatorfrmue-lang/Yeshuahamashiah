@@ -66,6 +66,8 @@ std::shared_ptr<Map> Editor::activeMap() {
 }
 void Editor::update(float dt) {
     if (statusTimer_ > 0) statusTimer_ -= dt;
+    { static bool dbg = getenv("TSUKURU_CONFIRM") != nullptr, shown = false;   // debug: preview confirm dialog
+      if (dbg && !shown) { shown = true; askConfirm("맵 '예슈아한민족진리복종마을' 을(를) 삭제할까요? 되돌릴 수 없습니다.", []{}); } }
     ensureThumbsForTab();   // build map thumbnails OUTSIDE the frame render texture
     // Open the native file dialog OUTSIDE the draw frame: showing a modal Win32
     // dialog mid-render (between BeginDrawing/EndDrawing) corrupts the GL frame
@@ -154,6 +156,9 @@ void Editor::update(float dt) {
     if (tab_ == Tab::Assets) handleAssetDrop();
 }
 void Editor::draw() {
+    // While a confirm dialog is open, draw the tabs for context but block their
+    // input so a click can't fall through to a button behind the dialog.
+    ui::g_inputEnabled = !confirmOpen_;
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
@@ -170,6 +175,31 @@ void Editor::draw() {
         int w = MeasureTextU(status_.c_str(), 16);
         DrawRectangle(screenW() - w - 28, screenH() - 34, w + 20, 26, ui::kAccent);
         DrawTextU(status_.c_str(), screenW() - w - 18, screenH() - 30, 16, BLACK);
+    }
+
+    ui::g_inputEnabled = true;   // the dialog itself accepts input
+    if (confirmOpen_) drawConfirmOverlay();
+}
+
+// Centered modal: a message plus 확인 / 취소. Runs the stored action on confirm.
+void Editor::drawConfirmOverlay() {
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
+    Rectangle box = { sw/2.0f - 220, sh/2.0f - 90, 440, 180 };
+    ui::panel(box);
+    DrawTextU("확인", (int)box.x + 18, (int)box.y + 14, 22, ui::kDanger);
+    // wrap the message across the box width
+    DrawTextU(confirmMsg_.c_str(), (int)box.x + 18, (int)box.y + 56, 18, ui::kText);
+    Rectangle yes = { box.x + 40, box.y + box.height - 52, 160, 38 };
+    Rectangle no  = { box.x + box.width - 200, box.y + box.height - 52, 160, 38 };
+    if (ui::button(yes, "확인 (삭제)", false)) {
+        confirmOpen_ = false;
+        if (confirmAction_) confirmAction_();
+        confirmAction_ = nullptr;
+    }
+    if (ui::button(no, "취소", false) || IsKeyPressed(KEY_ESCAPE)) {
+        confirmOpen_ = false;
+        confirmAction_ = nullptr;
     }
 }
 

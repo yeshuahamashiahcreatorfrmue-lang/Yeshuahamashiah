@@ -165,6 +165,7 @@ void GamePlay::updateMonsters(float dt) {
             PartyMember& hero = gs.party[0];
             hero.hp = std::max(0, hero.hp - dmg);
             playerHurt_ = 0.22f;
+            spawnPopup(pxX_, pxY_, "-" + std::to_string(dmg), Color{ 255, 110, 110, 255 }); // damage taken
             engine_.audio().playSfx("hurt", 0.7f);
             if (gs.partyWiped()) {
                 // play the custom death motion first (if any), else go straight to GameOver
@@ -214,8 +215,10 @@ void GamePlay::drawMonsters() {
 // ----------------------------- damage / death -----------------------------
 bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
     if (!m.alive()) return false;
-    m.hp -= std::max(1, dmg);
+    int d = std::max(1, dmg);
+    m.hp -= d;
     m.hurtFlash = 0.18f;
+    spawnPopup(m.px, m.py, std::to_string(d), Color{ 255, 220, 90, 255 });   // damage dealt
     if (m.hp <= 0) { onMonsterKilled(m); return true; }
     return false;
 }

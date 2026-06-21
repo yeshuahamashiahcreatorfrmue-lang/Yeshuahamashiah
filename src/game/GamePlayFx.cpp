@@ -61,6 +61,37 @@ void GamePlay::updateFx(float dt) {
     for (auto& f : fx_) f.t += dt;
     fx_.erase(std::remove_if(fx_.begin(), fx_.end(),
               [](const SkillFx& f){ return f.t >= f.dur; }), fx_.end());
+    for (auto& p : popups_) p.t += dt;
+    popups_.erase(std::remove_if(popups_.begin(), popups_.end(),
+              [](const FloatingText& p){ return p.t >= p.dur; }), popups_.end());
+}
+
+// Spawn a floating combat number above a tile. A tiny horizontal jitter keeps
+// stacked hits readable instead of overlapping perfectly.
+void GamePlay::spawnPopup(float px, float py, const std::string& text, Color color) {
+    FloatingText f;
+    f.px = px + (float)((std::rand() % 11) - 5);
+    f.py = py;
+    f.text = text;
+    f.color = color;
+    popups_.push_back(f);
+}
+
+// world-space floating numbers: rise and fade over their lifetime
+void GamePlay::drawPopups() {
+    int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
+    for (auto& p : popups_) {
+        float k = p.dur > 0 ? p.t / p.dur : 1.0f;          // 0..1 progress
+        float rise = 22.0f * k;                            // float upward
+        unsigned char a = (unsigned char)(255 * (1.0f - k * k)); // fade out late
+        Color c = { p.color.r, p.color.g, p.color.b, a };
+        int fontSize = 16;
+        int tw = MeasureTextU(p.text.c_str(), fontSize);
+        float x = p.px + TS / 2.0f - tw / 2.0f;
+        float y = p.py - rise;
+        DrawTextU(p.text.c_str(), (int)x + 1, (int)y + 1, fontSize, Fade(BLACK, a / 255.0f * 0.8f)); // shadow
+        DrawTextU(p.text.c_str(), (int)x, (int)y, fontSize, c);
+    }
 }
 
 void GamePlay::drawProjectiles() {

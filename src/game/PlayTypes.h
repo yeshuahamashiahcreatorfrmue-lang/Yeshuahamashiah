@@ -81,6 +81,15 @@ struct SkillFx {
     float sizePx = 0;       // explicit draw size in px (0 = use the type's default)
 };
 
+// A floating combat number/text that rises and fades above a target (damage to
+// an enemy, damage taken by the player, heals, etc.).
+struct FloatingText {
+    float px = 0, py = 0;    // world pixel position (rises over life)
+    float t = 0, dur = 0.8f;
+    std::string text;
+    Color color = { 255, 255, 255, 255 };
+};
+
 // --- atmosphere -------------------------------------------------------------
 
 struct Particle { float x, y, vx, vy, life; };

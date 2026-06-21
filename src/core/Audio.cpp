@@ -1,5 +1,7 @@
 #include "core/Audio.h"
 #include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
 
@@ -11,16 +13,42 @@ void Audio::init() {
     if (ready_) SetMasterVolume(masterVol_);
 }
 
+void Audio::loadSettings(const std::string& path) {
+    settingsPath_ = path;
+    std::error_code ec;
+    if (fs::exists(path, ec)) {
+        std::ifstream f(path);
+        if (f) {
+            try {
+                nlohmann::json j; f >> j;
+                masterVol_ = j.value("master", masterVol_);
+                musicVol_  = j.value("music",  musicVol_);
+                sfxVol_    = j.value("sfx",    sfxVol_);
+            } catch (...) {}
+        }
+    }
+    if (ready_) SetMasterVolume(masterVol_);
+}
+
+void Audio::saveSettings() const {
+    if (settingsPath_.empty()) return;
+    std::ofstream f(settingsPath_);
+    if (f) f << nlohmann::json{{"master", masterVol_}, {"music", musicVol_}, {"sfx", sfxVol_}}.dump(2);
+}
+
 void Audio::setMasterVolume(float v) {
     masterVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
     if (ready_) SetMasterVolume(masterVol_);
+    saveSettings();
 }
 void Audio::setMusicVolume(float v) {
     musicVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
     if (ready_ && bgmLoaded_) SetMusicVolume(bgm_, musicVol_);
+    saveSettings();
 }
 void Audio::setSfxVolume(float v) {
     sfxVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
+    saveSettings();
 }
 
 void Audio::shutdown() {

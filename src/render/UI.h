@@ -24,6 +24,10 @@ inline Color factionColor(int faction) {
                         : Color{ 210, 210, 210, 255 };
 }
 
+// Global input gate: when false, button()/textField()/intStepper() still draw but
+// ignore clicks/keys. Used to make a modal dialog block the UI behind it.
+extern bool g_inputEnabled;
+
 void panel(Rectangle r, Color c = kPanel);
 void label(const std::string& text, int x, int y, int size = 18, Color c = kText);
 void labelCentered(const std::string& text, Rectangle r, int size = 18, Color c = kText);

@@ -5,6 +5,8 @@
 namespace tsukuru {
 namespace ui {
 
+bool g_inputEnabled = true;
+
 bool mouseIn(Rectangle r) {
     return CheckCollisionPointRec(GetMousePosition(), r);
 }
@@ -26,7 +28,7 @@ void labelCentered(const std::string& text, Rectangle r, int size, Color c) {
 
 bool button(Rectangle r, const std::string& text, bool active, int fontSize) {
     bool hover = mouseIn(r);
-    bool click = hover && IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
+    bool click = g_inputEnabled && hover && IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
     Color bg = active ? kAccent : (hover ? kPanelHi : kPanel);
     if (active && hover) bg = kAccentHi;
     DrawRectangleRec(r, bg);
@@ -39,7 +41,7 @@ bool textField(Rectangle r, std::string& text, bool focused, int maxLen) {
     DrawRectangleRec(r, focused ? kPanelHi : kPanel);
     DrawRectangleLinesEx(r, 1, focused ? kAccent : Fade(BLACK, 0.5f));
 
-    if (focused) {
+    if (focused && g_inputEnabled) {
         int key = GetCharPressed();
         while (key > 0) {
             if (key >= 32 && key <= 125 && (int)text.size() < maxLen)

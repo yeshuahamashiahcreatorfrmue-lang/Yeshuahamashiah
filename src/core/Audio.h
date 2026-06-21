@@ -31,8 +31,14 @@ public:
     float musicVolume()  const { return musicVol_; }
     float sfxVolume()    const { return sfxVol_; }
 
+    // Persist the three volumes to a small JSON file so preferences survive across
+    // launches. loadSettings remembers the path; later setter calls auto-save.
+    void loadSettings(const std::string& path);
+    void saveSettings() const;
+
 private:
     bool ready_ = false;
+    std::string settingsPath_;  // where volumes are persisted (empty = no persistence)
     std::unordered_map<std::string, Sound> sfx_;
     Music bgm_{};
     bool  bgmLoaded_ = false;

@@ -3,6 +3,7 @@
 // Asset registration (drag & drop files), and the Database editor.
 #include <memory>
 #include <string>
+#include <functional>
 #include <vector>
 #include <unordered_map>
 #include "raylib.h"
@@ -223,6 +224,16 @@ private:
     int  prefabSel_ = 0;            // selected stamp/prefab index
     std::string status_;
     float statusTimer_ = 0;
+
+    // Confirmation dialog for destructive actions (delete map/asset, etc.). The
+    // action runs only if the user clicks 확인; while open it blocks the UI behind it.
+    bool confirmOpen_ = false;
+    std::string confirmMsg_;
+    std::function<void()> confirmAction_;
+    void askConfirm(const std::string& msg, std::function<void()> action) {
+        confirmMsg_ = msg; confirmAction_ = std::move(action); confirmOpen_ = true;
+    }
+    void drawConfirmOverlay();
 
     void setStatus(const std::string& s) { status_ = s; statusTimer_ = 3.0f; }
     void pushUndo();   // snapshot current map before an edit
