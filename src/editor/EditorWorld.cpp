@@ -612,6 +612,30 @@ void Editor::drawWorldPreviewOverlay() {
                     }
                 }
             }
+            // ---- mob spawn markers (몹 등장 위치): purple 'M', click=삭제 ----
+            for (int si = 0; si < (int)pm->mobSpawns.size(); ++si) {
+                auto& s = pm->mobSpawns[si];
+                Vector2 sp = t2s((float)s.x, (float)s.y);
+                DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
+                DrawCircleV(sp, r, Color{ 180, 90, 220, 255 });
+                DrawTextU("M", (int)sp.x - 4, (int)sp.y - 7, 14, WHITE);
+                if (CheckCollisionPointCircle(mouse, sp, r + 5)) {
+                    hitMarker = true;
+                    const CharacterDef* md = p.database.mob(s.mobId);
+                    DrawTextU(md ? md->name.c_str() : "몹", (int)sp.x + 10, (int)sp.y - 8, 14, WHITE);
+                    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) { pm->mobSpawns.erase(pm->mobSpawns.begin()+si); p.save(); setStatus("몹 등장지점 삭제"); break; }
+                }
+            }
+            // ---- click empty cell to PLACE the selected mob spawn ----
+            if (prevMobToPlace_ >= 0 && CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                int tx = (int)((mouse.x - bx) / pw * mw);
+                int ty = (int)((mouse.y - by) / ph * mh);
+                if (tx >= 0 && ty >= 0 && tx < mw && ty < mh) {
+                    pm->mobSpawns.push_back({ prevMobToPlace_, tx, ty });
+                    p.save(); setStatus(TextFormat("몹 등장지점 배치: (%d,%d)", tx, ty));
+                    hitMarker = true;   // consume so it doesn't clear selection
+                }
+            }
             // zone gates: a placed map's edge passages toward placed neighbours
             if (pm->placed) {
                 struct G { int dx, dy; float tx, ty; const char* n; };
@@ -660,6 +684,7 @@ void Editor::drawWorldPreviewOverlay() {
         auto chip = [&](Color c, const char* t){ DrawCircle((int)lx+6,(int)ly+8,6,c); DrawTextU(t,(int)lx+16,(int)ly+1,13,ui::kText); lx += 18 + MeasureTextU(t,13) + 16; };
         chip(ui::kGood, "건물입구(클릭=내부)"); chip(Color{90,210,230,255}, "존통로(클릭=이동)");
         chip(ui::factionColor(0), "NPC"); chip(ui::factionColor(2), "적/몹"); chip(Color{240,210,80,255}, "이벤트");
+        chip(Color{180,90,220,255}, "몹 등장지점(우클릭=삭제)");
     } else {
         DrawTextU("미리보기 생성 중…", (int)((sw - panelW)/2 - 70), sh/2, 18, ui::kTextDim);
     }

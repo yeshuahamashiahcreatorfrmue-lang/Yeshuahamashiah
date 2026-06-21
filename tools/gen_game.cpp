@@ -303,10 +303,8 @@ int main(int argc,char**argv){
     // ground: grass with variation
     for(int y=0;y<H;y++)for(int x=0;x<W;x++){int v=hsh(x*7,y*7);int t=GRASS;if(v>247)t=FLGRASS;else if(v>235)t=GRASS2;setT(0,x,y,t);}
 
-    // tree border (trunk below + canopy overhead)
-    auto tree=[&](int x,int y){if(!tm.inBounds(x,y))return;setT(1,x,y,TRUNK);setT(2,x,y,CANOPY);blk(x,y);};
-    for(int x=0;x<W;x++){tree(x,0);tree(x,H-1);}
-    for(int y=0;y<H;y++){tree(0,y);tree(W-1,y);}
+    // (테두리 나무 제거됨: 타일/에셋으로 편집되지 않아 혼란을 주므로 경계는
+    //  맵 범위로만 막고, 가장자리는 일반 잔디로 둬서 자유롭게 편집 가능하게 함)
 
     // pond (water + shallow ring) with a bridge
     int px=5,py=6,pw=9,ph=6;

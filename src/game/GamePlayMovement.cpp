@@ -58,6 +58,28 @@ void GamePlay::updateField(float dt) {
     updateProjectiles(dt);
     updateFx(dt);
 
+    // chat input: while open it captures typing and freezes the field
+    if (chatOpen_) {
+        int key = GetCharPressed();
+        while (key > 0) {
+            if (key >= 32 && key != 127) { int n=0; const char* e = CodepointToUTF8(key,&n); chatInput_.append(e,(size_t)n); }
+            key = GetCharPressed();
+        }
+        if (IsKeyPressed(KEY_BACKSPACE) && !chatInput_.empty()) {
+            size_t i = chatInput_.size(); do { --i; } while (i>0 && ((unsigned char)chatInput_[i]&0xC0)==0x80); chatInput_.erase(i);
+        }
+        if (IsKeyPressed(KEY_ENTER)) {
+            if (!chatInput_.empty()) {
+                chatLog_.push_back("나: " + chatInput_);
+                if (chatLog_.size() > 50) chatLog_.erase(chatLog_.begin());
+                chatBubble_ = chatInput_; chatBubbleT_ = 4.0f;
+            }
+            chatInput_.clear(); chatOpen_ = false;
+        }
+        if (IsKeyPressed(KEY_ESCAPE)) { chatInput_.clear(); chatOpen_ = false; }
+        return;
+    }
+
     // inventory (I) / equipment (C) windows freeze the field while open; they
     // handle their own clicks in draw(). Bottom HUD buttons toggle them too.
     // Inventory (I) and Character (O) open as side-by-side panels — they DON'T
@@ -98,7 +120,14 @@ void GamePlay::updateField(float dt) {
     if (IsKeyPressed(KEY_F)) castSlot(4);
     if (IsKeyPressed(KEY_G)) castSlot(5);
     handleSkillClicks();                 // touch / mouse click on the skill panel
-    if (IsKeyPressed(KEY_ENTER)) interact();
+    // Enter: talk to an interactable in front; if none, open chat input.
+    if (IsKeyPressed(KEY_ENTER)) {
+        Vec2i d = dirToDelta((Direction)dir_);
+        int fx = destX_ + d.x, fy = destY_ + d.y;
+        bool front = actionEventAt(fx, fy) || actionEventAt(destX_, destY_) || npcAt(fx, fy);
+        if (front) interact();
+        else { chatOpen_ = true; chatInput_.clear(); }
+    }
 
     // Debug autopilot: chase and attack the nearest monster (verifies combat).
     Direction autoDir = Direction::Right; bool autoMove = false;

@@ -18,11 +18,14 @@ int Map::nextEventId() const {
 json Map::toJson() const {
     json evs = json::array();
     for (const auto& e : events) evs.push_back(e.toJson());
+    json sp = json::array();
+    for (const auto& s : mobSpawns) sp.push_back({{"mobId", s.mobId}, {"x", s.x}, {"y", s.y}});
     return {
         {"id", id}, {"name", name},
         {"tilemap", tilemap.toJson()},
         {"tileset", tileset.toJson()},
         {"events", evs},
+        {"mobSpawns", sp},
         {"encounterEnemies", encounterEnemies},
         {"encounterRate", encounterRate},
         {"bgmAsset", bgmAsset},
@@ -43,6 +46,10 @@ void Map::fromJson(const json& j) {
     events.clear();
     if (j.contains("events"))
         for (const auto& e : j["events"]) events.push_back(Event::fromJson(e));
+    mobSpawns.clear();
+    if (j.contains("mobSpawns"))
+        for (const auto& s : j["mobSpawns"])
+            mobSpawns.push_back({ s.value("mobId", -1), s.value("x", 0), s.value("y", 0) });
     encounterEnemies = j.value("encounterEnemies", std::vector<int>{});
     encounterRate    = j.value("encounterRate", 0);
     bgmAsset         = j.value("bgmAsset", -1);

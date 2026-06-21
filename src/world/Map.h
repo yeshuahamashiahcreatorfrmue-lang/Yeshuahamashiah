@@ -8,6 +8,13 @@
 
 namespace tsukuru {
 
+// A monster spawn point placed on the map: which mob appears, where, and how it
+// respawns. mobId indexes Database::mobs (CharacterDef-based monsters).
+struct MobSpawn {
+    int mobId = -1;     // Database::mobs id
+    int x = 0, y = 0;   // tile position the mob spawns at
+};
+
 class Map {
 public:
     int         id = -1;
@@ -15,6 +22,7 @@ public:
     Tilemap     tilemap;
     Tileset     tileset;
     std::vector<Event> events;
+    std::vector<MobSpawn> mobSpawns;   // placed monster spawn points
 
     // Random battle encounters when walking (enemy troop = list of enemy ids).
     std::vector<int> encounterEnemies; // enemy ids that can appear

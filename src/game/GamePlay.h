@@ -66,6 +66,7 @@ private:
 
     // --- field monsters (GamePlayMonsters.cpp) ---
     void spawnMonsters();
+    void spawnMapMobs();   // spawn CharacterDef mobs from Map::mobSpawns
     void spawnOne();
     void updateMonsters(float dt);
     void drawMonsters();
@@ -142,6 +143,7 @@ private:
     void drawWeather(float dt);
     void drawMinimap();
     void drawFullMap();   // M: full-screen map overview
+    void drawChat();      // chat input line + speech bubble + right-side chat log
     void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling
 
     Engine& engine_;
@@ -185,6 +187,13 @@ private:
     int   shopMode_ = 0;         // 0 = 구매(buy), 1 = 판매(sell at half price)
     bool  questLogOpen_ = false;// J: quest log overlay
     bool  fullMapOpen_ = false; // M: full-map overview overlay
+    // chat: Enter opens an input line; sending shows a speech bubble over the
+    // player and appends to the right-side chat log window.
+    bool  chatOpen_ = false;
+    std::string chatInput_;
+    std::vector<std::string> chatLog_;
+    std::string chatBubble_;
+    float chatBubbleT_ = 0;
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
 

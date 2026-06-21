@@ -15,20 +15,44 @@ namespace tsukuru {
 // Drop every monster/NPC that died this frame. Centralised so the four call
 // sites (melee, projectile, monster & NPC updates) prune identically.
 void GamePlay::reapDead() {
+    // Map-placed spawner mobs with a respawn period are KEPT (dead) so they can
+    // respawn at their point; everything else is removed on death.
     monsters_.erase(std::remove_if(monsters_.begin(), monsters_.end(),
-                    [](const FieldMonster& m){ return !m.alive(); }), monsters_.end());
+                    [](const FieldMonster& m){ return !m.alive() && !(m.respawnSecs > 0 && m.homeX >= 0); }), monsters_.end());
     npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
                 [](const NpcInst& n){ return !n.alive(); }), npcs_.end());
+}
+
+// Spawn the CharacterDef-based mobs placed on the map (몹 탭 + 맵 등장지점).
+void GamePlay::spawnMapMobs() {
+    if (!map_) return;
+    const Database& db = engine_.project().database;
+    int TS = map_->tileset.tileWidth;
+    for (const auto& sp : map_->mobSpawns) {
+        const CharacterDef* md = db.mob(sp.mobId);
+        if (!md) continue;
+        FieldMonster m;
+        m.mobCharId = md->id; m.name = md->name; m.spriteAsset = -1;
+        m.x = m.destX = sp.x; m.y = m.destY = sp.y;
+        m.px = sp.x * (float)TS; m.py = sp.y * (float)TS;
+        m.hp = m.maxHp = md->maxHp; m.atk = md->atk; m.def = md->def;
+        m.expReward = md->expReward; m.goldReward = md->goldReward;
+        m.spawnFreeze = md->spawnFreezeSecs;
+        m.homeX = sp.x; m.homeY = sp.y; m.respawnSecs = md->respawnSecs;
+        m.moveCd = 0.3f + (std::rand() % 100) / 100.0f;
+        monsters_.push_back(m);
+    }
 }
 
 void GamePlay::spawnMonsters() {
     monsters_.clear();
     if (!map_) { targetMonsters_ = 0; return; }
-    // only maps that explicitly list encounter enemies spawn random field monsters
+    spawnMapMobs();    // placed mob spawn points (always, independent of encounters)
+    // maps that list encounter enemies also spawn roaming random field monsters
     if (map_->encounterEnemies.empty()) { targetMonsters_ = 0; return; }
     int area = map_->tilemap.width() * map_->tilemap.height();
-    targetMonsters_ = std::min(8, std::max(3, area / 45));
-    for (int i = 0; i < targetMonsters_; ++i) spawnOne();
+    targetMonsters_ = std::min(8, std::max(3, area / 45)) + (int)monsters_.size();
+    while ((int)monsters_.size() < targetMonsters_) spawnOne();
 }
 
 void GamePlay::spawnOne() {
@@ -88,13 +112,14 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
     }
     toast_ = m.name + " 처치!  +" + std::to_string(m.expReward) + " EXP  +" +
              std::to_string(m.goldReward) + " G";
-    // item drop roll (from EnemyDef)
-    if (const EnemyDef* def = engine_.project().database.enemy(m.enemyId)) {
-        if (def->dropItemId >= 0 && def->dropRate > 0 && (std::rand() % 100) < def->dropRate) {
-            gs.inventory.addItem(def->dropItemId, 1);
-            const Item* it = engine_.project().database.item(def->dropItemId);
-            toast_ += "   [" + (it ? it->name : std::string("아이템")) + " 획득!]";
-        }
+    // item drop roll — CharacterDef mob carries its own drop; else fall back to EnemyDef
+    int dropId = -1, dropRate = 0;
+    if (const CharacterDef* md = engine_.project().database.mob(m.mobCharId)) { dropId = md->dropItemId; dropRate = md->dropRate; }
+    else if (const EnemyDef* def = engine_.project().database.enemy(m.enemyId)) { dropId = def->dropItemId; dropRate = def->dropRate; }
+    if (dropId >= 0 && dropRate > 0 && (std::rand() % 100) < dropRate) {
+        gs.inventory.addItem(dropId, 1);
+        const Item* it = engine_.project().database.item(dropId);
+        toast_ += "   [" + (it ? it->name : std::string("아이템")) + " 획득!]";
     }
     if (leveled) toast_ += "   ★레벨 업! Lv " + std::to_string(gs.party[0].level);
     toastTimer_ = leveled ? 2.6f : 1.8f;
@@ -117,6 +142,24 @@ void GamePlay::updateMonsters(float dt) {
     }
 
     for (auto& m : monsters_) {
+        // dead spawner mob: count down 탄생 주기 then respawn at its point
+        if (!m.alive()) {
+            if (m.respawnSecs > 0 && m.homeX >= 0) {
+                m.respawnTimer -= dt;
+                bool clear = !monsterAt(m.homeX, m.homeY) && !(m.homeX == destX_ && m.homeY == destY_);
+                if (m.respawnTimer <= 0 && clear) {
+                    m.hp = m.maxHp; m.x = m.destX = m.homeX; m.y = m.destY = m.homeY;
+                    m.px = m.homeX * (float)TS; m.py = m.homeY * (float)TS; m.moving = false;
+                    const CharacterDef* md = db.mob(m.mobCharId);
+                    m.spawnFreeze = md ? md->spawnFreezeSecs : 1.2f;
+                }
+            }
+            continue;
+        }
+        if (m.mobCharId >= 0) {                       // CharacterDef mob: advance walk anim
+            m.animTime += dt;
+            if (m.animTime > 0.12f) { m.animTime = 0; m.frame++; }
+        }
         if (m.hurtFlash > 0) m.hurtFlash -= dt;
         if (m.atkCd > 0)     m.atkCd -= dt;
         if (m.spawnFreeze > 0) m.spawnFreeze -= dt;   // 탄생 정지: 끝나기 전엔 공격 금지
@@ -192,11 +235,21 @@ void GamePlay::updateMonsters(float dt) {
 // ----------------------------- monster rendering -----------------------------
 void GamePlay::drawMonsters() {
     int TS = map_->tileset.tileWidth;
+    const Database& db = engine_.project().database;
     for (auto& m : monsters_) {
+        if (!m.alive()) continue;   // dead spawner mob awaiting respawn: invisible
         // fade in over the spawn-freeze so a mob materializes instead of popping in
         float a = m.spawnFreeze > 0 ? std::clamp(1.0f - m.spawnFreeze / 1.2f, 0.25f, 1.0f) : 1.0f;
         Color tint = Fade(m.hurtFlash > 0 ? Color{ 255, 120, 120, 255 } : WHITE, a);
-        if (m.spriteAsset >= 0) {
+        const CharacterDef* md = m.mobCharId >= 0 ? db.mob(m.mobCharId) : nullptr;
+        if (md) {                   // CharacterDef mob: play its walk motion (이미지·모션)
+            const auto& fr = md->motions[MO_Walk].dirFrames(m.dir);
+            int asset = fr.empty() ? -1 : fr[m.frame % (int)fr.size()];
+            float wT = std::max(1, md->drawTilesW), hT = std::max(1, md->drawTilesH);
+            float pct = md->drawPct / 100.0f;
+            if (asset >= 0) drawCharacter(asset, m.dir, 0, m.px, m.py, tint, 1, wT*pct, hT*pct);
+            else DrawCircle((int)m.px + TS/2, (int)m.py + TS/2, TS*0.4f, Fade(Color{160,80,160,255}, a));
+        } else if (m.spriteAsset >= 0) {
             const Texture2D& tex = engine_.assetTexture(m.spriteAsset);
             float size = TS * 1.15f;
             Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
@@ -223,7 +276,11 @@ bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
     m.hp -= d;
     m.hurtFlash = 0.18f;
     spawnPopup(m.px, m.py, std::to_string(d), Color{ 255, 220, 90, 255 });   // damage dealt
-    if (m.hp <= 0) { onMonsterKilled(m); return true; }
+    if (m.hp <= 0) {
+        onMonsterKilled(m);
+        if (m.respawnSecs > 0 && m.homeX >= 0) m.respawnTimer = m.respawnSecs;  // 탄생 주기 시작
+        return true;
+    }
     return false;
 }
 

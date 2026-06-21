@@ -69,6 +69,10 @@ void GamePlay::onEnter() {
                       "마을 장로", -1, {}, -1, -1);
     if (getenv("TSUKURU_HELP")) helpOpen_ = true; // debug: open F1 help overlay
     if (getenv("TSUKURU_FULLMAP")) fullMapOpen_ = true; // debug: open M full-map overlay
+    if (getenv("TSUKURU_CHAT")) {                       // debug: seed chat + open input
+        chatLog_ = { "촌장: 어서 오게!", "나: 안녕하세요", "마을사람: 좋은 날씨네요" };
+        chatBubble_ = "안녕하세요!"; chatBubbleT_ = 5.0f; chatOpen_ = true; chatInput_ = "반갑습니다";
+    }
     if (getenv("TSUKURU_DEBUGVARS")) {            // debug: seed some flags + open F3 inspector
         GameState& g = engine_.state();
         g.setSwitch(10, true); g.setSwitch(40, true); g.setVar(1, 5); g.setVar(2, 12);
@@ -163,10 +167,10 @@ void GamePlay::quickLoad() {
 }
 
 void GamePlay::update(float dt) {
-    // Play mode has no text input — keep the IME off so WASD/keys always register
-    // even if the user's input language is Korean (otherwise Hangul composition
-    // eats the keypresses and the player won't move).
-    plat::setImeEnabled(false);
+    // IME on only while typing chat, off otherwise so WASD/keys always register
+    // even if the input language is Korean.
+    plat::setImeEnabled(chatOpen_);
+    if (chatBubbleT_ > 0) chatBubbleT_ -= dt;
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
     if (IsKeyPressed(KEY_F3)) debugVarsOpen_ = !debugVarsOpen_;   // switch/variable inspector
     if (IsKeyPressed(KEY_F1)) helpOpen_ = !helpOpen_;             // controls help
@@ -235,6 +239,7 @@ void GamePlay::draw() {
     }
     if (phase_ == Phase::Shop)   { drawField(); drawShop(); return; }
     drawField();
+    drawChat();   // chat log/bubble/input over the field
     if (fullMapOpen_) drawFullMap();
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();

@@ -253,6 +253,32 @@ void Editor::drawWorldPreviewPanel(Map& m, Rectangle area) {
     }
     float listTop = ay + ((kObjCount + 1) / 2) * 28.0f + 12;
 
+    // ---- mob spawn points: pick a mob, then click the map to place ----
+    Database& db = engine_.project().database;
+    DrawTextU("몹 등장지점 — 몹 선택 후 맵 클릭=배치 (우클릭 마커=삭제)", (int)area.x + 12, (int)listTop, 12, ui::kTextDim);
+    listTop += 18;
+    if (db.mobs.empty()) {
+        DrawTextU("(몹 탭에서 몹을 먼저 만드세요)", (int)area.x + 14, (int)listTop, 12, ui::kTextDim);
+        listTop += 20;
+    } else {
+        float mx = area.x + 10, mw2 = (area.width - 28) / 2;
+        int shownM = std::min((int)db.mobs.size(), 6);
+        for (int i = 0; i < shownM; ++i) {
+            Rectangle b = { mx + (i % 2) * (mw2 + 8), listTop + (i / 2) * 28.0f, mw2, 25 };
+            if (ui::button(b, db.mobs[i].name, prevMobToPlace_ == db.mobs[i].id))
+                prevMobToPlace_ = (prevMobToPlace_ == db.mobs[i].id) ? -1 : db.mobs[i].id;
+        }
+        listTop += ((shownM + 1) / 2) * 28.0f + 4;
+        if (prevMobToPlace_ >= 0) {
+            const CharacterDef* md = db.mob(prevMobToPlace_);
+            DrawTextU(TextFormat("배치 대기: %s — 맵을 클릭하세요", md ? md->name.c_str() : "?"),
+                      (int)area.x + 12, (int)listTop, 12, ui::kAccentHi);
+            listTop += 18;
+        }
+    }
+    DrawTextU(TextFormat("배치된 몹 등장지점: %d", (int)m.mobSpawns.size()), (int)area.x + 12, (int)listTop, 12, ui::kTextDim);
+    listTop += 18;
+
     // ---- existing objects: select / delete ----
     DrawTextU(TextFormat("현재 오브젝트 (%d) — 클릭=선택, 삭제", (int)m.events.size()),
               (int)area.x + 12, (int)listTop, 12, ui::kTextDim);

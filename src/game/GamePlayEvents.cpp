@@ -513,7 +513,7 @@ void GamePlay::drawHelp() {
     static const Row rows[] = {
         { "방향키 / WASD", "이동" },
         { "Shift (이동 중)", "달리기" },
-        { "Enter", "대화 / 상호작용" },
+        { "Enter", "대화 / 상호작용 (앞이 비면 채팅)" },
         { "Z / Space", "기본 공격(스킬1)" },
         { "X / V / F / G", "스킬 2~5" },
         { "I", "인벤토리 (우클릭=버리기)" },

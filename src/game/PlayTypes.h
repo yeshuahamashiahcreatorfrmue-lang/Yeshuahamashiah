@@ -27,6 +27,12 @@ struct FieldMonster {
     float hurtFlash = 0;       // white/red flash timer when struck
     float spawnFreeze = 0;     // 탄생 직후 무적·비공격 시간(초): 갑툭튀해서 바로 때리지 않게
     int  defeatSwitch = -1;    // when this troop is cleared, set this switch (boss gate)
+    // map-placed mob spawner link (CharacterDef-based mobs, db.mobs):
+    int  mobCharId = -1;       // Database::mobs id for motion/effect rendering (-1 = sprite enemy)
+    int  homeX = -1, homeY = -1;  // spawn-point origin (for respawn); -1 = not a spawner mob
+    float respawnTimer = 0;    // counts down after death; 0 + alive=false + respawnSecs>0 -> respawn
+    float respawnSecs = 0;     // 탄생 주기: respawn period seconds (0 = no respawn)
+    int  frame = 0; float animTime = 0;  // walk-motion playback for CharacterDef mobs
     bool alive() const { return hp > 0; }
 };
 

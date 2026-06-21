@@ -194,6 +194,43 @@ void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py
     }
 }
 
+// chat: speech bubble over the player, a right-side log window, and the input line
+void GamePlay::drawChat() {
+    int sw = screenW(), sh = screenH();
+    // chat log window (left column — the right side holds the minimap + skill bar)
+    if (!chatLog_.empty() || chatOpen_) {
+        float w = 250, h = 168;
+        Rectangle box = { 10, 92, w, h };
+        DrawRectangleRec(box, Fade(Color{ 12, 14, 20, 255 }, 0.72f));
+        DrawRectangleLinesEx(box, 1, Fade(ui::kAccent, 0.5f));
+        DrawTextU("채팅", (int)box.x + 10, (int)box.y + 6, 15, ui::kAccent);
+        int shown = std::min((int)chatLog_.size(), 7);
+        for (int i = 0; i < shown; ++i) {
+            const std::string& line = chatLog_[chatLog_.size() - shown + i];
+            DrawTextU(line.c_str(), (int)box.x + 10, (int)box.y + 28 + i * 19, 13, ui::kText);
+        }
+    }
+    // speech bubble above the player
+    if (chatBubbleT_ > 0 && map_) {
+        Vector2 sp = GetWorldToScreen2D({ pxX_ + map_->tileset.tileWidth/2.0f, pxY_ }, cam_);
+        int fs = 15, tw = MeasureTextU(chatBubble_.c_str(), fs);
+        int bw = tw + 20, bx = (int)sp.x - bw/2, by = (int)sp.y - 46;
+        if (bx < 4) bx = 4; if (bx + bw > sw - 4) bx = sw - 4 - bw;
+        DrawRectangleRounded({ (float)bx, (float)by, (float)bw, 26 }, 0.4f, 6, Fade(WHITE, 0.95f));
+        DrawTriangle({ sp.x-6, (float)by+26 }, { sp.x+6, (float)by+26 }, { sp.x, (float)by+36 }, Fade(WHITE,0.95f));
+        DrawTextU(chatBubble_.c_str(), bx + 10, by + 5, fs, BLACK);
+    }
+    // input line at the bottom while typing
+    if (chatOpen_) {
+        Rectangle ib = { 10, (float)sh - 64, (float)sw - 20, 28 };
+        DrawRectangleRec(ib, Fade(Color{ 10, 12, 18, 255 }, 0.92f));
+        DrawRectangleLinesEx(ib, 1, ui::kAccentHi);
+        std::string shown = "말하기: " + chatInput_ + (((int)(GetTime()*2)%2) ? "_" : "");
+        DrawTextU(shown.c_str(), (int)ib.x + 8, (int)ib.y + 6, 16, ui::kText);
+        DrawTextU("Enter=전송 · ESC=취소", (int)(ib.x + ib.width - 180), (int)ib.y + 7, 13, ui::kTextDim);
+    }
+}
+
 // ----------------------------- field rendering -----------------------------
 void GamePlay::drawField() {
     if (!map_) return;
@@ -369,7 +406,7 @@ void GamePlay::drawField() {
     if (engine_.net().active())
         DrawTextU(TextFormat("MMO %d/%d명 · %s", engine_.net().playerCount(), engine_.net().maxPlayers(),
                   engine_.net().status().c_str()), 12, 58, 14, ui::kGood);
-    DrawTextU("Z/X/V:스킬  I:인벤토리  O:캐릭터  J:퀘스트  M:지도  Enter:대화  ESC:메뉴",
+    DrawTextU("Z/X/V:스킬  I:인벤토리  O:캐릭터  J:퀘스트  M:지도  Enter:대화/채팅  ESC:메뉴",
              12, screenH() - 24, 14, Fade(ui::kText, 0.7f));
     // bottom buttons: inventory (I) / equipment (C) / quests (J)
     invBtn_   = { 12,  (float)screenH() - 58, 116, 28 };
