@@ -378,6 +378,7 @@ void GamePlay::drawInventoryOverlay() {
     float gx0 = 20, gy0 = 40 + 74, cell = 92, pad = 8;
     int cols = std::max(1, (int)((sw - 40) / (cell + pad)));
     int idx = 0;
+    const Item* hovItem = nullptr;
     for (auto& pr : gs.inventory.list()) {
         const Item* it = db.item(pr.first);
         if (!it) continue;
@@ -387,6 +388,7 @@ void GamePlay::drawInventoryOverlay() {
         int cx = idx % cols, cy = idx / cols;
         Rectangle r = { gx0 + cx*(cell+pad), gy0 + cy*(cell+pad), cell, cell };
         bool hov = CheckCollisionPointRec(GetMousePosition(), r);
+        if (hov) hovItem = it;
         DrawRectangleRec(r, hov ? Color{40,46,60,255} : Color{26,30,40,255});
         DrawRectangleLinesEx(r, 1, it->kind==1?Color{225,170,75,255}:it->kind==2?ui::kAccent:Fade(WHITE,0.3f));
         if (it->iconAsset >= 0) {
@@ -400,8 +402,30 @@ void GamePlay::drawInventoryOverlay() {
     }
     if (idx == 0) DrawTextU("이 분류에 아이템이 없습니다. (DB 탭의 아이템에서 식품/장비를 만들고 획득)",
                             (int)gx0, (int)gy0, 15, ui::kTextDim);
+    // hovered item: name, effect summary, and description (설명)
+    if (hovItem) {
+        std::string eff;
+        if (hovItem->kind == 2) {
+            if (hovItem->bonusAtk) eff += TextFormat("공+%d ", hovItem->bonusAtk);
+            if (hovItem->bonusDef) eff += TextFormat("방+%d ", hovItem->bonusDef);
+            if (hovItem->bonusSpd) eff += TextFormat("속+%d ", hovItem->bonusSpd);
+        } else {
+            if (hovItem->satiety)   eff += TextFormat("포만+%d ", hovItem->satiety);
+            if (hovItem->hydration) eff += TextFormat("수분+%d ", hovItem->hydration);
+            if (hovItem->healHp)    eff += TextFormat("HP+%d ", hovItem->healHp);
+            if (hovItem->healGp)    eff += TextFormat("GP+%d ", hovItem->healGp);
+            if (hovItem->bonusAtk)  eff += TextFormat("공+%d ", hovItem->bonusAtk);
+            if (hovItem->bonusDef)  eff += TextFormat("방+%d ", hovItem->bonusDef);
+            if (hovItem->bonusSpd)  eff += TextFormat("속+%d ", hovItem->bonusSpd);
+            if (hovItem->buffSecs && (hovItem->bonusAtk||hovItem->bonusDef||hovItem->bonusSpd))
+                eff += TextFormat("(%d초) ", hovItem->buffSecs);
+        }
+        DrawTextU(TextFormat("%s   %s", hovItem->name.c_str(), eff.c_str()), 20, sh - 70, 16, ui::kAccentHi);
+        if (!hovItem->description.empty())
+            DrawTextU(hovItem->description.c_str(), 20, sh - 48, 14, ui::kText);
+    }
     DrawTextU("아이템 클릭: 식품=먹기(포만/수분/HP/GP 회복) · 장비=장착",
-              20, sh - 28, 14, ui::kTextDim);
+              20, sh - 26, 14, ui::kTextDim);
 }
 
 // ---- C: body-part equipment window ----

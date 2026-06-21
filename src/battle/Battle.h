@@ -15,6 +15,7 @@ struct BattleEnemy {
     int hp = 0, maxHp = 0, mp = 0;
     int atk = 0, def = 0, spd = 0;
     int expReward = 0, goldReward = 0;
+    int spriteAsset = -1;       // enemy battler image (from EnemyDef)
     bool alive() const { return hp > 0; }
 };
 

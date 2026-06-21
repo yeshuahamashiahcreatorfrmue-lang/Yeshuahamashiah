@@ -39,6 +39,9 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
+    if (const char* c = getenv("TSUKURU_DBCAT")) { // debug: pick DB category + first entry
+        tab_ = Tab::Database; dbCategory_ = atoi(c); dbSelected_ = 0;
+    }
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
     if (getenv("TSUKURU_OBJ")) { tab_ = Tab::Map; objMode_ = true; }   // debug: object mode
     if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview

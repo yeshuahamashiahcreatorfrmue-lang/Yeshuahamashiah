@@ -149,7 +149,9 @@ void Menu::drawItems() {
                 if (it->buffSecs && (it->bonusAtk||it->bonusDef||it->bonusSpd)) d += TextFormat("(%d초) ", it->buffSecs);
                 if (d.empty()) d = "효과 없음";
             }
-            DrawTextU(d.c_str(), (int)r.x + 16, (int)(r.y + r.height - 52), 15, ui::kGood);
+            DrawTextU(d.c_str(), (int)r.x + 16, (int)(r.y + r.height - 72), 15, ui::kGood);
+            if (!it->description.empty())
+                DrawTextU(it->description.c_str(), (int)r.x + 16, (int)(r.y + r.height - 50), 14, ui::kText);
         }
     }
     DrawTextU("Enter: 사용/장착   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);

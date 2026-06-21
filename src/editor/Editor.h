@@ -118,6 +118,7 @@ private:
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;
     int  dbNameFocus_ = -1;
+    int  dbDescFocus_ = -1;   // item description text-field focus
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

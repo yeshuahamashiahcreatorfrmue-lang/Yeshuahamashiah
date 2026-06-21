@@ -14,6 +14,7 @@ Battle::Battle(Database& db, GameState& state, const std::vector<int>& enemyIds)
         e.hp = e.maxHp = d->maxHp; e.mp = d->maxMp;
         e.atk = d->atk; e.def = d->def; e.spd = d->spd;
         e.expReward = d->expReward; e.goldReward = d->goldReward;
+        e.spriteAsset = d->spriteAsset;
         enemies_.push_back(e);
     }
     if (enemies_.empty()) { result_ = BattleResult::Victory; return; }

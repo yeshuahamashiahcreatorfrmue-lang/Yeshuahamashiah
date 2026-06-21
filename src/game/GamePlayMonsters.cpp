@@ -240,7 +240,13 @@ void GamePlay::drawBattle() {
     for (int i = 0; i < (int)ens.size(); ++i) {
         const BattleEnemy& e = ens[i];
         int x = 120 + i * 200, y = 110;
-        DrawRectangle(x, y, 140, 90, e.alive() ? Color{ 200, 90, 90, 255 } : Color{ 70, 70, 82, 255 });
+        if (e.spriteAsset >= 0) {   // draw the enemy battler image when assigned
+            const Texture2D& tx = engine_.assetTexture(e.spriteAsset);
+            Color tint = e.alive() ? WHITE : Color{ 90, 90, 100, 255 };
+            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {(float)x,(float)y,140,90}, {0,0}, 0, tint);
+        } else {
+            DrawRectangle(x, y, 140, 90, e.alive() ? Color{ 200, 90, 90, 255 } : Color{ 70, 70, 82, 255 });
+        }
         DrawRectangleLines(x, y, 140, 90, BLACK);
         DrawTextU(e.name.c_str(), x + 6, y - 22, 16, ui::kText);
         DrawTextU(TextFormat("HP %d/%d", e.hp, e.maxHp), x + 6, y + 96, 14, e.alive() ? ui::kText : ui::kTextDim);

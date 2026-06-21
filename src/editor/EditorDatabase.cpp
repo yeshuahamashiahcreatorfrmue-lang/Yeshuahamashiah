@@ -76,6 +76,16 @@ void Editor::drawDatabaseTab() {
 
     switch (dbCategory_) {
         case 0: { Item& it = db.items[dbSelected_]; nameField(it.name);
+            // description (shown in inventory/menu as flavour/effect text)
+            ui::label("설명:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
+            {
+                Rectangle tf = { dx, dy, std::min(360.0f, dw), 28 };
+                bool focus = (dbDescFocus_ == dbSelected_);
+                if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) dbDescFocus_ = dbSelected_;
+                else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf) && dbDescFocus_ == dbSelected_) dbDescFocus_ = -1;
+                ui::textField(tf, it.description, focus, 64);
+                dy += 36;
+            }
             const char* kinds[] = {"기타","식품(음식/음료)","장비"};
             if (ui::button({dx,dy,260,26}, TextFormat("분류: %s", kinds[it.kind%3]))) it.kind=(it.kind+1)%3;
             dy+=32;
@@ -129,13 +139,31 @@ void Editor::drawDatabaseTab() {
             dy+=36;
             break; }
         case 3: { ActorDef& a = db.actors[dbSelected_]; nameField(a.name);
+            if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(a.spriteAsset), a.spriteAsset>=0))
+                cycleAsset(a.spriteAsset, AssetType::Image);
+            dy+=32;
             step("최대 HP", a.maxHp, 10, 1, 9999);
             step("최대 MP", a.maxMp, 5, 0, 9999);
             step("공격", a.atk, 1, 0, 999);
             step("방어", a.def, 1, 0, 999);
             step("속도", a.spd, 1, 0, 999);
+            // turn-based battle skills this actor can use (the battle "스킬" menu reads these)
+            DrawTextU("─ 전투 스킬 (턴제 전투에서 사용) ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=20;
+            if (db.skills.empty())
+                DrawTextU("(스킬 탭에서 스킬을 먼저 만드세요)", (int)dx, (int)dy, 13, ui::kTextDim), dy+=22;
+            for (auto& sk : db.skills) {
+                bool on = std::find(a.skills.begin(), a.skills.end(), sk.id) != a.skills.end();
+                if (ui::button({dx,dy,260,24}, (on?"[O] ":"[ - ] ")+sk.name, on)) {
+                    if (on) a.skills.erase(std::remove(a.skills.begin(),a.skills.end(),sk.id), a.skills.end());
+                    else    a.skills.push_back(sk.id);
+                }
+                dy+=27;
+            }
             break; }
         case 4: { EnemyDef& e = db.enemies[dbSelected_]; nameField(e.name);
+            if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(e.spriteAsset), e.spriteAsset>=0))
+                cycleAsset(e.spriteAsset, AssetType::Image);
+            dy+=32;
             step("최대 HP", e.maxHp, 10, 1, 9999);
             step("공격", e.atk, 1, 0, 999);
             step("방어", e.def, 1, 0, 999);
