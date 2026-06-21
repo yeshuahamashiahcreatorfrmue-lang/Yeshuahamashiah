@@ -500,6 +500,12 @@ static void testEventFields() {
     ActorDef sa; sa.id = 1; sa.maxHp = 100; sdb.actors.push_back(sa);
     GameState sg; sg.newGame(sdb, 1, -1, 1, 0, 0, 250, {{1, 3}});
     CHECK(sg.inventory.gold == 250 && sg.inventory.count(1) == 3, "새 게임 시작 골드/아이템 적용");
+    // map duplication copy semantics (tiles + events deep-copied)
+    Map ma; ma.tilemap.resize(5, 5); ma.tilemap.setTile(0, 2, 2, 9);
+    Event me; me.id = 1; me.x = 3; me.type = EventType::Shop; ma.events.push_back(me);
+    Map mb; mb.tilemap = ma.tilemap; mb.events = ma.events;
+    CHECK(mb.tilemap.tile(0, 2, 2) == 9 && mb.events.size() == 1 && mb.events[0].x == 3,
+          "맵 복제(타일/이벤트 깊은 복사)");
 }
 
 int main() {

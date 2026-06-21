@@ -132,6 +132,7 @@ private:
     void drawQuestLog();            // J: list of active/finished quests
     void drawDebugVars();           // F3: switch/variable inspector (event testing)
     void drawEventMarkers();        // floating !/?/$/+/bubble over interactable events
+    void drawHelp();                // F1: on-screen controls reference
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
@@ -180,6 +181,7 @@ private:
     std::string shopTitle_;      // shop window title (event text)
     bool  questLogOpen_ = false;// J: quest log overlay
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
+    bool  helpOpen_ = false;     // F1: controls help overlay
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

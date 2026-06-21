@@ -14,6 +14,7 @@ namespace tsukuru {
 
 void GamePlay::updateField(float dt) {
     if (!map_) return;
+    if (helpOpen_) { if (IsKeyPressed(KEY_ESCAPE)) helpOpen_ = false; return; }  // F1 help pauses
     int TS = map_->tileset.tileWidth;
 
     static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
@@ -135,6 +136,7 @@ void GamePlay::updateField(float dt) {
         const auto& gsParty = engine_.state().party;
         int spd = gsParty.empty() ? 5 : gsParty[0].spd;
         float speed = TS * std::clamp(4.0f + spd * 0.2f, 2.5f, 12.0f);
+        if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) speed *= 1.8f;  // 달리기(Shift)
         float dx = tx - pxX_, dy = ty - pxY_;
         float dist = std::sqrt(dx*dx + dy*dy);
         float step = speed * dt;

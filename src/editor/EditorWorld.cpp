@@ -238,6 +238,24 @@ void Editor::drawWorldTab() {
     dy += 38;
     if (ui::button({ dx, dy, 220, 30 }, "새 게임 시작 설정…", false)) worldStartSettings_ = true;
     dy += 38;
+    if (ui::button({ dx, dy, 220, 30 }, "맵 복제 (새 독립 맵)", false)) {
+        auto nm = p.addMap(m->name + " 복사본", m->tilemap.width(), m->tilemap.height());
+        nm->tilemap = m->tilemap;            // tiles + collision (deep copy)
+        nm->tileset = m->tileset;
+        nm->events = m->events;              // events copied (ids are per-map)
+        nm->encounterEnemies = m->encounterEnemies;
+        nm->encounterRate = m->encounterRate;
+        nm->bgmAsset = m->bgmAsset; nm->darkness = m->darkness;
+        nm->weather = m->weather; nm->dayNight = m->dayNight;
+        nm->animTiles = m->animTiles;        // (placed/world pos intentionally left default)
+        activeMapId_ = nm->id;
+        worldSelected_ = (int)p.maps.size() - 1;
+        dropMapThumb(nm->id);
+        p.save();
+        setStatus(std::string("맵 복제됨: ") + nm->name);
+        return;
+    }
+    dy += 38;
     if ((int)p.maps.size() > 1) {
         if (ui::button({ dx, dy, 220, 30 }, "맵 삭제", false)) {
             int delId = m->id;

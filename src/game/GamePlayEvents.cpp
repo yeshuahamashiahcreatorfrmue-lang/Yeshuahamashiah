@@ -441,6 +441,36 @@ void GamePlay::drawEventMarkers() {
     }
 }
 
+// F1: a concise on-screen reference of every control (the key set has grown).
+void GamePlay::drawHelp() {
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.7f));
+    Rectangle box = { sw/2.0f - 260, sh/2.0f - 220, 520, 440 };
+    ui::panel(box);
+    DrawTextU("조작 도움말   (F1 또는 ESC 로 닫기)", (int)box.x + 18, (int)box.y + 14, 22, ui::kAccent);
+    struct Row { const char* k; const char* d; };
+    static const Row rows[] = {
+        { "방향키 / WASD", "이동" },
+        { "Shift (이동 중)", "달리기" },
+        { "Enter", "대화 / 상호작용" },
+        { "Z / Space", "기본 공격(스킬1)" },
+        { "X / V / F / G", "스킬 2~5" },
+        { "I", "인벤토리 (우클릭=버리기)" },
+        { "C", "장비 (신체 부위)" },
+        { "J", "퀘스트 일지" },
+        { "ESC", "메뉴 (아이템/장비/상태/설정/저장)" },
+        { "F1", "이 도움말" },
+        { "F2", "에디터로 전환" },
+        { "F3", "스위치/변수 보기(디버그)" },
+    };
+    int y = (int)box.y + 56;
+    for (const auto& r : rows) {
+        DrawTextU(r.k, (int)box.x + 24, y, 18, ui::kAccentHi);
+        DrawTextU(r.d, (int)box.x + 230, y, 18, ui::kText);
+        y += 30;
+    }
+}
+
 // F3: a read-only inspector of all switches & variables — invaluable for testing
 // event logic (conditions, quest flags, choice results) without guesswork.
 void GamePlay::drawDebugVars() {
