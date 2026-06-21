@@ -135,6 +135,7 @@ private:
     RenderTexture2D worldBigThumb_{}; // hi-res preview texture (built on demand)
     int  worldBigId_ = -1;            // map id the big preview was built for
     int  worldPreviewMapId_ = -1;     // map currently shown in the overlay (navigable)
+    int  worldPrevSelEvent_ = -1;     // event whose info box is shown in the overlay
     std::vector<int> worldPreviewStack_; // back-stack for entering building interiors
     int  scrollDragAxis_ = 0;         // map-canvas scrollbar drag: 1=horizontal, 2=vertical
     std::unordered_map<int, RenderTexture2D> mapThumbs_;  // map id -> cached thumbnail

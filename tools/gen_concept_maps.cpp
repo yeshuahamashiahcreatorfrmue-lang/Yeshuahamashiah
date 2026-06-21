@@ -305,7 +305,7 @@ int main(int argc,char**argv){
             if (m->tileset.assetId != tilesId) continue;          // only concept-tileset maps
             if (m->name.rfind("내부:", 0) == 0) continue;          // skip interiors themselves
             int MW = m->tilemap.width(), MH = m->tilemap.height();
-            int cap = 6, cnt = 0;
+            int cap = 64, cnt = 0;                                // cover EVERY building door
             for (int y=0; y<MH && cnt<cap; ++y) for (int x=0; x<MW && cnt<cap; ++x) {
                 int t1 = m->tilemap.tile(1,x,y);
                 if (t1 != DOOR && t1 != GATE) continue;

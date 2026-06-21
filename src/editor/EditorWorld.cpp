@@ -496,38 +496,80 @@ void Editor::drawWorldPreviewOverlay() {
         DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, imgR, {0,0}, 0, WHITE);
         DrawRectangleLinesEx({ bx-3,by-3,pw+6,ph+6 }, 1, Fade(BLACK, 0.6f));
 
-        // ---- markers (events: NPCs / entrances / mob spawns / generic) ----
+        // ---- markers: events (NPC/입구/몹/이벤트) + zone gates (동서남북) ----
         int mw = pm->tilemap.width(), mh = pm->tilemap.height();
+        Vector2 mouse = GetMousePosition();
+        auto t2s = [&](float tx, float ty){ return Vector2{ bx + (tx+0.5f)/mw*pw, by + (ty+0.5f)/mh*ph }; };
         if (mw > 0 && mh > 0) {
             float r = std::max(5.0f, std::min(pw/mw, ph/mh) * 0.5f);
-            Vector2 mouse = GetMousePosition();
+            bool hitMarker = false;
             for (auto& e : pm->events) {
-                Vector2 sp = { bx + (e.x + 0.5f)/mw*pw, by + (e.y + 0.5f)/mh*ph };
+                Vector2 sp = t2s((float)e.x, (float)e.y);
                 bool entrance = (e.type == EventType::Teleport && e.targetMap >= 0);
-                Color col;
-                if (entrance)                         col = ui::kGood;                       // 문(입구)
-                else if (e.type == EventType::StartBattle) col = ui::kDanger;                 // 몹 스폰
-                else if (e.graphicAsset >= 0)         col = ui::factionColor((int)e.faction); // NPC
-                else                                   col = Color{240,210,80,255};            // 이벤트
+                Color col = entrance ? ui::kGood
+                          : e.type == EventType::StartBattle ? ui::kDanger
+                          : e.graphicAsset >= 0 ? ui::factionColor((int)e.faction)
+                                                : Color{240,210,80,255};
                 DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
                 DrawCircleV(sp, r, col);
-                if (entrance) {
-                    DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE);
-                    bool hov = CheckCollisionPointCircle(mouse, sp, r + 5);
-                    if (hov) {
-                        auto tgt = p.map(e.targetMap);
-                        DrawTextU(tgt ? tgt->name.c_str() : "내부", (int)sp.x + 8, (int)sp.y - 8, 14, WHITE);
-                        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) gotoMap = e.targetMap;
+                if (entrance) DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE); // 입구
+                if (worldPrevSelEvent_ == e.id) DrawCircleLines((int)sp.x, (int)sp.y, r + 5, WHITE);
+                if (CheckCollisionPointCircle(mouse, sp, r + 5)) {
+                    hitMarker = true;
+                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        if (entrance) gotoMap = e.targetMap;                 // 건물 입구 → 내부로 이동
+                        else worldPrevSelEvent_ = e.id;                      // 그 외 → 정보 표시
                     }
                 }
             }
+            // zone gates: a placed map's edge passages toward placed neighbours
+            if (pm->placed) {
+                struct G { int dx, dy; float tx, ty; const char* n; };
+                G gates[4] = {
+                    { -1, 0, 0.0f,            mh/2.0f,        "서" },
+                    {  1, 0, (float)mw - 1.0f, mh/2.0f,        "동" },
+                    {  0,-1, mw/2.0f,         0.0f,           "북" },
+                    {  0, 1, mw/2.0f,         (float)mh - 1.0f,"남" },
+                };
+                for (auto& g : gates) {
+                    auto nbm = p.mapAtWorld(pm->worldX + g.dx, pm->worldY + g.dy);
+                    if (!nbm) continue;
+                    Vector2 sp = t2s(g.tx, g.ty);
+                    DrawCircleV(sp, r + 3, Fade(BLACK, 0.7f));
+                    DrawCircleV(sp, r + 1, Color{ 90, 210, 230, 255 });
+                    DrawTextU(g.n, (int)sp.x - 5, (int)sp.y - 8, 14, BLACK);
+                    if (CheckCollisionPointCircle(mouse, sp, r + 6)) {
+                        hitMarker = true;
+                        DrawTextU(nbm->name.c_str(), (int)sp.x + 10, (int)sp.y - 8, 14, WHITE);
+                        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) gotoMap = nbm->id; // 존 → 이웃 맵으로
+                    }
+                }
+            }
+            if (!hitMarker && CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+                worldPrevSelEvent_ = -1;                                     // empty click clears info
+        }
+        // ---- info box for the selected (non-navigating) marker ----
+        if (worldPrevSelEvent_ >= 0) {
+            Event* se = nullptr; for (auto& e : pm->events) if (e.id == worldPrevSelEvent_) se = &e;
+            if (se) {
+                const char* tn[] = { "메시지","이동","아이템지급","스위치","전투발생","상점","퀘스트","엔딩" };
+                const char* kind = se->graphicAsset >= 0
+                    ? (se->faction==NpcFaction::Enemy?"몹 (적)":se->faction==NpcFaction::Ally?"NPC (아군)":"NPC (중립)")
+                    : tn[(int)se->type];
+                Rectangle ib = { bx + 4, by + 4, 260, 92 };
+                DrawRectangleRec(ib, Color{ 15, 17, 24, 235 });
+                DrawRectangleLinesEx(ib, 1, ui::kAccent);
+                DrawTextU(TextFormat("종류: %s", kind), (int)ib.x + 8, (int)ib.y + 6, 15, ui::kAccentHi);
+                DrawTextU(TextFormat("위치: (%d, %d)", se->x, se->y), (int)ib.x + 8, (int)ib.y + 30, 13, ui::kText);
+                if (!se->text.empty())
+                    DrawTextU(("\"" + se->text + "\"").c_str(), (int)ib.x + 8, (int)ib.y + 52, 13, ui::kTextDim);
+            } else worldPrevSelEvent_ = -1;
         }
         // ---- legend ----
         float ly = by + ph + 10, lx = bx;
         auto chip = [&](Color c, const char* t){ DrawCircle((int)lx+6,(int)ly+8,6,c); DrawTextU(t,(int)lx+16,(int)ly+1,13,ui::kText); lx += 18 + MeasureTextU(t,13) + 16; };
-        chip(ui::kGood, "문/입구(클릭=내부)"); chip(ui::factionColor(0), "NPC");
-        chip(ui::factionColor(1), "아군"); chip(ui::factionColor(2), "적/몹");
-        chip(Color{240,210,80,255}, "이벤트");
+        chip(ui::kGood, "건물입구(클릭=내부)"); chip(Color{90,210,230,255}, "존통로(클릭=이동)");
+        chip(ui::factionColor(0), "NPC"); chip(ui::factionColor(2), "적/몹"); chip(Color{240,210,80,255}, "이벤트");
     } else {
         DrawTextU("미리보기 생성 중…", sw/2 - 70, sh/2, 18, ui::kTextDim);
     }
@@ -545,15 +587,18 @@ void Editor::drawWorldPreviewOverlay() {
                       && !CheckCollisionPointRec(mp, imgR)
                       && !CheckCollisionPointRec(mp, ctlZone);
 
-    if (gotoMap >= 0) {                        // enter a building interior
+    if (gotoMap >= 0) {                        // enter a building interior / cross a zone gate
         worldPreviewStack_.push_back(worldPreviewMapId_);
         worldPreviewMapId_ = gotoMap;
+        worldPrevSelEvent_ = -1;
     } else if (back) {                         // step back out
         worldPreviewMapId_ = worldPreviewStack_.back();
         worldPreviewStack_.pop_back();
+        worldPrevSelEvent_ = -1;
     } else if (close || clickedEmpty || IsKeyPressed(KEY_ESCAPE)) {
         worldPreviewFull_ = false;
         worldPreviewStack_.clear();
+        worldPrevSelEvent_ = -1;
     }
 }
 

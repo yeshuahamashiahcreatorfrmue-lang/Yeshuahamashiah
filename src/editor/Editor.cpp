@@ -42,9 +42,11 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
     if (getenv("TSUKURU_OBJ")) { tab_ = Tab::Map; objMode_ = true; }   // debug: object mode
     if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview
-        tab_ = Tab::World; worldSelected_ = 0;
-        worldPreviewFull_ = true;
-        if (auto m = activeMap()) worldPreviewMapId_ = m->id;
+        tab_ = Tab::World; worldSelected_ = 0; worldPreviewFull_ = true;
+        Project& pp = engine_.project();
+        worldPreviewMapId_ = pp.maps.empty() ? -1 : pp.maps.front()->id;
+        for (int i = 0; i < (int)pp.maps.size(); ++i)   // prefer a placed map (shows zone gates)
+            if (pp.maps[i]->placed) { worldSelected_ = i; worldPreviewMapId_ = pp.maps[i]->id; break; }
     }
 }
 
