@@ -3,6 +3,7 @@
 #include "core/Audio.h"
 #include "render/UI.h"
 #include "core/Text.h"
+#include "game/SaveMeta.h"
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
@@ -146,18 +147,26 @@ void Menu::drawSettings() {
 }
 
 void Menu::drawSave() {
-    Rectangle r = { 40, 40, 460, 280 };
+    Rectangle r = { 40, 40, 520, 300 };
     ui::panel(r);
     ui::label("저장 — 슬롯 선택", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
     for (int i = 0; i < 3; ++i) {
-        int y = (int)r.y + 60 + i * 50;
+        int y = (int)r.y + 56 + i * 60;
         Color c = i == selection_ ? ui::kAccentHi : ui::kText;
         fs::path f = fs::path(engine_.project().dir) / "save" / ("slot" + std::to_string(i + 1) + ".json");
-        std::error_code ec; bool used = fs::exists(f, ec);
-        DrawTextU(TextFormat("%s 슬롯 %d  %s", i == selection_ ? ">" : " ", i + 1,
-                  used ? "(저장됨)" : "(비어 있음)"), (int)r.x + 16, y, 20, c);
+        SaveMeta m = readSaveMeta(f);
+        DrawTextU(TextFormat("%s 슬롯 %d", i == selection_ ? ">" : " ", i + 1), (int)r.x + 16, y, 20, c);
+        if (m.exists) {
+            std::string mapName = "맵 " + std::to_string(m.currentMap);
+            if (auto mp = engine_.project().map(m.currentMap)) mapName = mp->name;
+            DrawTextU(TextFormat("Lv %d   %s   %s   %d G", m.level, mapName.c_str(),
+                      formatPlayTime(m.playSeconds).c_str(), m.gold),
+                      (int)r.x + 40, y + 26, 15, ui::kTextDim);
+        } else {
+            DrawTextU("(비어 있음)", (int)r.x + 40, y + 26, 15, ui::kTextDim);
+        }
     }
-    DrawTextU("위/아래: 선택   Enter: 저장   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
+    DrawTextU("위/아래: 선택   Enter: 저장   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 26), 14, ui::kTextDim);
 }
 
 void Menu::drawItems() {

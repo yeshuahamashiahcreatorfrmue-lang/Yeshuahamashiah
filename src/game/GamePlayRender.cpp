@@ -122,6 +122,44 @@ void GamePlay::drawMinimap() {
     DrawRectangle(ox+(int)(destX_*s)-1, oy+(int)(destY_*s)-1, 4,4, WHITE);
 }
 
+// M: a large overview of the whole current map (reuses the cached minimap texture
+// plus event/NPC/monster/player markers and a legend).
+void GamePlay::drawFullMap() {
+    if (!map_) return;
+    drawMinimap();   // ensures minimapTex_ is built/valid for this map
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.78f));
+    int w = map_->tilemap.width(), h = map_->tilemap.height();
+
+    // fit the map into a centred box leaving margins for title/legend
+    float availW = sw - 120, availH = sh - 150;
+    float s = std::min(availW / w, availH / h);
+    int dw = (int)(w * s), dh = (int)(h * s);
+    int ox = (sw - dw) / 2, oy = (sh - dh) / 2 + 10;
+
+    DrawTextU(map_->name.empty() ? "전체 지도" : map_->name.c_str(), ox, oy - 40, 28, ui::kAccent);
+    DrawRectangleLinesEx({ (float)ox-2, (float)oy-2, (float)dw+4, (float)dh+4 }, 2, Fade(ui::kAccent,0.7f));
+    DrawTexturePro(minimapTex_, { 0,0,(float)w,(float)h },
+                   { (float)ox,(float)oy,(float)dw,(float)dh }, {0,0}, 0, WHITE);
+
+    auto plot = [&](int tx, int ty, int sz, Color c){ DrawRectangle(ox+(int)(tx*s)-sz/2, oy+(int)(ty*s)-sz/2, sz, sz, c); };
+    // interactable events (teleport/quest/shop/etc.)
+    for (auto& e : map_->events) if (e.enabled) plot(e.x, e.y, 5, Color{120,200,255,255});
+    for (auto& n : npcs_)     plot(n.x, n.y, 5, YELLOW);
+    for (auto& mo : monsters_) if (mo.alive()) plot(mo.x, mo.y, 5, RED);
+    // player (blinking)
+    if (((int)(GetTime()*3)) % 2 == 0) plot(destX_, destY_, 8, WHITE);
+    else plot(destX_, destY_, 8, Color{120,220,120,255});
+
+    // legend + hint
+    int ly = oy + dh + 16;
+    DrawRectangle(ox,      ly, 10,10, WHITE);  DrawTextU("플레이어", ox+16,  ly-3, 15, ui::kText);
+    DrawRectangle(ox+110,  ly, 10,10, YELLOW); DrawTextU("NPC",      ox+126, ly-3, 15, ui::kText);
+    DrawRectangle(ox+200,  ly, 10,10, RED);    DrawTextU("적",       ox+216, ly-3, 15, ui::kText);
+    DrawRectangle(ox+270,  ly, 10,10, Color{120,200,255,255}); DrawTextU("이벤트", ox+286, ly-3, 15, ui::kText);
+    DrawTextU("M 또는 ESC: 닫기", ox + dw - MeasureTextU("M 또는 ESC: 닫기",15), ly-3, 15, ui::kTextDim);
+}
+
 void GamePlay::visibleRange(int& x0,int& y0,int& x1,int& y1) const {
     int TS = map_->tileset.tileWidth;
     Vector2 tl = GetScreenToWorld2D({0,0}, cam_);

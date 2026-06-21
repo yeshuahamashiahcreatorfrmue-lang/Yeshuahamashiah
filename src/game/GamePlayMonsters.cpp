@@ -72,7 +72,8 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
     gs.addKillProgress(m.enemyId);    // 처치형 퀘스트 진행
     refreshQuestObjective();
     engine_.audio().playSfx("defeat", 0.8f);
-    if (!gs.party.empty() && gs.party[0].level > beforeLv) engine_.audio().playSfx("levelup");
+    bool leveled = !gs.party.empty() && gs.party[0].level > beforeLv;
+    if (leveled) engine_.audio().playSfx("levelup");
     // boss gate: when the last monster of a tagged troop dies, flip its switch
     if (m.defeatSwitch >= 0) {
         bool anyLeft = false;
@@ -95,7 +96,8 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
             toast_ += "   [" + (it ? it->name : std::string("아이템")) + " 획득!]";
         }
     }
-    toastTimer_ = 1.8f;
+    if (leveled) toast_ += "   ★레벨 업! Lv " + std::to_string(gs.party[0].level);
+    toastTimer_ = leveled ? 2.6f : 1.8f;
     TraceLog(LOG_INFO, "KILL: %s  party gold=%d exp=%d lv=%d", m.name.c_str(),
              gs.inventory.gold, gs.party.empty()?0:gs.party[0].exp,
              gs.party.empty()?0:gs.party[0].level);

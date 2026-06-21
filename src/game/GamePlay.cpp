@@ -66,6 +66,7 @@ void GamePlay::onEnter() {
         showMessageEx("이 마을은 오랜 옛날부터 예슈아한민족진리복종마을이라 불렸으며, 북쪽 산맥의 동굴 깊은 곳에는 마을을 지키는 신비한 크리스탈이 잠들어 있다고 전해진다. 자네가 그것을 되찾아 준다면 온 마을이 자네를 영웅으로 기릴 것이네.",
                       "마을 장로", -1, {}, -1, -1);
     if (getenv("TSUKURU_HELP")) helpOpen_ = true; // debug: open F1 help overlay
+    if (getenv("TSUKURU_FULLMAP")) fullMapOpen_ = true; // debug: open M full-map overlay
     if (getenv("TSUKURU_DEBUGVARS")) {            // debug: seed some flags + open F3 inspector
         GameState& g = engine_.state();
         g.setSwitch(10, true); g.setSwitch(40, true); g.setVar(1, 5); g.setVar(2, 12);
@@ -105,6 +106,23 @@ void GamePlay::loadMap(int id) {
     spawnNpcs();
     carveZoneGates();      // ensure the middle-edge gates toward neighbours are walkable
     if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
+
+    // Autosave on genuine map transitions (not the very first load / quickload),
+    // so progress survives even if the player never opens the save menu.
+    if (autosaveArmed_) autoSave();
+    autosaveArmed_ = true;
+}
+
+// Silent background save written whenever the player crosses into a new map.
+void GamePlay::autoSave() {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::path(engine_.project().dir) / "save";
+    std::error_code ec; fs::create_directories(dir, ec);
+    std::ofstream f((dir / "auto.json").string());
+    if (f) {
+        f << engine_.state().toJson().dump(2);
+        toast_ = "자동 저장됨"; toastTimer_ = 1.2f;
+    }
 }
 
 // ----------------------------- lifecycle / dispatch -----------------------------
@@ -148,6 +166,8 @@ void GamePlay::update(float dt) {
 
     if (toastTimer_ > 0) toastTimer_ -= dt;
     if (areaBannerT_ > 0) areaBannerT_ -= dt;
+    if (phase_ != Phase::GameOver && phase_ != Phase::GameClear)
+        engine_.state().playSeconds += dt;   // accumulate play time for save metadata
 
     switch (phase_) {
         case Phase::Field: updateField(dt); break;
@@ -206,6 +226,7 @@ void GamePlay::draw() {
     }
     if (phase_ == Phase::Shop)   { drawField(); drawShop(); return; }
     drawField();
+    if (fullMapOpen_) drawFullMap();
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();
     if (questLogOpen_) drawQuestLog();

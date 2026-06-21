@@ -67,6 +67,10 @@ void GamePlay::updateField(float dt) {
         if (IsKeyPressed(KEY_ESCAPE)) { invOpen_ = equipOpen_ = questLogOpen_ = false; }
         return;
     }
+    // M: full-map overview. Toggling runs every frame so pressing M again (or ESC)
+    // closes it; while open the field is frozen.
+    if (IsKeyPressed(KEY_M)) fullMapOpen_ = !fullMapOpen_;
+    if (fullMapOpen_) { if (IsKeyPressed(KEY_ESCAPE)) fullMapOpen_ = false; return; }
 
     // hunger / thirst drain — 1 per second; at 0 the player slowly loses HP
     if (!engine_.state().party.empty()) {

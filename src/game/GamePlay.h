@@ -44,6 +44,7 @@ private:
     void loadMap(int id);
     void quickSave();   // F9: instant save to save/quick.json
     void quickLoad();   // F12: restore save/quick.json
+    void autoSave();    // silent save on map transition (save/auto.json)
 
     // --- movement (GamePlayMovement.cpp) ---
     void updateField(float dt);
@@ -138,6 +139,7 @@ private:
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float wScale = 1.0f, float hScale = 1.0f);
     void drawWeather(float dt);
     void drawMinimap();
+    void drawFullMap();   // M: full-screen map overview
     void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling
 
     Engine& engine_;
@@ -165,6 +167,7 @@ private:
     Rectangle skillBtn_[kSkillSlots] = {}; // screen rects for click/touch casting
     float mpRegen_ = 0;         // MP regenerates slowly over time
     float hpRegen_ = 0;         // HP regenerates out of combat when well-fed
+    bool  autosaveArmed_ = false; // false until the first map loads (skip autosave on entry)
     std::vector<FieldSkill> skills_;       // active skill set (from db or defaults)
 
     // survival + inventory/equipment windows
@@ -179,6 +182,7 @@ private:
     std::string shopTitle_;      // shop window title (event text)
     int   shopMode_ = 0;         // 0 = 구매(buy), 1 = 판매(sell at half price)
     bool  questLogOpen_ = false;// J: quest log overlay
+    bool  fullMapOpen_ = false; // M: full-map overview overlay
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
 

@@ -92,6 +92,7 @@ public:
     int  currentMap = -1;
     int  playerX = 0, playerY = 0;
     int  playerDir = 0; // Direction
+    double playSeconds = 0;  // accumulated play time (for save-slot metadata)
     std::string objective;   // current quest objective shown on the HUD
 
     // --- quests (keyed by giver event) ---

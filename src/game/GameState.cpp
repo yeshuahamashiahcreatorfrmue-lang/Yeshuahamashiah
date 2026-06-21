@@ -87,6 +87,7 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
     }
     currentMap = startMap;
     playerX = sx; playerY = sy; playerDir = 0;
+    playSeconds = 0;
     objective.clear();
 }
 
@@ -204,7 +205,8 @@ json GameState::toJson() const {
     for (const auto& kv : quests) { json e = kv.second.toJson(); e["key"] = kv.first; qs.push_back(e); }
     return {{"inventory", inventory.toJson()}, {"party", pt},
             {"currentMap", currentMap}, {"playerX", playerX}, {"playerY", playerY},
-            {"playerDir", playerDir}, {"switches", sw}, {"variables", vr},
+            {"playerDir", playerDir}, {"playSeconds", playSeconds},
+            {"switches", sw}, {"variables", vr},
             {"objective", objective}, {"equipped", eq}, {"buffs", bf}, {"quests", qs}};
 }
 
@@ -215,6 +217,7 @@ void GameState::fromJson(const json& j) {
     currentMap = j.value("currentMap", -1);
     playerX = j.value("playerX", 0); playerY = j.value("playerY", 0);
     playerDir = j.value("playerDir", 0);
+    playSeconds = j.value("playSeconds", 0.0);
     objective = j.value("objective", std::string());
     switches_.clear();
     for (const auto& s : j.value("switches", json::array())) switches_[s.value("id",-1)] = s.value("v", false);

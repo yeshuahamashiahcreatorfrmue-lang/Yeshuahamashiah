@@ -2,6 +2,8 @@
 #include "core/Engine.h"
 #include "render/UI.h"
 #include "core/Text.h"
+#include "game/SaveMeta.h"
+#include <vector>
 #include <filesystem>
 #include <fstream>
 
@@ -12,12 +14,16 @@ namespace tsukuru {
 
 TitleScreen::TitleScreen(Engine& engine) : engine_(engine) {}
 
-// Newest existing save among slot1..3 (empty if none) — "이어하기" loads this.
+// Newest existing save among slot1..3 + quick + auto (empty if none) —
+// "이어하기" loads whichever was written most recently.
 static fs::path latestSave(const std::string& projectDir) {
     fs::path dir = fs::path(projectDir) / "save";
+    std::vector<fs::path> candidates = {
+        dir / "slot1.json", dir / "slot2.json", dir / "slot3.json",
+        dir / "quick.json", dir / "auto.json"
+    };
     fs::path best; fs::file_time_type bestT{};
-    for (int i = 1; i <= 3; ++i) {
-        fs::path f = dir / ("slot" + std::to_string(i) + ".json");
+    for (const auto& f : candidates) {
         std::error_code ec;
         if (!fs::exists(f, ec)) continue;
         auto t = fs::last_write_time(f, ec);
@@ -98,6 +104,11 @@ void TitleScreen::draw() {
     for (int i = 0; i < 5; ++i) {
         Color c = !enabled[i] ? ui::kTextDim : (i == selection_ ? ui::kAccentHi : ui::kText);
         std::string text = (i == selection_ ? "> " : "  ") + std::string(opts[i]);
+        // annotate "이어하기" with the most recent save's headline (Lv / 플레이타임)
+        if (i == 1 && enabled[1]) {
+            SaveMeta m = readSaveMeta(latestSave(engine_.project().dir));
+            if (m.exists) text += "  (Lv " + std::to_string(m.level) + " · " + formatPlayTime(m.playSeconds) + ")";
+        }
         int w = MeasureTextU(text.c_str(), 26);
         DrawTextU(text.c_str(), (sw - w) / 2, oy + i * 40, 26, c);
     }

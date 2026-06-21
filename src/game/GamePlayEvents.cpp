@@ -353,7 +353,10 @@ void GamePlay::grantQuestReward(const Event& e) {
     const Database& db = engine_.project().database;
     std::string r;
     if (e.rewardGold > 0) { gs.inventory.gold += e.rewardGold; r += TextFormat("골드 +%d   ", e.rewardGold); }
+    int beforeLv = gs.party.empty() ? 0 : gs.party[0].level;
     if (e.rewardExp > 0 && !gs.party.empty()) { gs.party[0].gainExp(e.rewardExp); r += TextFormat("경험치 +%d   ", e.rewardExp); }
+    if (!gs.party.empty() && gs.party[0].level > beforeLv)
+        r += TextFormat("★레벨 업! Lv %d   ", gs.party[0].level);
     if (e.rewardItemId >= 0) {
         gs.inventory.addItem(e.rewardItemId, std::max(1, e.rewardItemCount));
         const Item* it = db.item(e.rewardItemId);
@@ -503,7 +506,7 @@ void GamePlay::drawEventMarkers() {
 void GamePlay::drawHelp() {
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.7f));
-    Rectangle box = { sw/2.0f - 260, sh/2.0f - 220, 520, 440 };
+    Rectangle box = { sw/2.0f - 260, sh/2.0f - 240, 520, 480 };
     ui::panel(box);
     DrawTextU("조작 도움말   (F1 또는 ESC 로 닫기)", (int)box.x + 18, (int)box.y + 14, 22, ui::kAccent);
     struct Row { const char* k; const char* d; };
@@ -516,6 +519,7 @@ void GamePlay::drawHelp() {
         { "I", "인벤토리 (우클릭=버리기)" },
         { "C", "장비 (신체 부위)" },
         { "J", "퀘스트 일지" },
+        { "M", "전체 지도 보기" },
         { "ESC", "메뉴 (아이템/장비/상태/설정/저장)" },
         { "F1", "이 도움말" },
         { "F2", "에디터로 전환" },
