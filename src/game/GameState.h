@@ -18,6 +18,8 @@ struct PartyMember {
     int exp = 0;
     int hp = 0, mp = 0;            // current
     int maxHp = 0, maxMp = 0;      // effective (base + level growth)
+    int hunger = 42000, thirst = 42000;   // current 포만치 / 수분치 (허기·목마름)
+    int maxHunger = 42000, maxThirst = 42000;
     int atk = 0, def = 0, spd = 0; // base (equipment added on top)
     int weaponId = -1;             // equipped equipment ids (-1 none)
     int armorId  = -1;
@@ -39,6 +41,9 @@ class GameState {
 public:
     Inventory inventory;
     std::vector<PartyMember> party;
+    // body-part equipment: slot 1..7 (머리/몸통/손/다리/발/무기/장신구) -> item id
+    std::map<int,int> equipped;
+    int equipBonus(const Database& db, int which) const; // which: 0 atk,1 def,2 spd — sum of equipped items
 
     int  currentMap = -1;
     int  playerX = 0, playerY = 0;

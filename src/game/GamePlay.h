@@ -97,6 +97,12 @@ private:
     void updateMotion(float dt);             // advance the current motion's frames
     int  motionFrameAsset() const;           // current frame's image id, or -1 (use sheet)
 
+    // --- survival (hunger/thirst), inventory grid & body-part equipment ---
+    void drawInventoryOverlay();   // I key: rectangular item grid (식품/장비/기타)
+    void drawEquipOverlay();       // C key: body-part equipment window
+    void useOrEquipItem(int itemId); // consume food (restore) or equip equipment
+    void unequipSlot(int slot);
+
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float wScale = 1.0f, float hScale = 1.0f);
@@ -129,6 +135,13 @@ private:
     Rectangle skillBtn_[kSkillSlots] = {}; // screen rects for click/touch casting
     float mpRegen_ = 0;         // MP regenerates slowly over time
     std::vector<FieldSkill> skills_;       // active skill set (from db or defaults)
+
+    // survival + inventory/equipment windows
+    float survivalAcc_ = 0;     // accumulates dt to drain hunger/thirst 1/sec
+    bool  invOpen_ = false;     // I: inventory grid window open
+    bool  equipOpen_ = false;   // C: body-part equipment window open
+    int   invCat_ = 0;          // inventory category tab (0 전체/1 식품/2 장비/3 기타)
+    Rectangle invBtn_{}, equipBtn_{}; // bottom HUD buttons
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

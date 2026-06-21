@@ -22,13 +22,15 @@ PartyMember PartyMember::fromActor(const ActorDef& d) {
     m.maxHp = d.maxHp; m.maxMp = d.maxMp;
     m.hp = d.maxHp; m.mp = d.maxMp;
     m.atk = d.atk; m.def = d.def; m.spd = d.spd;
+    m.maxHunger = m.hunger = 42000; m.maxThirst = m.thirst = 42000;
     return m;
 }
 
 void PartyMember::applyCharacter(const CharacterDef& c) {
     maxHp = c.maxHp; maxMp = c.maxGp;      // 기력(GP) is stored in maxMp at runtime
+    maxHunger = c.maxHunger; maxThirst = c.maxThirst;
     atk = c.atk; def = c.def; spd = c.spd;
-    hp = maxHp; mp = maxMp;
+    hp = maxHp; mp = maxMp; hunger = maxHunger; thirst = maxThirst;
 }
 
 void PartyMember::gainExp(int amount) {
@@ -46,6 +48,7 @@ void PartyMember::gainExp(int amount) {
 json PartyMember::toJson() const {
     return {{"actorId", actorId}, {"level", level}, {"exp", exp},
             {"hp", hp}, {"mp", mp}, {"maxHp", maxHp}, {"maxMp", maxMp},
+            {"hunger", hunger}, {"thirst", thirst}, {"maxHunger", maxHunger}, {"maxThirst", maxThirst},
             {"atk", atk}, {"def", def}, {"spd", spd},
             {"weaponId", weaponId}, {"armorId", armorId}};
 }
@@ -57,6 +60,8 @@ PartyMember PartyMember::fromJson(const json& j) {
     m.hp = j.value("hp", 0); m.mp = j.value("mp", 0);
     m.maxHp = j.value("maxHp", 0); m.maxMp = j.value("maxMp", 0);
     m.atk = j.value("atk", 0); m.def = j.value("def", 0); m.spd = j.value("spd", 0);
+    m.hunger = j.value("hunger", 42000); m.thirst = j.value("thirst", 42000);
+    m.maxHunger = j.value("maxHunger", 42000); m.maxThirst = j.value("maxThirst", 42000);
     m.weaponId = j.value("weaponId", -1); m.armorId = j.value("armorId", -1);
     return m;
 }
@@ -65,6 +70,7 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
     party.clear();
     switches_.clear();
     variables_.clear();
+    equipped.clear();
     inventory = Inventory{};
     if (const ActorDef* a = db.actor(startActorId))
         party.push_back(PartyMember::fromActor(*a));
@@ -82,6 +88,17 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
     objective.clear();
 }
 
+// Sum a stat bonus across all body-equipped items. which: 0 atk, 1 def, 2 spd.
+int GameState::equipBonus(const Database& db, int which) const {
+    int t = 0;
+    for (const auto& kv : equipped) {
+        const Item* it = db.item(kv.second);
+        if (!it) continue;
+        t += which == 0 ? it->bonusAtk : which == 1 ? it->bonusDef : it->bonusSpd;
+    }
+    return t;
+}
+
 bool GameState::partyWiped() const {
     for (const auto& m : party) if (m.alive()) return false;
     return true;
@@ -94,10 +111,12 @@ json GameState::toJson() const {
     for (const auto& kv : variables_) vr.push_back({{"id", kv.first}, {"v", kv.second}});
     json pt = json::array();
     for (const auto& m : party) pt.push_back(m.toJson());
+    json eq = json::array();
+    for (const auto& kv : equipped) eq.push_back({{"slot", kv.first}, {"item", kv.second}});
     return {{"inventory", inventory.toJson()}, {"party", pt},
             {"currentMap", currentMap}, {"playerX", playerX}, {"playerY", playerY},
             {"playerDir", playerDir}, {"switches", sw}, {"variables", vr},
-            {"objective", objective}};
+            {"objective", objective}, {"equipped", eq}};
 }
 
 void GameState::fromJson(const json& j) {
@@ -112,6 +131,8 @@ void GameState::fromJson(const json& j) {
     for (const auto& s : j.value("switches", json::array())) switches_[s.value("id",-1)] = s.value("v", false);
     variables_.clear();
     for (const auto& v : j.value("variables", json::array())) variables_[v.value("id",-1)] = v.value("v", 0);
+    equipped.clear();
+    for (const auto& e : j.value("equipped", json::array())) equipped[e.value("slot",0)] = e.value("item",-1);
 }
 
 } // namespace tsukuru

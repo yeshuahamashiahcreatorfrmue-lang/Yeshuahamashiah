@@ -43,14 +43,34 @@ void GamePlay::updateField(float dt) {
     updateProjectiles(dt);
     updateFx(dt);
 
+    // inventory (I) / equipment (C) windows freeze the field while open; they
+    // handle their own clicks in draw(). Bottom HUD buttons toggle them too.
+    if (IsKeyPressed(KEY_I)) { invOpen_ = !invOpen_; equipOpen_ = false; }
+    if (IsKeyPressed(KEY_C)) { equipOpen_ = !equipOpen_; invOpen_ = false; }
+    if (invOpen_ || equipOpen_) {
+        if (IsKeyPressed(KEY_ESCAPE)) { invOpen_ = equipOpen_ = false; }
+        return;
+    }
+
+    // hunger / thirst drain — 1 per second; at 0 the player slowly loses HP
+    if (!engine_.state().party.empty()) {
+        survivalAcc_ += dt;
+        while (survivalAcc_ >= 1.0f) {
+            survivalAcc_ -= 1.0f;
+            PartyMember& h = engine_.state().party[0];
+            if (h.hunger > 0) --h.hunger;
+            if (h.thirst > 0) --h.thirst;
+            if ((h.hunger == 0 || h.thirst == 0) && h.hp > 1) --h.hp;
+        }
+    }
+
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }
 
     // Skills: Z/Space slot0, X slot1, C slot2, V slot3, F slot4, G slot5.
     if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_Z) || IsKeyPressed(KEY_LEFT_CONTROL))
         castSlot(0);
     if (IsKeyPressed(KEY_X)) castSlot(1);
-    if (IsKeyPressed(KEY_C)) castSlot(2);
-    if (IsKeyPressed(KEY_V)) castSlot(3);
+    if (IsKeyPressed(KEY_V)) castSlot(3);   // (C는 장비창 단축키로 사용 — 스킬은 패널 클릭)
     if (IsKeyPressed(KEY_F)) castSlot(4);
     if (IsKeyPressed(KEY_G)) castSlot(5);
     handleSkillClicks();                 // touch / mouse click on the skill panel

@@ -76,13 +76,39 @@ void Editor::drawDatabaseTab() {
 
     switch (dbCategory_) {
         case 0: { Item& it = db.items[dbSelected_]; nameField(it.name);
-            step("가격", it.price, 10, 0, 99999);
-            step("효과량", it.power, 5, 0, 9999);
-            const char* effs[] = {"없음","HP회복","MP회복","데미지"};
-            if (ui::button({dx,dy,200,26}, TextFormat("효과: %s", effs[(int)it.effect]))) it.effect=(ItemEffect)(((int)it.effect+1)%4);
+            const char* kinds[] = {"기타","식품(음식/음료)","장비"};
+            if (ui::button({dx,dy,260,26}, TextFormat("분류: %s", kinds[it.kind%3]))) it.kind=(it.kind+1)%3;
             dy+=32;
-            if (ui::button({dx,dy,200,26}, it.consumable?"소모성: 예":"소모성: 아니오")) it.consumable=!it.consumable;
-            dy+=36;
+            // icon image (cycle through image assets) + import
+            if (ui::button({dx,dy,260,26}, std::string("이미지: ")+assetName(it.iconAsset), it.iconAsset>=0))
+                cycleAsset(it.iconAsset, AssetType::Image);
+            dy+=30;
+            step("가격", it.price, 10, 0, 99999);
+            if (it.kind == 1) {                                  // 식품(food/drink)
+                DrawTextU("─ 식품 효과 ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=18;
+                step("포만도 +", it.satiety, 100, 0, 99999);
+                step("수분 +",   it.hydration, 100, 0, 99999);
+                step("HP 회복 +", it.healHp, 5, 0, 99999);
+                step("기력 회복 +", it.healGp, 5, 0, 9999);
+                DrawTextU("─ 추가 효과(영구 버프) ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=18;
+                step("공격 +", it.bonusAtk, 1, -999, 999);
+                step("방어 +", it.bonusDef, 1, -999, 999);
+                step("이동 +", it.bonusSpd, 1, -99, 99);
+            } else if (it.kind == 2) {                           // 장비(equipment)
+                const char* bn[] = {"없음","머리","몸통","손","다리","발","무기","장신구"};
+                if (ui::button({dx,dy,260,26}, TextFormat("장착 부위: %s", bn[it.bodySlot%8]))) it.bodySlot=(it.bodySlot+1)%8;
+                dy+=32;
+                step("공격 +", it.bonusAtk, 1, -999, 999);
+                step("방어 +", it.bonusDef, 1, -999, 999);
+                step("이동 +", it.bonusSpd, 1, -99, 99);
+            } else {                                             // 기타
+                step("효과량", it.power, 5, 0, 9999);
+                const char* effs[] = {"없음","HP회복","MP회복","데미지"};
+                if (ui::button({dx,dy,200,26}, TextFormat("효과: %s", effs[(int)it.effect]))) it.effect=(ItemEffect)(((int)it.effect+1)%4);
+                dy+=32;
+                if (ui::button({dx,dy,200,26}, it.consumable?"소모성: 예":"소모성: 아니오")) it.consumable=!it.consumable;
+                dy+=36;
+            }
             break; }
         case 1: { Equipment& e = db.equipment[dbSelected_]; nameField(e.name);
             if (ui::button({dx,dy,200,26}, e.slot==EquipSlot::Weapon?"슬롯: 무기":"슬롯: 방어구"))

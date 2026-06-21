@@ -18,6 +18,17 @@ struct Item {
     ItemEffect  effect = ItemEffect::None;
     int         power = 0;       // amount healed / damage dealt
     bool        consumable = true;
+    // category: 0 기타(misc) · 1 식품(food/drink) · 2 장비(equipment)
+    int         kind = 0;
+    // 식품(food) — restored / granted when eaten
+    int         satiety = 0;     // 포만도 회복
+    int         hydration = 0;   // 수분 회복
+    int         healHp = 0;      // 추가 HP 회복
+    int         healGp = 0;      // 추가 기력(GP) 회복
+    // 장비(equipment) — body slot 0 없음,1 머리,2 몸통,3 손,4 다리,5 발,6 무기,7 장신구
+    int         bodySlot = 0;
+    int         bonusAtk = 0, bonusDef = 0, bonusSpd = 0; // 장착 시 보너스(식품은 일시 효과로도 사용)
+    int         buffSecs = 0;    // 식품 버프 지속(초); 0 = 즉시효과만
 };
 
 enum class EquipSlot { Weapon, Armor };
@@ -97,6 +108,8 @@ struct CharacterDef {
     // (실제 데미지 = atk * skill.powerPct/100).
     int maxHp = 100;   // 체력
     int maxGp = 30;    // 기력 (구 MP)
+    int maxHunger = 42000; // 포만치 (허기)
+    int maxThirst = 42000; // 수분치 (목마름)
     int atk   = 12;    // 공격력 (모든 스킬 공통, 배수 이전)
     int def   = 5;     // 방어력
     int spd   = 5;     // 속도

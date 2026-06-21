@@ -102,7 +102,11 @@ json Database::toJson() const {
     for (const auto& i : items)
         j["items"].push_back({{"id", i.id}, {"name", i.name}, {"description", i.description},
             {"price", i.price}, {"iconAsset", i.iconAsset}, {"effect", effName(i.effect)},
-            {"power", i.power}, {"consumable", i.consumable}});
+            {"power", i.power}, {"consumable", i.consumable},
+            {"kind", i.kind}, {"satiety", i.satiety}, {"hydration", i.hydration},
+            {"healHp", i.healHp}, {"healGp", i.healGp}, {"bodySlot", i.bodySlot},
+            {"bonusAtk", i.bonusAtk}, {"bonusDef", i.bonusDef}, {"bonusSpd", i.bonusSpd},
+            {"buffSecs", i.buffSecs}});
 
     j["equipment"] = json::array();
     for (const auto& e : equipment)
@@ -138,7 +142,8 @@ json Database::toJson() const {
         json sk = json::array();
         for (const auto& s : c.skills) sk.push_back(skillToJson(s));
         j["characters"].push_back({{"id", c.id}, {"name", c.name},
-            {"maxHp", c.maxHp}, {"maxGp", c.maxGp}, {"atk", c.atk}, {"def", c.def}, {"spd", c.spd},
+            {"maxHp", c.maxHp}, {"maxGp", c.maxGp}, {"maxHunger", c.maxHunger}, {"maxThirst", c.maxThirst},
+            {"atk", c.atk}, {"def", c.def}, {"spd", c.spd},
             {"drawPct", c.drawPct}, {"drawTilesW", c.drawTilesW}, {"drawTilesH", c.drawTilesH},
             {"motions", mo}, {"skills", sk}});
     }
@@ -155,6 +160,10 @@ void Database::fromJson(const json& j) {
         it.description = i.value("description", ""); it.price = i.value("price", 0);
         it.iconAsset = i.value("iconAsset", -1); it.effect = effFrom(i.value("effect", "none"));
         it.power = i.value("power", 0); it.consumable = i.value("consumable", true);
+        it.kind = i.value("kind", 0); it.satiety = i.value("satiety", 0); it.hydration = i.value("hydration", 0);
+        it.healHp = i.value("healHp", 0); it.healGp = i.value("healGp", 0); it.bodySlot = i.value("bodySlot", 0);
+        it.bonusAtk = i.value("bonusAtk", 0); it.bonusDef = i.value("bonusDef", 0); it.bonusSpd = i.value("bonusSpd", 0);
+        it.buffSecs = i.value("buffSecs", 0);
         items.push_back(it);
     }
     for (const auto& e : j.value("equipment", json::array())) {
@@ -196,6 +205,7 @@ void Database::fromJson(const json& j) {
         CharacterDef cd;
         cd.id = c.value("id", -1); cd.name = c.value("name", "캐릭터");
         cd.maxHp = c.value("maxHp", 100); cd.maxGp = c.value("maxGp", 30);
+        cd.maxHunger = c.value("maxHunger", 42000); cd.maxThirst = c.value("maxThirst", 42000);
         cd.atk = c.value("atk", 12); cd.def = c.value("def", 5); cd.spd = c.value("spd", 5);
         cd.drawPct = c.value("drawPct", 125);
         cd.drawTilesW = c.value("drawTilesW", 1);

@@ -826,6 +826,8 @@ void Editor::drawCharDataEditor() {
     ui::intStepper({ lx, ly, lw, 26 }, "공격력",        cd.atk,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "방어력",        cd.def,    1, 0, 9999);  ly += 32;
     ui::intStepper({ lx, ly, lw, 26 }, "속도 (이동)",   cd.spd,    1, 0, 999);   ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "포만치 (허기)",   cd.maxHunger, 1000, 0, 999999); ly += 32;
+    ui::intStepper({ lx, ly, lw, 26 }, "수분치 (목마름)", cd.maxThirst, 1000, 0, 999999); ly += 32;
     // tile footprint (칸): drag/click the grid; sprite fits the chosen block
     {
         int prev = cd.motions[MO_Walk].frames.empty() ? -1 : cd.motions[MO_Walk].frames.front();

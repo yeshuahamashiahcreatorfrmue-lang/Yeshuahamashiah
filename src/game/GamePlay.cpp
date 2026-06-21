@@ -119,6 +119,8 @@ void GamePlay::draw() {
         return;
     }
     drawField();
+    if (invOpen_)   drawInventoryOverlay();
+    if (equipOpen_) drawEquipOverlay();
     if (phase_ == Phase::Message) drawMessage();
     if (phase_ == Phase::Menu && menu_) menu_->draw();
 }

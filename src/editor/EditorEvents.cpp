@@ -110,7 +110,9 @@ void Editor::drawPlayerEditor(Rectangle panel) {
     ui::intStepper({ x, y, 300, 26 }, "기력 (GP)",   cd->maxGp,  5, 0, 9999);  y += 32;
     ui::intStepper({ x, y, 300, 26 }, "공격력",      cd->atk,    1, 0, 9999);  y += 32;
     ui::intStepper({ x, y, 300, 26 }, "방어력",      cd->def,    1, 0, 9999);  y += 32;
-    ui::intStepper({ x, y, 300, 26 }, "속도 (이동)", cd->spd,    1, 0, 999);   y += 36;
+    ui::intStepper({ x, y, 300, 26 }, "속도 (이동)", cd->spd,    1, 0, 999);   y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "포만치 (허기)",   cd->maxHunger, 1000, 0, 999999); y += 32;
+    ui::intStepper({ x, y, 300, 26 }, "수분치 (목마름)", cd->maxThirst, 1000, 0, 999999); y += 36;
     {
         int prev = cd->motions[MO_Walk].frames.empty() ? -1 : cd->motions[MO_Walk].frames.front();
         drawFootprintControl(x, y, 300, cd->drawTilesW, cd->drawTilesH, cd->drawPct, prev, false);
