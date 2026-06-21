@@ -59,7 +59,7 @@ void GamePlay::onEnter() {
         showMessageEx("어디로 가시겠어요?", "촌장", -1,
                       { "북쪽 숲", "동쪽 마을", "남쪽 항구", "그냥 머문다" }, -1, 1);
     if (getenv("TSUKURU_MSGLONG"))                // debug: long message (auto-wrap test)
-        showMessageEx("이 마을은 오랜 옛날부터 윌로우브룩이라 불렸으며, 북쪽 산맥의 동굴 깊은 곳에는 마을을 지키는 신비한 크리스탈이 잠들어 있다고 전해진다. 자네가 그것을 되찾아 준다면 온 마을이 자네를 영웅으로 기릴 것이네.",
+        showMessageEx("이 마을은 오랜 옛날부터 예슈아한민족진리복종마을이라 불렸으며, 북쪽 산맥의 동굴 깊은 곳에는 마을을 지키는 신비한 크리스탈이 잠들어 있다고 전해진다. 자네가 그것을 되찾아 준다면 온 마을이 자네를 영웅으로 기릴 것이네.",
                       "마을 장로", -1, {}, -1, -1);
     if (getenv("TSUKURU_HELP")) helpOpen_ = true; // debug: open F1 help overlay
     if (getenv("TSUKURU_DEBUGVARS")) {            // debug: seed some flags + open F3 inspector
@@ -150,7 +150,7 @@ void GamePlay::draw() {
         const char* a = "THE END";
         int aw = MeasureTextU(a, 72);
         DrawTextU(a, sw/2 - aw/2, sh/3, 72, Color{ 255, 220, 120, 255 });
-        const char* b = "윌로우브룩에 평화가 찾아왔습니다. 플레이해 주셔서 감사합니다!";
+        const char* b = "예슈아한민족진리복종마을에 평화가 찾아왔습니다. 플레이해 주셔서 감사합니다!";
         int bw = MeasureTextU(b, 22);
         DrawTextU(b, sw/2 - bw/2, sh/3 + 96, 22, ui::kText);
         const char* c = "Enter를 누르세요";

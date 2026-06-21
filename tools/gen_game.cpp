@@ -210,7 +210,7 @@ int main(int argc,char**argv){
     printf("art + audio + skill assets generated\n");
 
     auto p = std::make_shared<Project>();
-    p->dir = out; p->name = "윌로우브룩";
+    p->dir = out; p->name = "예슈아한민족진리복종마을";
     int A_ts   = p->assets.addExisting(AssetType::Image,"tileset","assets/tileset.png");
     int A_hero = p->assets.addExisting(AssetType::Image,"hero","assets/hero.png");
     int A_v1   = p->assets.addExisting(AssetType::Image,"villager1","assets/villager1.png");
@@ -290,7 +290,7 @@ int main(int argc,char**argv){
     mkChar(3,"궁수(초록)",RM,11,16);  // faster, snappier
     p->playerCharId = 1;     // drive the player with the first custom character
 
-    auto m = p->addMap("윌로우브룩 마을", 44, 34);
+    auto m = p->addMap("예슈아한민족진리복종마을", 44, 34);
     m->tileset.assetId=A_ts; m->tileset.tileWidth=32; m->tileset.tileHeight=32; m->tileset.columns=8; m->tileset.rows=6;
     m->animTiles = { WATER, SHALLOW };
     Tilemap& tm = m->tilemap;
@@ -361,7 +361,7 @@ int main(int argc,char**argv){
     auto sign=[&](int x,int y,const std::string&txt){ setT(1,x,y,SIGN);blk(x,y); Event e;e.x=x;e.y=y;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
     auto door=[&](std::pair<int,int> pos,const std::string&txt){ Event e;e.x=pos.first;e.y=pos.second;e.type=EventType::Message;e.trigger=TriggerType::ActionButton;e.text=txt;ev(e); };
 
-    npc(23,16,A_eld,"촌장: 윌로우브룩에 온 걸 환영하네, 젊은 용사여!|동쪽 들판엔 야수들이 떠돌고,|북쪽 동굴에선 무언가 꿈틀대고 있다네...");
+    npc(23,16,A_eld,"촌장: 예슈아한민족진리복종마을에 온 걸 환영하네, 젊은 용사여!|동쪽 들판엔 야수들이 떠돌고,|북쪽 동굴에선 무언가 꿈틀대고 있다네...");
     npc(19,15,A_v1,"마을 사람: 우물물이 차갑고 달아요.|동쪽 상점에 들러보세요!",true);
     npc(28,20,A_v2,"농부: 이 부드러운 비에도|내 꽃들이 잘 피어난다오.",true);
     npc(8,16,A_girl,"소녀: 나무 근처에서 반짝이는 상자를 봤어요!|히히.",true);
@@ -380,7 +380,7 @@ int main(int argc,char**argv){
     setT(1,3,2,CHEST);
     { Event e; e.x=3;e.y=2;e.type=EventType::GiveItem;e.trigger=TriggerType::ActionButton;e.itemId=2;e.amount=1;e.once=true;e.text="하이포션을 발견했다!"; ev(e); }
 
-    sign(21,18,"윌로우브룩 마을  -  광장");
+    sign(21,18,"예슈아한민족진리복종마을  -  광장");
     sign(40,17,"동쪽 들판: 몬스터 출현! Space로 공격하세요.");
 
     door(h1,"아늑한 오두막. 문이 잠겨 있다.");

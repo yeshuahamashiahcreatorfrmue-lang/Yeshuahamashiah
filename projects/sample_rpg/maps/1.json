@@ -33,7 +33,7 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "촌장: 윌로우브룩에 온 걸 환영하네, 젊은 용사여!|동쪽 들판엔 야수들이 떠돌고,|북쪽 동굴에선 무언가 꿈틀대고 있다네...",
+      "text": "촌장: 예슈아한민족진리복종마을에 온 걸 환영하네, 젊은 용사여!|동쪽 들판엔 야수들이 떠돌고,|북쪽 동굴에선 무언가 꿈틀대고 있다네...",
       "trigger": "action",
       "type": "message",
       "wander": false,
@@ -257,7 +257,7 @@
       "targetMap": -1,
       "targetX": 0,
       "targetY": 0,
-      "text": "윌로우브룩 마을  -  광장",
+      "text": "예슈아한민족진리복종마을  -  광장",
       "trigger": "action",
       "type": "message",
       "wander": false,
@@ -536,7 +536,7 @@
     }
   ],
   "id": 1,
-  "name": "윌로우브룩 마을",
+  "name": "예슈아한민족진리복종마을",
   "placed": false,
   "tilemap": {
     "collision": [
