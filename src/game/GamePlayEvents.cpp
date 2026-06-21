@@ -14,8 +14,11 @@ namespace tsukuru {
 
 // Event activation condition: an optional switch AND an optional variable gate.
 bool eventConditionMet(GameState& gs, const Event& e) {
+    if (!e.enabled) return false;
     if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) return false;
     if (e.conditionVar >= 0 && gs.getVar(e.conditionVar) < e.conditionVarMin) return false;
+    if (e.conditionItemId >= 0 && gs.inventory.count(e.conditionItemId) < e.conditionItemCount) return false;
+    if (e.conditionGold > 0 && gs.inventory.gold < e.conditionGold) return false;
     return true;
 }
 
@@ -142,6 +145,9 @@ void GamePlay::runEvent(Event& e) {
         case EventType::GiveItem: {
             if (e.amount < 0) gs.inventory.removeItem(e.itemId, -e.amount);  // 음수 = 회수
             else if (e.itemId >= 0) gs.inventory.addItem(e.itemId, e.amount);
+            for (const auto& gi : e.giveItems)                              // 추가 아이템(상자 등)
+                if (gi.first >= 0) { if (gi.second < 0) gs.inventory.removeItem(gi.first, -gi.second);
+                                     else gs.inventory.addItem(gi.first, gi.second); }
             if (e.giveGold != 0) gs.inventory.gold = std::max(0, gs.inventory.gold + e.giveGold);
             if (e.switchId >= 0) gs.setSwitch(e.switchId, true);   // mark quest progress
             engine_.audio().playSfx("coin");

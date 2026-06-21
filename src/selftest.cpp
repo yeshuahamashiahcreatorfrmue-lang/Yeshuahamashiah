@@ -17,6 +17,17 @@
 namespace fs = std::filesystem;
 using namespace tsukuru;
 
+// Mirror of GamePlayEvents.cpp's eventConditionMet (kept in sync); tested here
+// because the graphics TU isn't linked into the headless self-test.
+static bool condMet(GameState& gs, const Event& e) {
+    if (!e.enabled) return false;
+    if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) return false;
+    if (e.conditionVar >= 0 && gs.getVar(e.conditionVar) < e.conditionVarMin) return false;
+    if (e.conditionItemId >= 0 && gs.inventory.count(e.conditionItemId) < e.conditionItemCount) return false;
+    if (e.conditionGold > 0 && gs.inventory.gold < e.conditionGold) return false;
+    return true;
+}
+
 static int g_failures = 0;
 #define CHECK(cond, msg) do { \
     if (cond) { std::printf("  [PASS] %s\n", msg); } \
@@ -501,6 +512,17 @@ static void testEventFields() {
     { QuestState& q = tg.quests[tk]; q.status = 1; q.objective = 4; q.target = 12; q.need = 1; }
     tg.addTalkProgress(5); CHECK(tg.quests[tk].count == 0, "다른 NPC 대화는 무시");
     tg.addTalkProgress(12); CHECK(tg.quests[tk].count >= 1, "대상 NPC와 대화 시 완료");
+    // condition gates (item / gold / enabled) + multi-give serialization
+    GameState cg; cg.inventory.addItem(5, 2); cg.inventory.gold = 50;
+    Event ce; ce.conditionItemId = 5; ce.conditionItemCount = 2;
+    CHECK(condMet(cg, ce), "조건: 아이템 보유 충족");
+    ce.conditionItemCount = 3; CHECK(!condMet(cg, ce), "조건: 아이템 부족 시 불충족");
+    Event ge; ge.conditionGold = 100; CHECK(!condMet(cg, ge), "조건: 골드 부족 시 불충족");
+    ge.conditionGold = 50; CHECK(condMet(cg, ge), "조건: 골드 충족");
+    Event de; de.enabled = false; CHECK(!condMet(cg, de), "비활성 이벤트는 발동 안함");
+    Event gm; gm.giveItems = { {1, 2}, {5, 3} };
+    Event gm2 = Event::fromJson(gm.toJson());
+    CHECK(gm2.giveItems.size() == 2 && gm2.giveItems[1].second == 3, "다중 아이템 지급 직렬화");
     // enemy item drops
     Database edb; EnemyDef en; en.id = 1; en.name = "슬라임"; en.dropItemId = 5; en.dropRate = 30;
     edb.enemies.push_back(en);

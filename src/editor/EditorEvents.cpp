@@ -324,13 +324,24 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             y += 28;
             break;
         }
-        case EventType::GiveItem:
+        case EventType::GiveItem: {
             stepN("아이템ID(-1=골드만)", ev->itemId, 1, -1, 999);
             { const Item* it = db.item(ev->itemId); if (ev->itemId >= 0) nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger); }
             stepN("수량(음수=회수)", ev->amount, 1, -99, 99);
             stepN("골드(음수=차감)", ev->giveGold, 10, -99999, 99999);
+            DrawTextU("─ 추가 아이템(상자 등) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            for (int i = 0; i < (int)ev->giveItems.size(); ++i) {
+                ui::intStepper({ panel.x + 12, y, 150, 24 }, "ID", ev->giveItems[i].first, 1, 0, 999);
+                ui::intStepper({ panel.x + 166, y, 90, 24 }, "x", ev->giveItems[i].second, 1, 1, 99);
+                if (ui::button({ panel.x + 262, y, 46, 24 }, "삭제")) { ev->giveItems.erase(ev->giveItems.begin() + i); --i; y += 26; continue; }
+                const Item* it = db.item(ev->giveItems[i].first);
+                y += 26; nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
+            }
+            if (ui::button({ panel.x + 12, y, 296, 24 }, "+ 아이템 추가")) ev->giveItems.push_back({ 1, 1 });
+            y += 28;
             stepN("진행 스위치 ON(-1없음)", ev->switchId, 1, -1, 999);
             break;
+        }
         case EventType::SetSwitch:
             stepN("스위치ID(-1=변수만)", ev->switchId, 1, -1, 999);
             if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "값: 켜짐" : "값: 꺼짐"))
@@ -437,6 +448,19 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     }
     stepN("조건 변수(-1없음)", ev->conditionVar, 1, -1, 999);
     if (ev->conditionVar >= 0) stepN("변수 ≥", ev->conditionVarMin, 1, -99999, 99999);
+    stepN("조건 아이템ID(-1없음)", ev->conditionItemId, 1, -1, 999);
+    if (ev->conditionItemId >= 0) {
+        const Item* it = db.item(ev->conditionItemId);
+        nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
+        stepN("필요 개수", ev->conditionItemCount, 1, 1, 99);
+    }
+    stepN("조건 골드 이상(0=없음)", ev->conditionGold, 10, 0, 999999);
+    DrawTextU("─ 배치 / 상태 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+    stepN("X 위치", ev->x, 1, 0, std::max(0, m.tilemap.width() - 1));
+    stepN("Y 위치", ev->y, 1, 0, std::max(0, m.tilemap.height() - 1));
+    if (ui::button({ panel.x + 12, y, 296, 24 }, ev->enabled ? "사용: 켜짐(활성)" : "사용: 꺼짐(비활성)", ev->enabled))
+        ev->enabled = !ev->enabled;
+    y += 30;
     // per-event sound effect (cycle through common built-in sfx)
     {
         static const char* kSfx[] = { "", "select", "coin", "levelup", "defeat", "slash", "magic", "boom" };
@@ -517,18 +541,25 @@ void Editor::drawEventsTab() {
             editingEventId_ = pasted.id;
             setStatus("이벤트 붙여넣음");
         }
-        Rectangle rows = { listP.x, listP.y + 52, listP.width, listP.height - 60 };
+        // type filter (cycle): -1 all, else EventType index
+        if (ui::button({ listP.x + 6, listP.y + 50, listP.width - 12, 22 },
+                       std::string("필터: ") + (eventListFilter_ < 0 ? "전체" : tShort[eventListFilter_ % 9]),
+                       eventListFilter_ >= 0))
+            eventListFilter_ = (eventListFilter_ + 2) % 10 - 1;   // -1..8 cycle
+        Rectangle rows = { listP.x, listP.y + 76, listP.width, listP.height - 84 };
         uiScissor((int)rows.x, (int)rows.y, (int)rows.width, (int)rows.height);
         if (ui::mouseIn(rows)) eventListScroll_ -= GetMouseWheelMove() * 40;
         if (eventListScroll_ < 0) eventListScroll_ = 0;
         float ly = rows.y - eventListScroll_;
         for (auto& e : m->events) {
+            int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
+            if (eventListFilter_ >= 0 && ti != eventListFilter_) continue;   // filtered out
             if (ly + 26 >= rows.y && ly <= rows.y + rows.height) {
-                int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
                 Rectangle r = { listP.x + 6, ly, listP.width - 12, 24 };
+                std::string pre = e.enabled ? "" : "[off] ";
                 std::string lbl = e.label.empty()
-                    ? std::string(TextFormat("#%d %s @%d,%d", e.id, tShort[ti], e.x, e.y))
-                    : std::string(TextFormat("#%d %s", e.id, e.label.c_str()));
+                    ? std::string(TextFormat("#%d %s%s @%d,%d", e.id, pre.c_str(), tShort[ti], e.x, e.y))
+                    : std::string(TextFormat("#%d %s%s", e.id, pre.c_str(), e.label.c_str()));
                 if (ui::button(r, lbl, e.id == editingEventId_)) {
                     editingEventId_ = e.id;
                     cam_.target = { (e.x + 0.5f) * m->tileset.tileWidth, (e.y + 0.5f) * m->tileset.tileHeight };

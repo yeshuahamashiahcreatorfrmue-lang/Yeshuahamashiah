@@ -122,6 +122,7 @@ private:
     Event eventClip_;           // copied event (paste works across maps)
     bool  eventClipHas_ = false;
     int   dragEventId_ = -1;     // event being dragged to a new tile (events tab)
+    int   eventListFilter_ = -1; // event-list type filter (-1 = all, else EventType index)
     // Database editing
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;

@@ -68,6 +68,11 @@ struct Event {
     bool conditionValue  = true;
     int  conditionVar    = -1;   // also gate on a variable: fires only if var >= conditionVarMin
     int  conditionVarMin = 1;
+    int  conditionItemId = -1;   // require holding >= conditionItemCount of this item
+    int  conditionItemCount = 1;
+    int  conditionGold   = 0;    // require at least this much gold (0 = no gold gate)
+    bool enabled = true;         // false = event ignored (temporarily disabled in editor)
+    std::vector<std::pair<int,int>> giveItems; // GiveItem: extra items (id,count) beyond itemId
     bool once = false; // run only one time (sets a hidden flag)
     bool wander = false; // legacy roam flag (kept in sync with behavior==Wander)
 

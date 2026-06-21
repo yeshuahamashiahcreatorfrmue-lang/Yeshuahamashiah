@@ -44,6 +44,8 @@ static TriggerType triggerFrom(const std::string& s) {
 }
 
 json Event::toJson() const {
+    json gi = json::array();
+    for (const auto& it : giveItems) gi.push_back({ {"id", it.first}, {"count", it.second} });
     return {
         {"id", id}, {"x", x}, {"y", y}, {"label", label}, {"sfx", sfx},
         {"type", eventTypeName(type)}, {"trigger", triggerName(trigger)},
@@ -64,6 +66,8 @@ json Event::toJson() const {
         {"rewardItemId", rewardItemId}, {"rewardItemCount", rewardItemCount},
         {"questTakeItems", questTakeItems},
         {"conditionVar", conditionVar}, {"conditionVarMin", conditionVarMin},
+        {"conditionItemId", conditionItemId}, {"conditionItemCount", conditionItemCount},
+        {"conditionGold", conditionGold}, {"enabled", enabled}, {"giveItems", gi},
         {"speakerName", speakerName}, {"faceAsset", faceAsset},
         {"choiceA", choiceA}, {"choiceB", choiceB}, {"choiceC", choiceC}, {"choiceD", choiceD},
         {"choiceSwitch", choiceSwitch}, {"choiceVar", choiceVar},
@@ -117,6 +121,13 @@ Event Event::fromJson(const json& j) {
     e.questTakeItems  = j.value("questTakeItems", true);
     e.conditionVar    = j.value("conditionVar", -1);
     e.conditionVarMin = j.value("conditionVarMin", 1);
+    e.conditionItemId = j.value("conditionItemId", -1);
+    e.conditionItemCount = j.value("conditionItemCount", 1);
+    e.conditionGold   = j.value("conditionGold", 0);
+    e.enabled         = j.value("enabled", true);
+    e.giveItems.clear();
+    for (const auto& it : j.value("giveItems", json::array()))
+        e.giveItems.push_back({ it.value("id", -1), it.value("count", 1) });
     e.speakerName     = j.value("speakerName", "");
     e.faceAsset       = j.value("faceAsset", -1);
     e.choiceA         = j.value("choiceA", "");
