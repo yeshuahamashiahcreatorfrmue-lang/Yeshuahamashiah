@@ -41,6 +41,20 @@ void GamePlay::updateField(float dt) {
         }
     }
 
+    // Gentle HP regeneration: only out of combat (no monsters) and only when the
+    // player is well-fed (hunger/thirst not depleted). Keeps exploration from being
+    // a slog without trivializing fights.
+    if (!engine_.state().party.empty() && monsters_.empty() && attackTimer_ <= 0) {
+        PartyMember& h = engine_.state().party[0];
+        if (h.hp < h.maxHp && h.hunger > 0 && h.thirst > 0) {
+            hpRegen_ -= dt;
+            if (hpRegen_ <= 0) {
+                hpRegen_ = 3.0f;
+                h.hp = std::min(h.maxHp, h.hp + 1);
+            }
+        }
+    }
+
     updateProjectiles(dt);
     updateFx(dt);
 

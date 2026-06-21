@@ -40,6 +40,10 @@ void GamePlay::interact() {
     int fx = destX_ + delta.x, fy = destY_ + delta.y;
     // a wandering NPC may have moved off its event tile — resolve by live position
     if (NpcInst* n = npcAt(fx, fy)) {
+        // turn the NPC to look back at the player (opposite of the player's facing)
+        static const int opposite[4] = { 3, 2, 1, 0 }; // Down<->Up, Left<->Right
+        n->dir = opposite[dir_ & 3];
+        n->moving = false;
         Event* best = actionEventAt(n->x, n->y);
         if (best) { runEvent(*best); return; }
     }
@@ -218,6 +222,7 @@ void GamePlay::runEvent(Event& e) {
 void GamePlay::openShop(const std::vector<int>& items, const std::string& title) {
     shopItems_ = items;
     shopTitle_ = title;
+    shopMode_ = 0;
     phase_ = Phase::Shop;
 }
 
@@ -231,38 +236,81 @@ void GamePlay::drawShop() {
     const Database& db = engine_.project().database;
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
-    int rows = std::max(1, (int)shopItems_.size());
+
+    // In sell mode the rows come from the player's inventory (sellable = priced items).
+    std::vector<std::pair<int,int>> sellRows; // (itemId, owned count)
+    if (shopMode_ == 1) {
+        for (const auto& pr : gs.inventory.list()) {
+            const Item* it = db.item(pr.first);
+            if (it && it->price > 0) sellRows.push_back(pr);
+        }
+    }
+    int rows = std::max(1, shopMode_ == 0 ? (int)shopItems_.size() : (int)sellRows.size());
     float listH = rows * 64.0f;
-    Rectangle box = { sw/2.0f - 280, sh/2.0f - (listH + 130) / 2, 560, listH + 130 };
+    Rectangle box = { sw/2.0f - 280, sh/2.0f - (listH + 170) / 2, 560, listH + 170 };
     ui::panel(box);
     DrawTextU(shopTitle_.c_str(), (int)box.x + 18, (int)box.y + 14, 24, ui::kAccent);
     DrawTextU(TextFormat("골드: %d", gs.inventory.gold), (int)(box.x + box.width - 170), (int)box.y + 18, 18, Color{230,200,90,255});
 
-    float ry = box.y + 54;
-    if (shopItems_.empty())
-        DrawTextU("판매 상품이 없습니다.", (int)box.x + 18, (int)ry, 18, ui::kTextDim);
-    for (int it_i = 0; it_i < (int)shopItems_.size(); ++it_i) {
-        const Item* it = db.item(shopItems_[it_i]);
-        if (!it) continue;
-        Rectangle row = { box.x + 16, ry, box.width - 32, 56 };
-        DrawRectangleRec(row, Color{26,30,40,255});
-        DrawRectangleLinesEx(row, 1, Fade(ui::kAccent, 0.5f));
-        if (it->iconAsset >= 0) {
-            const Texture2D& tx = engine_.assetTexture(it->iconAsset);
-            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {row.x+6,row.y+6,44,44}, {0,0},0,WHITE);
+    // 구매 / 판매 toggle
+    Rectangle buyTab  = { box.x + 18, box.y + 48, 130, 34 };
+    Rectangle sellTab = { box.x + 154, box.y + 48, 130, 34 };
+    if (ui::button(buyTab,  "구매", shopMode_ == 0)) shopMode_ = 0;
+    if (ui::button(sellTab, "판매", shopMode_ == 1)) shopMode_ = 1;
+
+    float ry = box.y + 92;
+    if (shopMode_ == 0) {
+        if (shopItems_.empty())
+            DrawTextU("판매 상품이 없습니다.", (int)box.x + 18, (int)ry, 18, ui::kTextDim);
+        for (int it_i = 0; it_i < (int)shopItems_.size(); ++it_i) {
+            const Item* it = db.item(shopItems_[it_i]);
+            if (!it) continue;
+            Rectangle row = { box.x + 16, ry, box.width - 32, 56 };
+            DrawRectangleRec(row, Color{26,30,40,255});
+            DrawRectangleLinesEx(row, 1, Fade(ui::kAccent, 0.5f));
+            if (it->iconAsset >= 0) {
+                const Texture2D& tx = engine_.assetTexture(it->iconAsset);
+                DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {row.x+6,row.y+6,44,44}, {0,0},0,WHITE);
+            }
+            DrawTextU(it->name.c_str(), (int)row.x + 58, (int)row.y + 8, 18, ui::kText);
+            DrawTextU(TextFormat("%d G   보유 %d", it->price, gs.inventory.count(it->id)),
+                      (int)row.x + 58, (int)row.y + 32, 14, Color{230,200,90,255});
+            bool canBuy = gs.inventory.gold >= it->price;
+            Rectangle buyB = { row.x + row.width - 110, row.y + 12, 96, 32 };
+            if (ui::button(buyB, canBuy ? "구입" : "골드부족", false) && canBuy) {
+                gs.inventory.gold -= it->price;
+                gs.inventory.addItem(it->id, 1);
+                engine_.audio().playSfx("coin");
+                toast_ = it->name + " 구입!"; toastTimer_ = 1.2f;
+            }
+            ry += 64;
         }
-        DrawTextU(it->name.c_str(), (int)row.x + 58, (int)row.y + 8, 18, ui::kText);
-        DrawTextU(TextFormat("%d G   보유 %d", it->price, gs.inventory.count(it->id)),
-                  (int)row.x + 58, (int)row.y + 32, 14, Color{230,200,90,255});
-        bool canBuy = gs.inventory.gold >= it->price;
-        Rectangle buyB = { row.x + row.width - 110, row.y + 12, 96, 32 };
-        if (ui::button(buyB, canBuy ? "구입" : "골드부족", false) && canBuy) {
-            gs.inventory.gold -= it->price;
-            gs.inventory.addItem(it->id, 1);
-            engine_.audio().playSfx("coin");
-            toast_ = it->name + " 구입!"; toastTimer_ = 1.2f;
+    } else {
+        if (sellRows.empty())
+            DrawTextU("팔 수 있는 물건이 없습니다.", (int)box.x + 18, (int)ry, 18, ui::kTextDim);
+        for (const auto& pr : sellRows) {
+            const Item* it = db.item(pr.first);
+            if (!it) continue;
+            int sellPrice = std::max(1, it->price / 2);
+            Rectangle row = { box.x + 16, ry, box.width - 32, 56 };
+            DrawRectangleRec(row, Color{26,30,40,255});
+            DrawRectangleLinesEx(row, 1, Fade(ui::kAccent, 0.5f));
+            if (it->iconAsset >= 0) {
+                const Texture2D& tx = engine_.assetTexture(it->iconAsset);
+                DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {row.x+6,row.y+6,44,44}, {0,0},0,WHITE);
+            }
+            DrawTextU(it->name.c_str(), (int)row.x + 58, (int)row.y + 8, 18, ui::kText);
+            DrawTextU(TextFormat("%d G   보유 %d", sellPrice, pr.second),
+                      (int)row.x + 58, (int)row.y + 32, 14, Color{230,200,90,255});
+            Rectangle sellB = { row.x + row.width - 110, row.y + 12, 96, 32 };
+            if (ui::button(sellB, "판매", false)) {
+                gs.inventory.removeItem(it->id, 1);
+                gs.inventory.gold += sellPrice;
+                engine_.audio().playSfx("coin");
+                toast_ = it->name + " 판매! +" + std::to_string(sellPrice) + "G"; toastTimer_ = 1.2f;
+            }
+            ry += 64;
         }
-        ry += 64;
     }
     if (ui::button({ box.x + box.width/2 - 100, box.y + box.height - 46, 200, 36 }, "닫기 (ESC)", false))
         phase_ = Phase::Field;
@@ -472,6 +520,7 @@ void GamePlay::drawHelp() {
         { "F1", "이 도움말" },
         { "F2", "에디터로 전환" },
         { "F3", "스위치/변수 보기(디버그)" },
+        { "F9 / F12", "퀵세이브 / 퀵로드" },
     };
     int y = (int)box.y + 56;
     for (const auto& r : rows) {

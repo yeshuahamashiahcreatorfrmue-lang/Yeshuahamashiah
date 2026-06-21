@@ -42,6 +42,8 @@ private:
 
     // --- lifecycle / dispatch (GamePlay.cpp) ---
     void loadMap(int id);
+    void quickSave();   // F9: instant save to save/quick.json
+    void quickLoad();   // F12: restore save/quick.json
 
     // --- movement (GamePlayMovement.cpp) ---
     void updateField(float dt);
@@ -162,6 +164,7 @@ private:
     float skillCd_[kSkillSlots] = {};
     Rectangle skillBtn_[kSkillSlots] = {}; // screen rects for click/touch casting
     float mpRegen_ = 0;         // MP regenerates slowly over time
+    float hpRegen_ = 0;         // HP regenerates out of combat when well-fed
     std::vector<FieldSkill> skills_;       // active skill set (from db or defaults)
 
     // survival + inventory/equipment windows
@@ -174,6 +177,7 @@ private:
     // shop screen state
     std::vector<int> shopItems_; // items the current shop sells
     std::string shopTitle_;      // shop window title (event text)
+    int   shopMode_ = 0;         // 0 = 구매(buy), 1 = 판매(sell at half price)
     bool  questLogOpen_ = false;// J: quest log overlay
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay

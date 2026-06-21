@@ -8,6 +8,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 
 namespace tsukuru {
 
@@ -53,8 +55,10 @@ void GamePlay::onEnter() {
     runAutoruns();
     if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
         startEncounterBattle();   // debug: spawn an encounter troop on the field
-    if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop (item ids "1,2,3")
+    if (const char* s = getenv("TSUKURU_SHOP")) { // debug: open a shop (item ids "1,2,3")
         openShop({ atoi(s), 2, 8 }, "무기·도구 상점");
+        if (getenv("TSUKURU_SHOPSELL")) shopMode_ = 1;   // debug: open straight to sell tab
+    }
     if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a 4-way choice message
         showMessageEx("어디로 가시겠어요?", "촌장", -1,
                       { "북쪽 숲", "동쪽 마을", "남쪽 항구", "그냥 머문다" }, -1, 1);
@@ -104,10 +108,43 @@ void GamePlay::loadMap(int id) {
 }
 
 // ----------------------------- lifecycle / dispatch -----------------------------
+// F9: write the live game state to save/quick.json (instant, no menu).
+void GamePlay::quickSave() {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::path(engine_.project().dir) / "save";
+    std::error_code ec; fs::create_directories(dir, ec);
+    std::ofstream f((dir / "quick.json").string());
+    if (f) {
+        f << engine_.state().toJson().dump(2);
+        engine_.audio().playSfx("select", 0.7f);
+        toast_ = "퀵세이브 완료 (F9)"; toastTimer_ = 1.6f;
+    } else {
+        toast_ = "퀵세이브 실패"; toastTimer_ = 1.6f;
+    }
+}
+
+// F12: restore the quick save, if one exists.
+void GamePlay::quickLoad() {
+    namespace fs = std::filesystem;
+    fs::path f = fs::path(engine_.project().dir) / "save" / "quick.json";
+    std::error_code ec;
+    if (!fs::exists(f, ec)) { toast_ = "퀵세이브가 없습니다"; toastTimer_ = 1.6f; return; }
+    std::ifstream in(f.string());
+    if (!in) { toast_ = "퀵로드 실패"; toastTimer_ = 1.6f; return; }
+    nlohmann::json j; in >> j;
+    engine_.state().fromJson(j);
+    loadMap(engine_.state().currentMap);
+    phase_ = Phase::Field;
+    engine_.audio().playSfx("select", 0.7f);
+    toast_ = "퀵로드 완료 (F12)"; toastTimer_ = 1.6f;
+}
+
 void GamePlay::update(float dt) {
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
     if (IsKeyPressed(KEY_F3)) debugVarsOpen_ = !debugVarsOpen_;   // switch/variable inspector
     if (IsKeyPressed(KEY_F1)) helpOpen_ = !helpOpen_;             // controls help
+    if (IsKeyPressed(KEY_F9))  quickSave();                        // 퀵세이브
+    if (IsKeyPressed(KEY_F12)) quickLoad();                        // 퀵로드
 
     if (toastTimer_ > 0) toastTimer_ -= dt;
     if (areaBannerT_ > 0) areaBannerT_ -= dt;
