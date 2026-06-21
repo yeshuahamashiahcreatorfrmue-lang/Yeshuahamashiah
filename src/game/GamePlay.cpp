@@ -45,6 +45,9 @@ void GamePlay::onEnter() {
     loadSkills();
     spawnMonsters();
     runAutoruns();
+    if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
+        startEncounterBattle();   // debug: jump straight into a turn-based battle
+    if (getenv("TSUKURU_MENU") && menu_) { menu_->open(); phase_ = Phase::Menu; }  // debug
 }
 
 void GamePlay::loadMap(int id) {
@@ -88,6 +91,7 @@ void GamePlay::update(float dt) {
         case Phase::Menu:
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
+        case Phase::Battle: updateBattle(dt); break;
         case Phase::GameOver:
         case Phase::GameClear:
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
@@ -120,6 +124,7 @@ void GamePlay::draw() {
         DrawTextU(sub, screenW()/2 - sw2/2, screenH()/2 + 20, 22, ui::kTextDim);
         return;
     }
+    if (phase_ == Phase::Battle) { drawBattle(); return; }
     drawField();
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();

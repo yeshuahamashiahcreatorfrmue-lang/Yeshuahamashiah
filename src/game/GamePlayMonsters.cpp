@@ -26,6 +26,7 @@ void GamePlay::spawnMonsters() {
     if (!map_) { targetMonsters_ = 0; return; }
     // only maps that explicitly list encounter enemies spawn random field monsters
     if (map_->encounterEnemies.empty()) { targetMonsters_ = 0; return; }
+    if (map_->encounterRate > 0) { targetMonsters_ = 0; return; } // turn-based encounters instead
     int area = map_->tilemap.width() * map_->tilemap.height();
     targetMonsters_ = std::min(8, std::max(3, area / 45));
     for (int i = 0; i < targetMonsters_; ++i) spawnOne();
@@ -206,6 +207,110 @@ bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
     m.hurtFlash = 0.18f;
     if (m.hp <= 0) { onMonsterKilled(m); return true; }
     return false;
+}
+
+// ----------------------------- turn-based battle -----------------------------
+void GamePlay::startEncounterBattle() {
+    if (!map_ || map_->encounterEnemies.empty()) return;
+    std::vector<int> ids;
+    int n = 1 + std::rand() % 3;                       // 1..3 enemies
+    for (int i = 0; i < n; ++i)
+        ids.push_back(map_->encounterEnemies[std::rand() % map_->encounterEnemies.size()]);
+    battle_ = std::make_unique<Battle>(engine_.project().database, engine_.state(), ids);
+    battleMenu_ = 0;
+    phase_ = Phase::Battle;
+    engine_.audio().playSfx("select");
+}
+
+void GamePlay::updateBattle(float dt) {
+    (void)dt;
+    if (!battle_) { phase_ = Phase::Field; return; }   // input handled in drawBattle (immediate mode)
+}
+
+void GamePlay::drawBattle() {
+    if (!battle_) { phase_ = Phase::Field; return; }
+    Database& db = engine_.project().database;
+    GameState& gs = engine_.state();
+    int sw = screenW(), sh = screenH();
+    DrawRectangleGradientV(0, 0, sw, sh, Color{ 46, 24, 30, 255 }, Color{ 12, 10, 20, 255 });
+    DrawTextU("전투!", 24, 18, 28, ui::kDanger);
+
+    // enemies
+    const auto& ens = battle_->enemies();
+    for (int i = 0; i < (int)ens.size(); ++i) {
+        const BattleEnemy& e = ens[i];
+        int x = 120 + i * 200, y = 110;
+        DrawRectangle(x, y, 140, 90, e.alive() ? Color{ 200, 90, 90, 255 } : Color{ 70, 70, 82, 255 });
+        DrawRectangleLines(x, y, 140, 90, BLACK);
+        DrawTextU(e.name.c_str(), x + 6, y - 22, 16, ui::kText);
+        DrawTextU(TextFormat("HP %d/%d", e.hp, e.maxHp), x + 6, y + 96, 14, e.alive() ? ui::kText : ui::kTextDim);
+    }
+
+    // party status
+    int py = sh - 230;
+    if (!gs.party.empty()) {
+        PartyMember& m = gs.party[0];
+        DrawTextU(TextFormat("아군 — 체력 %d/%d   기력 %d/%d", m.hp, m.maxHp, m.mp, m.maxMp),
+                  24, py, 18, ui::kAccentHi);
+    }
+    // last log lines
+    const auto& lg = battle_->log();
+    int ly = py + 28;
+    for (int i = std::max(0, (int)lg.size() - 4); i < (int)lg.size(); ++i) { DrawTextU(lg[i].c_str(), 24, ly, 15, ui::kText); ly += 20; }
+
+    // result -> continue
+    if (battle_->result() != BattleResult::Ongoing) {
+        const char* r = battle_->result() == BattleResult::Victory ? "승리!"
+                      : battle_->result() == BattleResult::Defeat  ? "패배..." : "도망쳤다";
+        DrawTextU(r, sw / 2 - 60, sh / 2 - 30, 40, ui::kGood);
+        DrawTextU("Enter / 클릭으로 계속", sw / 2 - 96, sh / 2 + 24, 18, ui::kTextDim);
+        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            BattleResult res = battle_->result();
+            battle_.reset();
+            phase_ = (res == BattleResult::Defeat) ? Phase::GameOver : Phase::Field;
+        }
+        return;
+    }
+
+    // action menu for the current actor
+    if (battle_->actorReady()) {
+        float bx = 24, by = sh - 150;
+        int firstE = battle_->firstAliveEnemy();
+        if (battleMenu_ == 0) {
+            if (ui::button({ bx,       by, 120, 36 }, "공격"))   { BattleAction a; a.kind = ActionKind::Attack; a.targetIndex = firstE; battle_->submit(a); }
+            if (ui::button({ bx + 130, by, 120, 36 }, "스킬"))   battleMenu_ = 1;
+            if (ui::button({ bx + 260, by, 120, 36 }, "아이템")) battleMenu_ = 2;
+            if (ui::button({ bx + 390, by, 120, 36 }, "도망"))   { BattleAction a; a.kind = ActionKind::Flee; battle_->submit(a); }
+        } else if (battleMenu_ == 1) {
+            DrawTextU("스킬 선택:", (int)bx, (int)by - 22, 14, ui::kTextDim);
+            float yy = by; int shown = 0; int ai = battle_->currentActor();
+            if (ai >= 0 && ai < (int)gs.party.size()) {
+                if (const ActorDef* ad = db.actor(gs.party[ai].actorId))
+                    for (int sid : ad->skills) {
+                        const Skill* sk = db.skill(sid); if (!sk) continue;
+                        if (ui::button({ bx, yy, 240, 30 }, TextFormat("%s (MP%d)", sk->name.c_str(), sk->mpCost))) {
+                            BattleAction a; a.kind = ActionKind::Skill; a.id = sid; a.targetIndex = firstE; battle_->submit(a); battleMenu_ = 0;
+                        }
+                        yy += 34; ++shown;
+                    }
+            }
+            if (!shown) DrawTextU("사용할 스킬이 없습니다.", (int)bx, (int)yy, 14, ui::kTextDim);
+            if (ui::button({ bx + 280, by, 90, 30 }, "뒤로")) battleMenu_ = 0;
+        } else {
+            DrawTextU("아이템 선택:", (int)bx, (int)by - 22, 14, ui::kTextDim);
+            float yy = by; int shown = 0;
+            for (auto& pr : gs.inventory.list()) {
+                const Item* it = db.item(pr.first);
+                if (!it || it->effect == ItemEffect::None) continue;   // only battle-usable items
+                if (ui::button({ bx, yy, 280, 30 }, TextFormat("%s x%d", it->name.c_str(), pr.second))) {
+                    BattleAction a; a.kind = ActionKind::Item; a.id = pr.first; a.targetIndex = 0; battle_->submit(a); battleMenu_ = 0;
+                }
+                yy += 34; ++shown; if (yy > sh - 30) break;
+            }
+            if (!shown) DrawTextU("전투에서 쓸 아이템이 없습니다.", (int)bx, (int)yy, 14, ui::kTextDim);
+            if (ui::button({ bx + 300, by, 90, 30 }, "뒤로")) battleMenu_ = 0;
+        }
+    }
 }
 
 } // namespace tsukuru

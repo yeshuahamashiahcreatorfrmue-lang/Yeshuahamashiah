@@ -152,6 +152,12 @@ void GamePlay::updateField(float dt) {
             }
             if (Event* e = map_->eventAt(destX_, destY_))
                 if (e->trigger == TriggerType::PlayerTouch) runEvent(*e);
+            // random turn-based encounter (per-step %): surfaces the Battle system
+            if (phase_ == Phase::Field && map_->encounterRate > 0 && !map_->encounterEnemies.empty()
+                && (std::rand() % 100) < map_->encounterRate) {
+                startEncounterBattle();
+                return;
+            }
         } else {
             pxX_ += dx / dist * step;
             pxY_ += dy / dist * step;

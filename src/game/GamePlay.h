@@ -13,6 +13,7 @@
 #include "core/Types.h"
 #include "database/Database.h"
 #include "game/PlayTypes.h"
+#include "battle/Battle.h"
 
 namespace tsukuru {
 
@@ -33,7 +34,7 @@ public:
     void draw();
 
 private:
-    enum class Phase { Field, Message, Menu, GameOver, GameClear };
+    enum class Phase { Field, Message, Menu, Battle, GameOver, GameClear };
 
     // --- lifecycle / dispatch (GamePlay.cpp) ---
     void loadMap(int id);
@@ -97,6 +98,11 @@ private:
     void updateMotion(float dt);             // advance the current motion's frames
     int  motionFrameAsset() const;           // current frame's image id, or -1 (use sheet)
 
+    // --- turn-based battle (random encounters; surfaces the Battle system) ---
+    void startEncounterBattle();   // build a troop from the map's encounter list
+    void updateBattle(float dt);
+    void drawBattle();
+
     // --- survival (hunger/thirst), inventory grid & body-part equipment ---
     void drawInventoryOverlay();   // I key: rectangular item grid (식품/장비/기타)
     void drawEquipOverlay();       // C key: body-part equipment window
@@ -142,6 +148,8 @@ private:
     bool  equipOpen_ = false;   // C: body-part equipment window open
     int   invCat_ = 0;          // inventory category tab (0 전체/1 식품/2 장비/3 기타)
     Rectangle invBtn_{}, equipBtn_{}; // bottom HUD buttons
+    std::unique_ptr<Battle> battle_;  // active turn-based battle (null when none)
+    int   battleMenu_ = 0;      // 0 root / 1 skill submenu / 2 item submenu
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)
