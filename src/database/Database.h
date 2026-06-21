@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "entity/Story.h"
 
 namespace tsukuru {
 
@@ -141,10 +142,13 @@ public:
     std::vector<FieldSkill> fieldSkills;
     std::vector<CharacterDef> characters;   // custom multi-motion characters (players/NPCs)
     std::vector<CharacterDef> mobs;         // monsters — same motion/effect/image system as characters
+    std::vector<DialogueScenario> dialogues; // branching 대화로그 시나리오
+    std::vector<Scene> scenes;               // 스토리 시나리오 시퀀스
 
     const Item*      item(int id) const;
     const CharacterDef* character(int id) const;
     const CharacterDef* mob(int id) const;
+    const DialogueScenario* dialogue(int id) const;
     const ActorDef*  actor(int id) const;
     const EnemyDef*  enemy(int id) const;
     const FieldSkill* fieldSkillForSlot(int slot) const; // first bound skill for a key

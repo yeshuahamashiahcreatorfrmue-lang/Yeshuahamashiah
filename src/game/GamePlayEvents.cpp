@@ -129,10 +129,15 @@ void GamePlay::runEvent(Event& e) {
     refreshQuestObjective();
     if (!e.sfx.empty()) engine_.audio().playSfx(e.sfx);   // 이벤트별 효과음
 
+    if (e.sceneId >= 0) { startScene(e.sceneId); if (e.once) firedOnce_.insert(key); return; } // 스토리 시나리오 실행
+
     switch (e.type) {
         case EventType::Message:
-            showMessageEx(e.text, e.speakerName, e.faceAsset,
-                          { e.choiceA, e.choiceB, e.choiceC, e.choiceD }, e.choiceSwitch, e.choiceVar);
+            if (e.dialogueId >= 0 && engine_.project().database.dialogue(e.dialogueId))
+                startDialogue(e.dialogueId);                 // 대화로그 시나리오 재생
+            else
+                showMessageEx(e.text, e.speakerName, e.faceAsset,
+                              { e.choiceA, e.choiceB, e.choiceC, e.choiceD }, e.choiceSwitch, e.choiceVar);
             break;
         case EventType::Teleport: {
             loadMap(e.targetMap);

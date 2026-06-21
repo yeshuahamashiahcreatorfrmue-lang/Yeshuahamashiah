@@ -1,0 +1,67 @@
+#include "entity/Story.h"
+
+using nlohmann::json;
+
+namespace tsukuru {
+
+static json answerToJson(const DialogueAnswer& a) {
+    return {{"text", a.text}, {"respType", a.respType},
+            {"rewardGold", a.rewardGold}, {"rewardExp", a.rewardExp},
+            {"rewardItemId", a.rewardItemId}, {"rewardItemCount", a.rewardItemCount},
+            {"mobId", a.mobId}, {"npcCharId", a.npcCharId}, {"durationSecs", a.durationSecs},
+            {"gotoLine", a.gotoLine}, {"dismissFollowers", a.dismissFollowers}};
+}
+static DialogueAnswer answerFromJson(const json& j) {
+    DialogueAnswer a;
+    a.text = j.value("text", "");
+    a.respType = j.value("respType", (int)DR_None);
+    a.rewardGold = j.value("rewardGold", 0); a.rewardExp = j.value("rewardExp", 0);
+    a.rewardItemId = j.value("rewardItemId", -1); a.rewardItemCount = j.value("rewardItemCount", 1);
+    a.mobId = j.value("mobId", -1); a.npcCharId = j.value("npcCharId", -1);
+    a.durationSecs = j.value("durationSecs", 0.0f);
+    a.gotoLine = j.value("gotoLine", -1); a.dismissFollowers = j.value("dismissFollowers", false);
+    return a;
+}
+
+json dialogueToJson(const DialogueScenario& d) {
+    json lines = json::array();
+    for (const auto& l : d.lines) {
+        json ans = json::array();
+        for (const auto& a : l.answers) ans.push_back(answerToJson(a));
+        lines.push_back({{"speaker", l.speaker}, {"text", l.text}, {"answers", ans}});
+    }
+    return {{"id", d.id}, {"name", d.name}, {"lines", lines}};
+}
+DialogueScenario dialogueFromJson(const json& j) {
+    DialogueScenario d;
+    d.id = j.value("id", -1); d.name = j.value("name", "대화");
+    for (const auto& lj : j.value("lines", json::array())) {
+        DialogueLine l;
+        l.speaker = lj.value("speaker", ""); l.text = lj.value("text", "");
+        for (const auto& aj : lj.value("answers", json::array())) l.answers.push_back(answerFromJson(aj));
+        d.lines.push_back(l);
+    }
+    return d;
+}
+
+json sceneToJson(const Scene& s) {
+    json acts = json::array();
+    for (const auto& a : s.actions)
+        acts.push_back({{"type", a.type}, {"targetId", a.targetId}, {"refId", a.refId},
+                        {"x", a.x}, {"y", a.y}, {"time", a.time}});
+    return {{"id", s.id}, {"name", s.name}, {"actions", acts}};
+}
+Scene sceneFromJson(const json& j) {
+    Scene s;
+    s.id = j.value("id", -1); s.name = j.value("name", "장면");
+    for (const auto& aj : j.value("actions", json::array())) {
+        SceneAction a;
+        a.type = aj.value("type", (int)SA_Wait);
+        a.targetId = aj.value("targetId", -1); a.refId = aj.value("refId", -1);
+        a.x = aj.value("x", 0); a.y = aj.value("y", 0); a.time = aj.value("time", 1.0f);
+        s.actions.push_back(a);
+    }
+    return s;
+}
+
+} // namespace tsukuru

@@ -27,7 +27,7 @@ public:
     bool wantsCtrlWheel() const;
 
 private:
-    enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Assets, Database };
+    enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
@@ -47,6 +47,8 @@ private:
     void ensureThumbsForTab();   // build any missing thumbnails for the current tab
     void drawMapTab();
     void drawEventsTab();
+    void drawDialogueTab();   // 대화로그 시나리오 편집
+    void drawScenarioTab();   // 스토리 시나리오 시퀀서 편집
     void drawCharsTab();
     void pickAndImportImages();        // native OS file picker -> import selected images
     int  makeTransparentBg(int assetId); // remove a solid/white background -> new transparent asset
@@ -136,6 +138,12 @@ private:
     float dbScroll_ = 0;      // detail-panel vertical scroll (tall editors overflow)
     bool  dbExpanded_[3] = { true, true, true };  // accordion: each category section open?
     float dbListScroll_ = 0;  // accordion list vertical scroll
+
+    // 대화로그 / 시나리오 편집 상태
+    int   dlgSel_ = -1, dlgLineSel_ = -1, dlgFocus_ = -1;
+    float dlgLineScroll_ = 0, dlgAnsScroll_ = 0;
+    int   scnSel_ = -1, scnFocus_ = -1;
+    float scnActScroll_ = 0;
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

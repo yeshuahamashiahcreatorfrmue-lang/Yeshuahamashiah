@@ -69,6 +69,17 @@ void GamePlay::onEnter() {
                       "마을 장로", -1, {}, -1, -1);
     if (getenv("TSUKURU_HELP")) helpOpen_ = true; // debug: open F1 help overlay
     if (getenv("TSUKURU_FULLMAP")) fullMapOpen_ = true; // debug: open M full-map overlay
+    if (getenv("TSUKURU_DLG")) {                        // debug: seed + play a dialogue scenario
+        Database& dbm = engine_.project().database;
+        DialogueScenario d; d.id = 9001; d.name = "테스트 대화";
+        DialogueLine l0; l0.speaker = "촌장"; l0.text = "용사여, 무엇을 도와줄까?";
+        l0.answers.push_back({ "보상을 주세요", DR_Reward, 100,10,-1,1, -1,-1, 0, -1, false });
+        l0.answers.push_back({ "동료가 필요해요", DR_NpcFollow, 0,0,-1,1, -1, 1, 30.0f, -1, false });
+        l0.answers.push_back({ "괜찮아요", DR_None, 0,0,-1,1, -1,-1, 0, -1, false });
+        d.lines.push_back(l0);
+        dbm.dialogues.push_back(d);
+        startDialogue(9001);
+    }
     if (getenv("TSUKURU_CHAT")) {                       // debug: seed chat + open input
         chatLog_ = { "촌장: 어서 오게!", "나: 안녕하세요", "마을사람: 좋은 날씨네요" };
         chatBubble_ = "안녕하세요!"; chatBubbleT_ = 5.0f; chatOpen_ = true; chatInput_ = "반갑습니다";
@@ -194,8 +205,17 @@ void GamePlay::update(float dt) {
     if (phase_ != Phase::GameOver && phase_ != Phase::GameClear)
         engine_.state().playSeconds += dt;   // accumulate play time for save metadata
 
+    // timed dialogue-summoned NPCs expire; story scene advances (both run over Field)
+    if (phase_ == Phase::Field || phase_ == Phase::Dialogue) {
+        for (auto& n : npcs_) if (n.lifeTimer > 0) n.lifeTimer -= dt;
+        npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
+                    [](const NpcInst& n){ return n.lifeTimer < 0 && (n.eventId <= -1000); }), npcs_.end());
+        updateScene(dt);
+    }
+
     switch (phase_) {
         case Phase::Field: updateField(dt); break;
+        case Phase::Dialogue: updateDialogue(); break;
         case Phase::Message: {
             static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
             bool lastPage = msgPage_ + 1 >= (int)msgPages_.size();
@@ -259,6 +279,7 @@ void GamePlay::draw() {
     if (debugVarsOpen_) drawDebugVars();
     if (helpOpen_) drawHelp();
     if (phase_ == Phase::Message) drawMessage();
+    if (phase_ == Phase::Dialogue) drawDialogueOverlay();
     if (phase_ == Phase::Menu && menu_) menu_->draw();
 }
 

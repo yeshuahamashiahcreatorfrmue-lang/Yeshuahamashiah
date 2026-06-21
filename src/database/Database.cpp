@@ -72,6 +72,10 @@ const CharacterDef* Database::mob(int id) const {
     for (const auto& c : mobs) if (c.id == id) return &c;
     return nullptr;
 }
+const DialogueScenario* Database::dialogue(int id) const {
+    for (const auto& d : dialogues) if (d.id == id) return &d;
+    return nullptr;
+}
 const CharacterDef* Database::character(int id) const {
     for (const auto& c : characters) if (c.id == id) return &c;
     return nullptr;
@@ -163,6 +167,10 @@ json Database::toJson() const {
     for (const auto& c : characters) j["characters"].push_back(charToJson(c));
     j["mobs"] = json::array();
     for (const auto& c : mobs) j["mobs"].push_back(charToJson(c));
+    j["dialogues"] = json::array();
+    for (const auto& d : dialogues) j["dialogues"].push_back(dialogueToJson(d));
+    j["scenes"] = json::array();
+    for (const auto& s : scenes) j["scenes"].push_back(sceneToJson(s));
     return j;
 }
 
@@ -205,6 +213,10 @@ void Database::fromJson(const json& j) {
     for (const auto& c : j.value("characters", json::array())) characters.push_back(charFromJson(c));
     mobs.clear();
     for (const auto& c : j.value("mobs", json::array())) mobs.push_back(charFromJson(c));
+    dialogues.clear();
+    for (const auto& d : j.value("dialogues", json::array())) dialogues.push_back(dialogueFromJson(d));
+    scenes.clear();
+    for (const auto& s : j.value("scenes", json::array())) scenes.push_back(sceneFromJson(s));
 }
 
 } // namespace tsukuru

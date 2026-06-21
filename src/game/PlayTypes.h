@@ -61,6 +61,8 @@ struct NpcInst {
     float atkCd = 0;
     float hurtFlash = 0;
     int   switchOnDeath = -1;    // event.switchId flipped when this NPC dies
+    float lifeTimer = 0;         // >0: 시간제한 NPC(대화로 소환된 적대/우호/추종) — 0이 되면 사라짐
+    bool  follower = false;      // 추종 NPC(대화로 떠나보낼 수 있음)
     bool  combatant() const { return maxHp > 0; }
     bool  alive() const { return maxHp <= 0 || hp > 0; }
 };

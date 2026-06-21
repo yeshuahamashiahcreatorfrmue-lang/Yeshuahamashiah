@@ -38,6 +38,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "npc") tab_ = Tab::Npc;
         else if (s == "events") tab_ = Tab::Events;
         else if (s == "chars") tab_ = Tab::Chars; else if (s == "mob") tab_ = Tab::Mob;
+        else if (s == "dialogue") tab_ = Tab::Dialogue; else if (s == "scenario") tab_ = Tab::Scenario;
         else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
@@ -91,7 +92,8 @@ void Editor::update(float dt) {
     // swallowed by Hangul composition.
     bool anyFieldFocused = eventTextFocus_ || eventFieldFocus_ != 0 || dbNameFocus_ >= 0 ||
         dbDescFocus_ >= 0 || mapNameFocus_ || mapSearchFocus_ || skillNameFocus_ ||
-        charDefNameFocus_ || charLibRenameFocus_ || charDataNameFocus_ >= 0;
+        charDefNameFocus_ || charLibRenameFocus_ || charDataNameFocus_ >= 0 ||
+        dlgFocus_ >= 0 || scnFocus_ >= 0;
     plat::setImeEnabled(anyFieldFocused);
 
     // Global shortcuts
@@ -179,6 +181,8 @@ void Editor::draw() {
         case Tab::Events:   drawEventsTab();   break;
         case Tab::Chars:    mobMode_ = false; drawCharsTab(); break;
         case Tab::Mob:      mobMode_ = true;  drawCharsTab(); break;   // same builder, db.mobs
+        case Tab::Dialogue: drawDialogueTab(); break;
+        case Tab::Scenario: drawScenarioTab(); break;
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
@@ -222,8 +226,8 @@ void Editor::drawToolbar() {
 
     float x = 6;
     auto tabBtn = [&](const char* name, Tab t) {
-        if (ui::button({ x, 6, 70, 28 }, name, tab_ == t)) tab_ = t;
-        x += 72;
+        if (ui::button({ x, 6, 58, 28 }, name, tab_ == t)) tab_ = t;
+        x += 60;
     };
     tabBtn("월드", Tab::World);
     tabBtn("전맵뷰어", Tab::WorldView);
@@ -232,15 +236,17 @@ void Editor::drawToolbar() {
     tabBtn("이벤트", Tab::Events);
     tabBtn("캐릭터", Tab::Chars);
     tabBtn("몹", Tab::Mob);
+    tabBtn("대화", Tab::Dialogue);
+    tabBtn("시나리오", Tab::Scenario);
     tabBtn("에셋", Tab::Assets);
     tabBtn("DB", Tab::Database);
 
-    x += 12;
-    if (ui::button({ x, 6, 90, 28 }, "저장")) { engine_.project().save(); setStatus("저장됨."); }
-    x += 94;
-    if (ui::button({ x, 6, 110, 28 }, "플레이 (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
-    x += 114;
-    if (ui::button({ x, 6, 130, 28 }, "이 맵 테스트 (F6)", false)) {
+    x += 10;
+    if (ui::button({ x, 6, 64, 28 }, "저장")) { engine_.project().save(); setStatus("저장됨."); }
+    x += 68;
+    if (ui::button({ x, 6, 88, 28 }, "플레이(F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
+    x += 92;
+    if (ui::button({ x, 6, 104, 28 }, "맵테스트(F6)", false)) {
         if (auto m = activeMap()) {
             engine_.project().save();
             int cx = m->tilemap.width()/2, cy = m->tilemap.height()/2, bx = cx, by = cy, best = 1<<30;

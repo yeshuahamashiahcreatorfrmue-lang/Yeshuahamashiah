@@ -57,6 +57,7 @@ file(GLOB_RECURSE CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/world/*.cpp
     ${CMAKE_SOURCE_DIR}/src/database/*.cpp
     ${CMAKE_SOURCE_DIR}/src/entity/Event.cpp
+    ${CMAKE_SOURCE_DIR}/src/entity/Story.cpp
     ${CMAKE_SOURCE_DIR}/src/game/Inventory.cpp
     ${CMAKE_SOURCE_DIR}/src/game/GameState.cpp
     ${CMAKE_SOURCE_DIR}/src/net/Net.cpp
@@ -113,6 +114,7 @@ if(BUILD_ENGINE)
         ${CMAKE_SOURCE_DIR}/src/game/GamePlaySkills.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayFx.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayNpc.cpp
+        ${CMAKE_SOURCE_DIR}/src/game/GamePlayStory.cpp
         ${CMAKE_SOURCE_DIR}/src/game/GamePlayRender.cpp
         ${CMAKE_SOURCE_DIR}/src/game/TitleScreen.cpp
         ${CMAKE_SOURCE_DIR}/src/game/Menu.cpp

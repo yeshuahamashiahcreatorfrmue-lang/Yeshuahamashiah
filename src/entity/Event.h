@@ -82,6 +82,8 @@ struct Event {
     std::string choiceA, choiceB, choiceC, choiceD; // up to 4 options (A/B min for a choice)
     int  choiceSwitch = -1;      // 2-way compat: set true if A chosen, false otherwise
     int  choiceVar = -1;         // stores the chosen option index (0..3) into this variable
+    int  dialogueId = -1;        // if >=0, this Message event plays a 대화로그 시나리오 instead
+    int  sceneId = -1;           // if >=0, this event triggers a 스토리 시나리오(장면) on action
 
     // --- GiveItem extras: also give/remove gold; amount<0 removes items ---
     int  giveGold = 0;

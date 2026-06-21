@@ -393,6 +393,8 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             textF("선택 D:", ev->choiceD, 7, 24);
             stepN("선택→변수(선택번호 0~3 저장, -1없음)", ev->choiceVar, 1, -1, 999);
             stepN("선택→스위치(A=ON/그외 OFF, -1없음)", ev->choiceSwitch, 1, -1, 999);
+            DrawTextU("─ 대화로그 시나리오(>=0이면 위 대사 대신 재생) ─", (int)panel.x + 12, (int)y, 12, ui::kAccentHi); y += 18;
+            stepN("대화ID (대화 탭, -1없음)", ev->dialogueId, 1, -1, 9999);
             break;
         case EventType::Teleport: {
             stepN("대상맵", ev->targetMap, 1, -1, 999);
@@ -522,6 +524,9 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         default: break;
     }
     y += 6;
+    DrawTextU("─ 스토리 시나리오(공통) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+    stepN("시나리오ID 실행 (시나리오 탭, -1없음)", ev->sceneId, 1, -1, 9999);
+    y += 4;
     DrawTextU("─ 발동 조건(공통) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
     stepN("조건 스위치(-1없음)", ev->conditionSwitch, 1, -1, 999);
     if (ev->conditionSwitch >= 0) {

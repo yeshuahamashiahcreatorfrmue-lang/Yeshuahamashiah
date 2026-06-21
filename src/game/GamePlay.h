@@ -40,7 +40,7 @@ public:
     void draw();
 
 private:
-    enum class Phase { Field, Message, Menu, Shop, GameOver, GameClear };
+    enum class Phase { Field, Message, Menu, Shop, GameOver, GameClear, Dialogue };
 
     // --- lifecycle / dispatch (GamePlay.cpp) ---
     void loadMap(int id);
@@ -146,6 +146,16 @@ private:
     void drawMinimap();
     void drawFullMap();   // M: full-screen map overview
     void drawChat();      // chat input line + speech bubble + right-side chat log
+    // --- 대화로그 시나리오 재생 ---
+    void startDialogue(int id);
+    void showDialogueLine();          // present the current line (+answers)
+    void applyDialogueAnswer(int idx);// run an answer's response, then branch
+    void updateDialogue();            // advance plain lines
+    void drawDialogueOverlay();       // line text + answer buttons
+    void spawnTimedNpc(int charId, int faction, float dur, bool follower); // dialogue-spawned NPC
+    // --- 스토리 시나리오 시퀀서 ---
+    void startScene(int id);
+    void updateScene(float dt);
     void visibleRange(int& x0, int& y0, int& x1, int& y1) const; // tile culling
 
     Engine& engine_;
@@ -197,6 +207,13 @@ private:
     std::string chatBubble_;
     float chatBubbleT_ = 0;
     std::unordered_map<int, std::pair<std::string,float>> remoteBubbles_; // netId -> (text, timer)
+    // dialogue playback
+    int dlgRunId_ = -1, dlgRunLine_ = 0;
+    std::vector<std::string> dlgAnswerTexts_;
+    // scene playback
+    int sceneRunId_ = -1, sceneStep_ = -1;
+    float sceneTimer_ = 0;
+    std::unordered_map<int,int> sceneTags_;  // scene tag -> spawned NpcInst eventId marker
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
 
