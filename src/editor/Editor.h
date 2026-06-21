@@ -83,6 +83,7 @@ private:
     void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
     void pickAndImportSound();                        // file picker -> assign a skill sound
     void pickAndImportBgm();                          // file picker -> import + assign a map's BGM
+    void pickAndImportItemIcon();                     // file picker -> import + assign a DB item's icon
     void pickAndImportTileset();                      // file picker -> assign the active map's tileset (no crop)
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
     void deleteAssets(const std::vector<int>& ids);  // unregister assets + scrub character motion refs
@@ -158,6 +159,8 @@ private:
     bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
     bool pendingBgmImport_ = false;        // request the picker to import a map BGM
     int  pendingBgmMapId_ = -1;            // map awaiting an imported BGM
+    bool pendingItemIcon_ = false;         // request the picker to import a DB item icon
+    int  pendingItemIconId_ = -1;          // item awaiting an imported icon
     bool pendingTilesetImport_ = false;    // request the picker to assign the map tileset
     bool pendingNpcCharImport_ = false;    // request the picker to assign an NPC sprite
     int  pendingNpcEventId_ = -1;          // event awaiting an imported NPC sprite

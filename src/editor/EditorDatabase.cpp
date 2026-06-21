@@ -79,9 +79,13 @@ void Editor::drawDatabaseTab() {
             const char* kinds[] = {"기타","식품(음식/음료)","장비"};
             if (ui::button({dx,dy,260,26}, TextFormat("분류: %s", kinds[it.kind%3]))) it.kind=(it.kind+1)%3;
             dy+=32;
-            // icon image (cycle through image assets) + import
+            // icon image: cycle existing assets, or import an external picture
             if (ui::button({dx,dy,260,26}, std::string("이미지: ")+assetName(it.iconAsset), it.iconAsset>=0))
                 cycleAsset(it.iconAsset, AssetType::Image);
+            dy+=30;
+            if (ui::button({dx,dy,260,24}, "이미지 가져오기 (외부 파일)", true)) {
+                pendingItemIcon_ = true; pendingItemIconId_ = it.id;
+            }
             dy+=30;
             step("가격", it.price, 10, 0, 99999);
             if (it.kind == 1) {                                  // 식품(food/drink)

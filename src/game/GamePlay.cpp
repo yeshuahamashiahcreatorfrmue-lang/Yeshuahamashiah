@@ -26,6 +26,8 @@ GamePlay::~GamePlay() = default;
 
 void GamePlay::onEnter() {
     if (!menu_) menu_ = std::make_unique<Menu>(engine_);
+    if (getenv("TSUKURU_INV")) invOpen_ = true;       // debug: open inventory window
+    if (getenv("TSUKURU_EQUIP")) equipOpen_ = true;   // debug: open equipment window
     firedOnce_.clear();
     GameState& gs = engine_.state();
     loadMap(gs.currentMap);

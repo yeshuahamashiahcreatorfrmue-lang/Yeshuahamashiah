@@ -83,6 +83,13 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
         party[0].applyCharacter(*c);
     }
     if (party.empty()) party.push_back(PartyMember{});   // never leave the party empty
+    // starter kit: a few of the first food + equipment items, IF the game defines
+    // any (so the inventory/equip windows are populated; no-op for games without).
+    int foodN = 0, equipN = 0;
+    for (const auto& it : db.items) {
+        if (it.kind == 1 && foodN  < 3) { inventory.addItem(it.id, 5); ++foodN; }
+        if (it.kind == 2 && equipN < 4) { inventory.addItem(it.id, 1); ++equipN; }
+    }
     currentMap = startMap;
     playerX = sx; playerY = sy; playerDir = 0;
     objective.clear();

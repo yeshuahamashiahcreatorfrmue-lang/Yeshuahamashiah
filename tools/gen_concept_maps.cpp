@@ -611,6 +611,31 @@ int main(int argc,char**argv){
       foeNpc(m,14,14,A_foe); foeNpc(m,26,18,A_foe);
       npc(m,8,8,"동굴 깊은 곳엔 뭔가 있어…",NWRK); sign(m,W/2,4,"깊은 동굴"); }
 
+    // sample 식품(food/drink) + 장비(equipment) items so the inventory(I)/장비(C)
+    // windows are populated out of the box (also keeps these Korean names in
+    // source so the font bakes their glyphs). Skipped if a name already exists.
+    {
+        auto& items = p->database.items;
+        auto exists = [&](const std::string& n){ for (auto& it : items) if (it.name == n) return true; return false; };
+        int iid = 1; for (auto& it : items) iid = std::max(iid, it.id + 1);
+        auto food = [&](const char* n, int sat, int hyd, int hp, int atk, int price){
+            if (exists(n)) return; Item it; it.id = iid++; it.name = n; it.kind = 1;
+            it.satiety = sat; it.hydration = hyd; it.healHp = hp; it.bonusAtk = atk; it.price = price;
+            items.push_back(it); };
+        auto gear = [&](const char* n, int slot, int atk, int def, int spd, int price){
+            if (exists(n)) return; Item it; it.id = iid++; it.name = n; it.kind = 2;
+            it.bodySlot = slot; it.bonusAtk = atk; it.bonusDef = def; it.bonusSpd = spd; it.price = price;
+            items.push_back(it); };
+        food("빵", 8000, 0, 0, 0, 20);
+        food("물병", 0, 9000, 0, 0, 15);
+        food("고기구이", 15000, 0, 40, 1, 60);
+        food("회복포션", 0, 2000, 120, 0, 80);
+        gear("철검", 6, 8, 0, 0, 120);
+        gear("가죽갑옷", 2, 0, 6, 0, 100);
+        gear("강철투구", 1, 0, 4, 0, 70);
+        gear("신속부츠", 5, 0, 1, 2, 90);
+    }
+
     // for a standalone pack, start on the field map; when appending, leave the
     // demo's existing start untouched.
     if (!append) {

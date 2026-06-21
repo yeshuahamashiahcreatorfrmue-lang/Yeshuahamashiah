@@ -440,6 +440,30 @@ void Editor::pickAndImportBgm() {
     setStatus("BGM 등록됨: " + assetName(id));
 }
 
+// Import an external image as a DB item's icon (food/drink/equipment picture).
+// Runs through the same AI cut-out + size-shrink path as other imports.
+void Editor::pickAndImportItemIcon() {
+    int id = pendingItemIconId_; pendingItemIconId_ = -1;
+    Project& p = engine_.project();
+    Item* it = nullptr;
+    for (auto& x : p.database.items) if (x.id == id) it = &x;
+    if (!it) { setStatus("아이템을 찾지 못했습니다."); return; }
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("이미지 불러오기 취소됨."); return; }
+    std::error_code ec;
+    std::string ext = fs::path(files.front()).extension().string();
+    fs::create_directories(fs::path(p.dir) / "assets", ec);
+    fs::path tmp = fs::path(p.dir) / "assets" / ("_itemicon" + ext);
+    int k = 1;
+    while (fs::exists(tmp, ec)) tmp = fs::path(p.dir) / "assets" / ("_itemicon" + std::to_string(k++) + ext);
+    if (!plat::copyFileUtf8(files.front(), tmp.string())) { setStatus("복사 실패."); return; }
+    int aid = importImageFile(tmp.string());      // AI 컷아웃 + 용량 축약
+    fs::remove(tmp, ec);
+    if (aid < 0) { setStatus("이미지 불러오기 실패."); return; }
+    it->iconAsset = aid; p.save();
+    setStatus("아이템 이미지 등록됨: " + assetName(aid));
+}
+
 // Make the BORDER background transparent (magic-wand flood-fill from the edges),
 // so interior same-colour pixels are kept. The top-left corner is the background
 // colour. Saves a NEW asset (non-destructive). Single images are cropped to the
