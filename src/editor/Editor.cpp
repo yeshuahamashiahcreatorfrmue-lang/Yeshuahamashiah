@@ -45,6 +45,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         if (const char* sc = getenv("TSUKURU_DBSCROLL")) dbScroll_ = (float)atoi(sc);
     }
     if (const char* e = getenv("TSUKURU_EVSEL")) { tab_ = Tab::Events; editingEventId_ = atoi(e); } // debug
+    if (const char* sc = getenv("TSUKURU_EVSCROLL")) { eventScroll_ = (float)atoi(sc); eventScrollId_ = atoi(getenv("TSUKURU_EVSEL")?getenv("TSUKURU_EVSEL"):"-1"); }
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
     if (getenv("TSUKURU_OBJ")) { tab_ = Tab::Map; objMode_ = true; }   // debug: object mode
     if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview

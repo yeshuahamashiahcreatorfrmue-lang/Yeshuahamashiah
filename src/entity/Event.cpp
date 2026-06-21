@@ -60,7 +60,14 @@ json Event::toJson() const {
         {"questCount", questCount}, {"questDoneText", questDoneText},
         {"rewardGold", rewardGold}, {"rewardExp", rewardExp},
         {"rewardItemId", rewardItemId}, {"rewardItemCount", rewardItemCount},
-        {"questTakeItems", questTakeItems}
+        {"questTakeItems", questTakeItems},
+        {"conditionVar", conditionVar}, {"conditionVarMin", conditionVarMin},
+        {"speakerName", speakerName}, {"faceAsset", faceAsset},
+        {"choiceA", choiceA}, {"choiceB", choiceB}, {"choiceSwitch", choiceSwitch},
+        {"giveGold", giveGold},
+        {"varId", varId}, {"varOp", varOp}, {"varValue", varValue},
+        {"faceDir", faceDir}, {"battleTurnBased", battleTurnBased},
+        {"shopItems", shopItems}, {"rewardSwitch", rewardSwitch}
     };
 }
 
@@ -103,6 +110,21 @@ Event Event::fromJson(const json& j) {
     e.rewardItemId    = j.value("rewardItemId", -1);
     e.rewardItemCount = j.value("rewardItemCount", 1);
     e.questTakeItems  = j.value("questTakeItems", true);
+    e.conditionVar    = j.value("conditionVar", -1);
+    e.conditionVarMin = j.value("conditionVarMin", 1);
+    e.speakerName     = j.value("speakerName", "");
+    e.faceAsset       = j.value("faceAsset", -1);
+    e.choiceA         = j.value("choiceA", "");
+    e.choiceB         = j.value("choiceB", "");
+    e.choiceSwitch    = j.value("choiceSwitch", -1);
+    e.giveGold        = j.value("giveGold", 0);
+    e.varId           = j.value("varId", -1);
+    e.varOp           = j.value("varOp", 0);
+    e.varValue        = j.value("varValue", 0);
+    e.faceDir         = j.value("faceDir", -1);
+    e.battleTurnBased = j.value("battleTurnBased", false);
+    e.shopItems       = j.value("shopItems", std::vector<int>{});
+    e.rewardSwitch    = j.value("rewardSwitch", -1);
     return e;
 }
 

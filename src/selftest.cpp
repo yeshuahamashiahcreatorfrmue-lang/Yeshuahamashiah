@@ -469,6 +469,26 @@ static void testQuests() {
           "퀘스트 상태 세이브/로드 직렬화");
 }
 
+static void testEventFields() {
+    std::printf("== Event fields (all types) ==\n");
+    Event e;
+    e.id = 7; e.type = EventType::Message; e.speakerName = "촌장"; e.faceAsset = 6;
+    e.choiceA = "예"; e.choiceB = "아니오"; e.choiceSwitch = 10;
+    e.giveGold = 100; e.varId = 3; e.varOp = 1; e.varValue = 5;
+    e.faceDir = 2; e.battleTurnBased = true; e.shopItems = { 1, 2, 8 };
+    e.rewardSwitch = 41; e.conditionVar = 4; e.conditionVarMin = 2;
+    Event r = Event::fromJson(e.toJson());
+    CHECK(r.speakerName == "촌장" && r.faceAsset == 6, "메시지 화자/초상화 직렬화");
+    CHECK(r.choiceA == "예" && r.choiceB == "아니오" && r.choiceSwitch == 10, "선택지 직렬화");
+    CHECK(r.giveGold == 100, "골드 지급 직렬화");
+    CHECK(r.varId == 3 && r.varOp == 1 && r.varValue == 5, "변수 설정 직렬화");
+    CHECK(r.faceDir == 2, "이동 도착방향 직렬화");
+    CHECK(r.battleTurnBased, "전투 방식(턴제) 직렬화");
+    CHECK(r.shopItems.size() == 3 && r.shopItems[2] == 8, "상점 다품목 직렬화");
+    CHECK(r.rewardSwitch == 41, "퀘스트 완료 스위치 직렬화");
+    CHECK(r.conditionVar == 4 && r.conditionVarMin == 2, "변수 발동조건 직렬화");
+}
+
 int main() {
     std::printf("===== Tsukuru Engine Core Self-Test =====\n");
     testTilemap();
@@ -488,6 +508,7 @@ int main() {
     testResidueStress();
     testFoodAndSurvival();
     testQuests();
+    testEventFields();
     testNetCapacity();
 
     std::printf("=========================================\n");

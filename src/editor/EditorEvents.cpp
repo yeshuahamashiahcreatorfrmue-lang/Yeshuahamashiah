@@ -264,6 +264,19 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     auto nameHint = [&](const std::string& s, Color c) {
         DrawTextU(("→ " + s).c_str(), (int)panel.x + 16, (int)y, 12, c); y += 18;
     };
+    auto textF = [&](const char* lbl, std::string& s, int fid, int maxlen) {
+        ui::label(lbl, (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
+        Rectangle r = { panel.x + 12, y, 296, 26 };
+        if (ui::mouseIn(r) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventFieldFocus_ = fid;
+        else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(r) && eventFieldFocus_ == fid) eventFieldFocus_ = 0;
+        ui::textField(r, s, eventFieldFocus_ == fid, maxlen); y += 32;
+    };
+    auto cycleImg = [&](int& asset) {   // cycle through registered images (-1 = none)
+        auto imgs = engine_.project().assets.byType(AssetType::Image);
+        if (imgs.empty()) { asset = -1; return; }
+        int idx = -1; for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == asset) idx = i;
+        idx++; asset = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
+    };
 
     // ---- event type, laid out as a labelled grid so every kind is visible ----
     DrawTextU("이벤트 종류 (탭에서 선택)", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 20;
@@ -281,41 +294,74 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
 
     const char* txtLbl = ev->type == EventType::Quest ? "안내문 (말 걸 때 대사):"
                        : ev->type == EventType::Shop  ? "상점 이름:" : "텍스트 / 대사:";
-    ui::label(txtLbl, (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
-    Rectangle tf = { panel.x + 12, y, 296, 26 };
-    if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
-    else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
-    ui::textField(tf, ev->text, eventTextFocus_, 120);
-    y += 34;
+    textF(txtLbl, ev->text, 1, 120);
     switch (ev->type) {
+        case EventType::Message:
+            textF("화자 이름(선택):", ev->speakerName, 2, 24);
+            if (ui::button({ panel.x + 12, y, 296, 24 }, std::string("초상화: ") + (ev->faceAsset >= 0 ? assetName(ev->faceAsset) : "없음"), ev->faceAsset >= 0))
+                cycleImg(ev->faceAsset);
+            y += 30;
+            DrawTextU("─ 선택지(둘 다 입력 시 분기) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            textF("선택 A:", ev->choiceA, 3, 24);
+            textF("선택 B:", ev->choiceB, 4, 24);
+            stepN("선택→스위치(A=ON/B=OFF, -1없음)", ev->choiceSwitch, 1, -1, 999);
+            break;
         case EventType::Teleport: {
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 26;
+            stepN("대상맵", ev->targetMap, 1, -1, 999);
             std::shared_ptr<Map> tm = engine_.project().map(ev->targetMap);
-            DrawTextU(tm ? ("→ " + tm->name).c_str() : "→ (없는 맵)",
-                      (int)panel.x + 16, (int)y, 12, tm ? ui::kAccentHi : ui::kDanger); y += 20;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "X", ev->targetX, 1, 0, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "Y", ev->targetY, 1, 0, 999); y += 28;
+            nameHint(tm ? tm->name : "(없는 맵)", tm ? ui::kAccentHi : ui::kDanger);
+            stepN("X", ev->targetX, 1, 0, 999);
+            stepN("Y", ev->targetY, 1, 0, 999);
+            const char* dirs[5] = { "유지", "아래", "왼쪽", "오른쪽", "위" };
+            int di = ev->faceDir < 0 ? 0 : ev->faceDir + 1;
+            if (ui::button({ panel.x + 12, y, 296, 24 }, TextFormat("도착 방향: %s", dirs[di % 5])))
+                { di = (di + 1) % 5; ev->faceDir = di == 0 ? -1 : di - 1; }
+            y += 28;
             break;
         }
         case EventType::GiveItem:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수량", ev->amount, 1, 1, 99); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
+            stepN("아이템ID(-1=골드만)", ev->itemId, 1, -1, 999);
+            { const Item* it = db.item(ev->itemId); if (ev->itemId >= 0) nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger); }
+            stepN("수량(음수=회수)", ev->amount, 1, -99, 99);
+            stepN("골드(음수=차감)", ev->giveGold, 10, -99999, 99999);
+            stepN("진행 스위치 ON(-1없음)", ev->switchId, 1, -1, 999);
             break;
         case EventType::SetSwitch:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치ID", ev->switchId, 1, 0, 999); y += 28;
+            stepN("스위치ID(-1=변수만)", ev->switchId, 1, -1, 999);
             if (ui::button({ panel.x + 12, y, 296, 24 }, ev->switchValue ? "값: 켜짐" : "값: 꺼짐"))
                 ev->switchValue = !ev->switchValue;
             y += 28;
+            DrawTextU("─ 변수(선택) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            stepN("변수ID(-1=없음)", ev->varId, 1, -1, 999);
+            if (ev->varId >= 0) {
+                if (ui::button({ panel.x + 12, y, 296, 24 }, ev->varOp == 1 ? "연산: 증가(+)" : "연산: 대입(=)"))
+                    ev->varOp = ev->varOp == 1 ? 0 : 1;
+                y += 28;
+                stepN("값", ev->varValue, 1, -99999, 99999);
+            }
             break;
         case EventType::StartBattle:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "적ID", ev->itemId, 1, -1, 999); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "수", ev->amount, 1, 1, 6); y += 28;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "처치스위치", ev->switchId, 1, -1, 999); y += 28;
+            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->battleTurnBased ? "방식: 턴제 전투(즉시)" : "방식: 필드 몹 소환"))
+                ev->battleTurnBased = !ev->battleTurnBased;
+            y += 28;
+            stepN("적ID", ev->itemId, 1, -1, 999);
+            { const EnemyDef* en = db.enemy(ev->itemId); nameHint(en ? en->name : "(없는 적)", en ? ui::kAccentHi : ui::kDanger); }
+            stepN(ev->battleTurnBased ? "적 수" : "소환 수", ev->amount, 1, 1, 6);
+            if (!ev->battleTurnBased) stepN("처치 스위치(-1없음)", ev->switchId, 1, -1, 999);
             break;
-        case EventType::Shop:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
+        case EventType::Shop: {
+            DrawTextU("─ 판매 품목 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            for (int i = 0; i < (int)ev->shopItems.size(); ++i) {
+                ui::intStepper({ panel.x + 12, y, 232, 24 }, TextFormat("품목 %d", i + 1), ev->shopItems[i], 1, 0, 999);
+                if (ui::button({ panel.x + 248, y, 60, 24 }, "삭제"))
+                    { ev->shopItems.erase(ev->shopItems.begin() + i); --i; y += 26; continue; }
+                const Item* it = db.item(ev->shopItems[i]);
+                y += 26; nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
+            }
+            if (ui::button({ panel.x + 12, y, 296, 24 }, "+ 품목 추가")) ev->shopItems.push_back(1);
+            y += 28;
             break;
+        }
         case EventType::Quest: {
             DrawTextU("─ 완료 조건 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             const char* objs[4] = { "즉시 지급(대화)", "몬스터 처치", "아이템 수집", "지역 도달" };
@@ -350,6 +396,7 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
                 nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
                 stepN("보상 수량", ev->rewardItemCount, 1, 1, 99);
             }
+            stepN("완료 시 스위치 ON(-1없음)", ev->rewardSwitch, 1, -1, 999);
             break;
         }
         case EventType::Ending:
@@ -358,7 +405,15 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         default: break;
     }
     y += 6;
-    ui::intStepper({ panel.x + 12, y, 296, 24 }, "조건스위치", ev->conditionSwitch, 1, -1, 999); y += 28;
+    DrawTextU("─ 발동 조건(공통) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+    stepN("조건 스위치(-1없음)", ev->conditionSwitch, 1, -1, 999);
+    if (ev->conditionSwitch >= 0) {
+        if (ui::button({ panel.x + 12, y, 296, 24 }, ev->conditionValue ? "필요 값: 켜짐" : "필요 값: 꺼짐"))
+            ev->conditionValue = !ev->conditionValue;
+        y += 28;
+    }
+    stepN("조건 변수(-1없음)", ev->conditionVar, 1, -1, 999);
+    if (ev->conditionVar >= 0) stepN("변수 ≥", ev->conditionVarMin, 1, -99999, 99999);
     if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
     if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
         auto imgs = engine_.project().assets.byType(AssetType::Image);

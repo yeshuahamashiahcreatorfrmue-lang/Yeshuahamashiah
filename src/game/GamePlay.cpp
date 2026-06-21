@@ -53,8 +53,10 @@ void GamePlay::onEnter() {
     runAutoruns();
     if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
         startEncounterBattle();   // debug: jump straight into a turn-based battle
-    if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop for item id s
-        openShop(atoi(s), "상점: 포션을 사시겠어요?");
+    if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop (item ids "1,2,3")
+        openShop({ atoi(s), 2, 8 }, "무기·도구 상점");
+    if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a choice message
+        showMessageEx("정말 마을을 떠나시겠어요?", "촌장", -1, "예, 떠납니다", "아니오", 10);
     if (getenv("TSUKURU_QUESTLOG") && map_) {     // debug: accept all quests + open log
         GameState& gs = engine_.state();
         for (auto& e : map_->events) {
@@ -100,8 +102,12 @@ void GamePlay::update(float dt) {
         case Phase::Field: updateField(dt); break;
         case Phase::Message: {
             static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
+            bool lastPage = msgPage_ + 1 >= (int)msgPages_.size();
+            bool choicePend = lastPage && msgChoiceSwitch_ != -2 &&
+                              !msgChoiceA_.empty() && !msgChoiceB_.empty();
+            if (choicePend) break;   // wait for the player to click a choice (drawMessage)
             if (autodismiss || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
-                if (msgPage_ + 1 < (int)msgPages_.size()) {
+                if (!lastPage) {
                     ++msgPage_;
                     message_ = msgPages_[msgPage_];
                     engine_.audio().playSfx("select", 0.5f);

@@ -114,6 +114,7 @@ private:
     // Event editing
     int  editingEventId_ = -1;
     bool eventTextFocus_ = false;
+    int  eventFieldFocus_ = 0; // which event text field is focused (0 none,1 text,2 speaker,3 choiceA,4 choiceB)
     float eventScroll_ = 0;   // event inspector vertical scroll (tall quest panels)
     int   eventScrollId_ = -1;// which event eventScroll_ belongs to (reset on change)
     // Database editing

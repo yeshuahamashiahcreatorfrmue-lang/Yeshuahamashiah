@@ -276,7 +276,7 @@ void GamePlay::runAutoruns() {
     GameState& gs = engine_.state();
     for (auto& e : map_->events) {
         if (e.trigger != TriggerType::Autorun) continue;
-        if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) continue;
+        if (!eventConditionMet(gs, e)) continue;
         long key = ((long)map_->id << 16) | (e.id & 0xffff);
         if (firedOnce_.count(key)) continue;        // autoruns fire once per session
         firedOnce_.insert(key);

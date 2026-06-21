@@ -21,6 +21,10 @@ namespace tsukuru {
 class Engine;
 class Menu;
 
+// Event activation gate (switch AND variable condition). Shared by interaction,
+// autoruns and touch triggers so every path honours the same rules.
+bool eventConditionMet(GameState& gs, const Event& e);
+
 // GamePlay is a thin controller; its method bodies live in purpose-grouped
 // translation units (GamePlay, GamePlayMovement, GamePlayEvents,
 // GamePlayMonsters, GamePlaySkills, GamePlayNpc, GamePlayRender). The member
@@ -53,6 +57,9 @@ private:
     Event* actionEventAt(int x, int y);
     void runEvent(Event& e);
     void showMessage(const std::string& text); // splits on '|' into pages
+    // rich message: speaker name plate, portrait, and an optional 2-way choice.
+    void showMessageEx(const std::string& text, const std::string& speaker, int faceAsset,
+                       const std::string& choiceA, const std::string& choiceB, int choiceSwitch);
     void drawMessage();
 
     // --- field monsters (GamePlayMonsters.cpp) ---
@@ -101,6 +108,7 @@ private:
 
     // --- turn-based battle (random encounters; surfaces the Battle system) ---
     void startEncounterBattle();   // build a troop from the map's encounter list
+    void startBattleWith(const std::vector<int>& enemyIds); // event-driven turn battle
     void updateBattle(float dt);
     void drawBattle();
 
@@ -111,7 +119,7 @@ private:
     void unequipSlot(int slot);
 
     // --- shop (EventType::Shop opens an on-screen buy screen) ---
-    void openShop(int itemId, const std::string& title);
+    void openShop(const std::vector<int>& items, const std::string& title);
     void updateShop(float dt);
     void drawShop();
 
@@ -166,8 +174,8 @@ private:
     int   battleMenu_ = 0;      // 0 root / 1 skill submenu / 2 item submenu
 
     // shop screen state
-    int   shopItemId_ = -1;     // item the current shop sells
-    std::string shopTitle_;     // shop window title (event text)
+    std::vector<int> shopItems_; // items the current shop sells
+    std::string shopTitle_;      // shop window title (event text)
     bool  questLogOpen_ = false;// J: quest log overlay
 
     // custom-character motion playback
@@ -195,6 +203,11 @@ private:
     std::string message_;
     std::vector<std::string> msgPages_;
     int msgPage_ = 0;
+    // rich-message extras
+    std::string msgSpeaker_;
+    int  msgFace_ = -1;
+    std::string msgChoiceA_, msgChoiceB_;
+    int  msgChoiceSwitch_ = -1;   // >=0 while an unanswered choice is pending
 
     std::unique_ptr<Menu> menu_;
 };

@@ -619,6 +619,14 @@ int main(int argc,char**argv){
     //   "배고픈 아이들을 위해 빵 2개만 모아다 주실래요?"
     //   "고마워요! 덕분에 아이들이 배불리 먹겠어요."
 
+    // Glyph anchors for the event showcase map (maps/93.json, data-only strings):
+    //   "여러 줄 대사도" "이렇게 표시됩니다." "마을은 평화롭다." "촌장" "초상화도 보이죠?"
+    //   "소녀" "정말 떠나시겠어요?" "바닥에서 자동으로 뜨는 글." "스위치10이 켜져야 보임."
+    //   "포션을 받았다!" "획득!" "반납했다." "보급품 지급!" "열쇠 아이템" "통행료 지불."
+    //   "스위치20 켜짐." "꺼짐." "변수 초기화" "스위치+변수 동시" "잡화점" "무기 상점"
+    //   "약초상" "종합 상점" "빵집" "단일 품목 상점" "큰 상점" "마리 처치!" "모아줘."
+    //   "북쪽 동굴에 도달하라." "즉시 보상!" "아무 적이나" "회복포션 1개 수집." "멧돼지" "엔딩"
+
     // sample 식품(food/drink) + 장비(equipment) items so the inventory(I)/장비(C)
     // windows are populated out of the box (also keeps these Korean names in
     // source so the font bakes their glyphs). Skipped if a name already exists.

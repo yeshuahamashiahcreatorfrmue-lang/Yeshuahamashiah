@@ -62,8 +62,36 @@ struct Event {
     // switch == conditionValue.
     int  conditionSwitch = -1;
     bool conditionValue  = true;
+    int  conditionVar    = -1;   // also gate on a variable: fires only if var >= conditionVarMin
+    int  conditionVarMin = 1;
     bool once = false; // run only one time (sets a hidden flag)
     bool wander = false; // legacy roam flag (kept in sync with behavior==Wander)
+
+    // --- Message extras (speaker name plate, portrait, yes/no choice) ---
+    std::string speakerName;     // name shown above the message box
+    int  faceAsset = -1;         // portrait image drawn in the message box
+    std::string choiceA, choiceB;// if both non-empty, show a 2-way choice
+    int  choiceSwitch = -1;      // set true if A chosen, false if B chosen
+
+    // --- GiveItem extras: also give/remove gold; amount<0 removes items ---
+    int  giveGold = 0;
+
+    // --- SetSwitch extras: optionally set/add a variable too ---
+    int  varId = -1;             // -1 = none
+    int  varOp = 0;              // 0 = 대입(set), 1 = 증가(add)
+    int  varValue = 0;
+
+    // --- Teleport extra: facing after arrival (-1 = keep) ---
+    int  faceDir = -1;
+
+    // --- StartBattle extra: true = 즉시 턴제 전투(아니면 필드 스폰) ---
+    bool battleTurnBased = false;
+
+    // --- Shop extra: multiple wares (falls back to itemId when empty) ---
+    std::vector<int> shopItems;
+
+    // --- Quest extra: set a switch ON when the quest is completed ---
+    int  rewardSwitch = -1;
 
     // --- Quest / reward (EventType::Quest) ---
     // A self-contained quest: the giver NPC offers it on first talk, the player

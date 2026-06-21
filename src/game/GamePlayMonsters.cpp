@@ -218,7 +218,12 @@ void GamePlay::startEncounterBattle() {
     int n = 1 + std::rand() % 3;                       // 1..3 enemies
     for (int i = 0; i < n; ++i)
         ids.push_back(map_->encounterEnemies[std::rand() % map_->encounterEnemies.size()]);
-    battle_ = std::make_unique<Battle>(engine_.project().database, engine_.state(), ids);
+    startBattleWith(ids);
+}
+
+void GamePlay::startBattleWith(const std::vector<int>& enemyIds) {
+    if (enemyIds.empty()) return;
+    battle_ = std::make_unique<Battle>(engine_.project().database, engine_.state(), enemyIds);
     battleMenu_ = 0;
     phase_ = Phase::Battle;
     engine_.audio().playSfx("select");

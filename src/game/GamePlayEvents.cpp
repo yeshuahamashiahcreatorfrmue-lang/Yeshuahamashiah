@@ -12,6 +12,13 @@
 
 namespace tsukuru {
 
+// Event activation condition: an optional switch AND an optional variable gate.
+bool eventConditionMet(GameState& gs, const Event& e) {
+    if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) return false;
+    if (e.conditionVar >= 0 && gs.getVar(e.conditionVar) < e.conditionVarMin) return false;
+    return true;
+}
+
 // Pick the first ActionButton event at (x,y) whose condition is satisfied
 // (multiple events on one tile act like RPG-Maker "event pages").
 Event* GamePlay::actionEventAt(int x, int y) {
@@ -19,8 +26,7 @@ Event* GamePlay::actionEventAt(int x, int y) {
     Event* fallback = nullptr;
     for (auto& e : map_->events) {
         if (e.x != x || e.y != y || e.trigger != TriggerType::ActionButton) continue;
-        bool condOk = (e.conditionSwitch < 0) || (gs.getSwitch(e.conditionSwitch) == e.conditionValue);
-        if (condOk) return &e;
+        if (eventConditionMet(gs, e)) return &e;
         if (!fallback) fallback = &e;
     }
     return fallback;
@@ -41,6 +47,15 @@ void GamePlay::interact() {
 
 // ----------------------------- message box -----------------------------
 void GamePlay::showMessage(const std::string& text) {
+    showMessageEx(text, "", -1, "", "", -1);
+}
+
+void GamePlay::showMessageEx(const std::string& text, const std::string& speaker, int faceAsset,
+                             const std::string& choiceA, const std::string& choiceB, int choiceSwitch) {
+    msgSpeaker_ = speaker; msgFace_ = faceAsset;
+    msgChoiceA_ = choiceA; msgChoiceB_ = choiceB;
+    // a choice is pending only when both options are provided
+    msgChoiceSwitch_ = (!choiceA.empty() && !choiceB.empty()) ? choiceSwitch : -2; // -2 = no choice
     msgPages_.clear();
     size_t start = 0;
     while (true) {
@@ -55,38 +70,59 @@ void GamePlay::showMessage(const std::string& text) {
     engine_.audio().playSfx("select", 0.5f);
 }
 
+// true while the player must still pick a choice (last page + both options set)
+static bool choicePending(int sw, const std::string& a, const std::string& b) {
+    return sw != -2 && !a.empty() && !b.empty();
+}
+
 void GamePlay::runEvent(Event& e) {
     GameState& gs = engine_.state();
-    if (e.conditionSwitch >= 0 && gs.getSwitch(e.conditionSwitch) != e.conditionValue) return;
+    if (!eventConditionMet(gs, e)) return;
     long key = ((long)map_->id << 16) | (e.id & 0xffff);
     if (e.once && firedOnce_.count(key)) return;
 
     switch (e.type) {
         case EventType::Message:
-            showMessage(e.text); break;
+            showMessageEx(e.text, e.speakerName, e.faceAsset, e.choiceA, e.choiceB, e.choiceSwitch);
+            break;
         case EventType::Teleport: {
             loadMap(e.targetMap);
             int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;
             destX_ = e.targetX; destY_ = e.targetY;
             pxX_ = destX_ * (float)TS; pxY_ = destY_ * (float)TS;
             moving_ = false;
-            gs.playerX = destX_; gs.playerY = destY_;
+            if (e.faceDir >= 0 && e.faceDir <= 3) dir_ = e.faceDir;   // face a set direction
+            gs.playerX = destX_; gs.playerY = destY_; gs.playerDir = dir_;
             spawnMonsters();
             runAutoruns();
             break;
         }
-        case EventType::GiveItem:
-            gs.inventory.addItem(e.itemId, e.amount);
+        case EventType::GiveItem: {
+            if (e.amount < 0) gs.inventory.removeItem(e.itemId, -e.amount);  // 음수 = 회수
+            else if (e.itemId >= 0) gs.inventory.addItem(e.itemId, e.amount);
+            if (e.giveGold != 0) gs.inventory.gold = std::max(0, gs.inventory.gold + e.giveGold);
             if (e.switchId >= 0) gs.setSwitch(e.switchId, true);   // mark quest progress
             engine_.audio().playSfx("coin");
-            showMessage(e.text.empty() ? "아이템을 얻었다!" : e.text);
+            std::string msg = e.text;
+            if (msg.empty()) msg = e.amount < 0 ? "아이템을 건넸다." : e.giveGold > 0 ? "골드를 얻었다!" : "아이템을 얻었다!";
+            showMessage(msg);
             break;
+        }
         case EventType::SetSwitch:
-            gs.setSwitch(e.switchId, e.switchValue);
+            if (e.switchId >= 0) gs.setSwitch(e.switchId, e.switchValue);
+            if (e.varId >= 0) {                                      // 변수 대입/증가
+                int cur = gs.getVar(e.varId);
+                gs.setVar(e.varId, e.varOp == 1 ? cur + e.varValue : e.varValue);
+            }
             if (!e.text.empty()) showMessage(e.text);
             break;
         case EventType::StartBattle: {
-            // Repurposed: spawn live monsters on the field near the event.
+            if (e.battleTurnBased) {                                // 즉시 턴제 전투
+                std::vector<int> ids(std::max(1, e.amount), e.itemId);
+                startBattleWith(ids);
+                break;
+            }
+            // Otherwise: spawn live monsters on the field near the event.
             const Database& db = engine_.project().database;
             const EnemyDef* def = db.enemy(e.itemId);
             int TS = map_->tileset.tileWidth;
@@ -105,9 +141,12 @@ void GamePlay::runEvent(Event& e) {
             }
             break;
         }
-        case EventType::Shop:
-            openShop(e.itemId, e.text.empty() ? "상점" : e.text);
+        case EventType::Shop: {
+            std::vector<int> wares = e.shopItems;
+            if (wares.empty() && e.itemId >= 0) wares.push_back(e.itemId);  // fallback: single ware
+            openShop(wares, e.text.empty() ? "상점" : e.text);
             break;
+        }
         case EventType::Quest:
             runQuestEvent(e);
             break;
@@ -120,10 +159,10 @@ void GamePlay::runEvent(Event& e) {
     if (e.once) firedOnce_.insert(key);
 }
 
-// ----------------------------- shop -----------------------------
-void GamePlay::openShop(int itemId, const std::string& title) {
-    shopItemId_ = itemId;
-    shopTitle_  = title;
+// ----------------------------- shop (multi-item) -----------------------------
+void GamePlay::openShop(const std::vector<int>& items, const std::string& title) {
+    shopItems_ = items;
+    shopTitle_ = title;
     phase_ = Phase::Shop;
 }
 
@@ -134,42 +173,43 @@ void GamePlay::updateShop(float dt) {
 
 void GamePlay::drawShop() {
     GameState& gs = engine_.state();
-    const Item* it = engine_.project().database.item(shopItemId_);
+    const Database& db = engine_.project().database;
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
-    Rectangle box = { sw/2.0f - 230, sh/2.0f - 170, 460, 340 };
+    int rows = std::max(1, (int)shopItems_.size());
+    float listH = rows * 64.0f;
+    Rectangle box = { sw/2.0f - 280, sh/2.0f - (listH + 130) / 2, 560, listH + 130 };
     ui::panel(box);
     DrawTextU(shopTitle_.c_str(), (int)box.x + 18, (int)box.y + 14, 24, ui::kAccent);
-    DrawTextU(TextFormat("골드: %d", gs.inventory.gold), (int)(box.x + box.width - 160), (int)box.y + 18, 18, Color{230,200,90,255});
+    DrawTextU(TextFormat("골드: %d", gs.inventory.gold), (int)(box.x + box.width - 170), (int)box.y + 18, 18, Color{230,200,90,255});
 
-    if (!it) {
-        DrawTextU("판매 상품이 없습니다.", (int)box.x + 18, (int)box.y + 70, 18, ui::kTextDim);
-    } else {
-        // item icon
-        Rectangle ir = { box.x + 24, box.y + 70, 96, 96 };
-        DrawRectangleRec(ir, Color{26,30,40,255});
-        DrawRectangleLinesEx(ir, 1, ui::kAccent);
+    float ry = box.y + 54;
+    if (shopItems_.empty())
+        DrawTextU("판매 상품이 없습니다.", (int)box.x + 18, (int)ry, 18, ui::kTextDim);
+    for (int it_i = 0; it_i < (int)shopItems_.size(); ++it_i) {
+        const Item* it = db.item(shopItems_[it_i]);
+        if (!it) continue;
+        Rectangle row = { box.x + 16, ry, box.width - 32, 56 };
+        DrawRectangleRec(row, Color{26,30,40,255});
+        DrawRectangleLinesEx(row, 1, Fade(ui::kAccent, 0.5f));
         if (it->iconAsset >= 0) {
             const Texture2D& tx = engine_.assetTexture(it->iconAsset);
-            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {ir.x+6,ir.y+6,84,84}, {0,0},0,WHITE);
+            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {row.x+6,row.y+6,44,44}, {0,0},0,WHITE);
         }
-        DrawTextU(it->name.c_str(), (int)box.x + 136, (int)box.y + 76, 22, ui::kText);
-        DrawTextU(TextFormat("가격: %d G", it->price), (int)box.x + 136, (int)box.y + 110, 18, Color{230,200,90,255});
-        DrawTextU(TextFormat("보유: %d개", gs.inventory.count(it->id)), (int)box.x + 136, (int)box.y + 136, 16, ui::kTextDim);
-        if (!it->description.empty())
-            DrawTextU(it->description.c_str(), (int)box.x + 24, (int)box.y + 180, 15, ui::kText);
-
+        DrawTextU(it->name.c_str(), (int)row.x + 58, (int)row.y + 8, 18, ui::kText);
+        DrawTextU(TextFormat("%d G   보유 %d", it->price, gs.inventory.count(it->id)),
+                  (int)row.x + 58, (int)row.y + 32, 14, Color{230,200,90,255});
         bool canBuy = gs.inventory.gold >= it->price;
-        if (ui::button({ box.x + 24, box.y + 280, 200, 40 }, "구입", false) && canBuy) {
+        Rectangle buyB = { row.x + row.width - 110, row.y + 12, 96, 32 };
+        if (ui::button(buyB, canBuy ? "구입" : "골드부족", false) && canBuy) {
             gs.inventory.gold -= it->price;
             gs.inventory.addItem(it->id, 1);
             engine_.audio().playSfx("coin");
             toast_ = it->name + " 구입!"; toastTimer_ = 1.2f;
         }
-        if (!canBuy)
-            DrawTextU("골드가 부족합니다", (int)box.x + 24, (int)box.y + 254, 14, ui::kDanger);
+        ry += 64;
     }
-    if (ui::button({ box.x + box.width - 224, box.y + 280, 200, 40 }, "닫기 (ESC)", false))
+    if (ui::button({ box.x + box.width/2 - 100, box.y + box.height - 46, 200, 36 }, "닫기 (ESC)", false))
         phase_ = Phase::Field;
 
     if (toastTimer_ > 0) {
@@ -214,6 +254,7 @@ void GamePlay::grantQuestReward(const Event& e) {
         const Item* it = db.item(e.rewardItemId);
         r += (it ? it->name : std::string("아이템")) + TextFormat(" x%d", std::max(1, e.rewardItemCount));
     }
+    if (e.rewardSwitch >= 0) gs.setSwitch(e.rewardSwitch, true);   // 완료 게이트 스위치
     engine_.audio().playSfx("levelup");
     toast_ = "보상 획득!"; toastTimer_ = 1.6f;
     std::string head = e.questDoneText.empty() ? "퀘스트 완료! 보상을 받았다." : e.questDoneText;
@@ -315,10 +356,41 @@ void GamePlay::drawQuestLog() {
 void GamePlay::drawMessage() {
     int sw = screenW(), sh = screenH();
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };
+    bool lastPage = msgPage_ + 1 >= (int)msgPages_.size();
+    bool choice = lastPage && choicePending(msgChoiceSwitch_, msgChoiceA_, msgChoiceB_);
+    float textX = box.x + 20;
+    // portrait
+    if (msgFace_ >= 0) {
+        const Texture2D& tx = engine_.assetTexture(msgFace_);
+        Rectangle fr = { box.x + 10, box.y - 80, 84, 84 };
+        DrawRectangleRec(fr, Fade(Color{20,24,36,255},0.95f));
+        DrawRectangleLinesEx(fr, 2, ui::kAccent);
+        DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {fr.x+4,fr.y+4,76,76}, {0,0},0,WHITE);
+    }
+    // name plate
+    if (!msgSpeaker_.empty()) {
+        int nw = MeasureTextU(msgSpeaker_.c_str(), 18) + 24;
+        DrawRectangle((int)box.x, (int)box.y - 30, nw, 28, ui::kAccent);
+        DrawTextU(msgSpeaker_.c_str(), (int)box.x + 12, (int)box.y - 26, 18, BLACK);
+    }
     DrawRectangleRec(box, Fade(Color{ 20, 24, 36, 255 }, 0.95f));
     DrawRectangleLinesEx(box, 2, ui::kAccent);
-    DrawTextU(message_.c_str(), (int)box.x + 20, (int)box.y + 20, 22, ui::kText);
-    DrawTextU("[Enter]", (int)(box.x + box.width - 96), (int)(box.y + box.height - 28), 16, ui::kTextDim);
+    DrawTextU(message_.c_str(), (int)textX, (int)box.y + 20, 22, ui::kText);
+    if (choice) {
+        // two-way choice buttons
+        Rectangle bA = { box.x + box.width - 360, box.y + box.height - 44, 168, 34 };
+        Rectangle bB = { box.x + box.width - 184, box.y + box.height - 44, 168, 34 };
+        if (ui::button(bA, msgChoiceA_, false)) {
+            if (msgChoiceSwitch_ >= 0) engine_.state().setSwitch(msgChoiceSwitch_, true);
+            phase_ = Phase::Field; message_.clear();
+        }
+        if (ui::button(bB, msgChoiceB_, false)) {
+            if (msgChoiceSwitch_ >= 0) engine_.state().setSwitch(msgChoiceSwitch_, false);
+            phase_ = Phase::Field; message_.clear();
+        }
+    } else {
+        DrawTextU("[Enter]", (int)(box.x + box.width - 96), (int)(box.y + box.height - 28), 16, ui::kTextDim);
+    }
 }
 
 
