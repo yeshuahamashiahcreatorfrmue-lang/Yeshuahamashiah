@@ -297,6 +297,21 @@ void GamePlay::drawField() {
         bar(rx,       m.maxHunger ? (float)m.hunger/m.maxHunger : 0, Color{225,170,75,255},  TextFormat("포만 %d", m.hunger));
         bar(rx + 158, m.maxThirst ? (float)m.thirst/m.maxThirst : 0, Color{85,170,235,255},  TextFormat("수분 %d", m.thirst));
     }
+    // active food buffs: a badge per buff on the left (clear of the right skill panel)
+    {
+        int by = 84;
+        for (const auto& b : gs.buffs) {
+            std::string t = TextFormat("%s ", b.name.c_str());
+            if (b.atk) t += TextFormat("공+%d ", b.atk);
+            if (b.def) t += TextFormat("방+%d ", b.def);
+            if (b.spd) t += TextFormat("속+%d ", b.spd);
+            t += TextFormat("(%.0f초)", b.remain);
+            int tw = MeasureTextU(t.c_str(), 14);
+            DrawRectangle(12, by, tw + 10, 18, Fade(Color{120,90,200,255}, 0.9f));
+            DrawTextU(t.c_str(), 16, by + 2, 14, WHITE);
+            by += 20;
+        }
+    }
     if (!gs.objective.empty()) {
         DrawRectangle(0, 32, MeasureTextU(gs.objective.c_str(), 16) + 110, 26, Fade(BLACK, 0.45f));
         DrawTextU(TextFormat("목표: %s", gs.objective.c_str()), 12, 36, 16, ui::kAccentHi);
@@ -329,38 +344,20 @@ void GamePlay::useOrEquipItem(int itemId) {
     const Database& db = engine_.project().database;
     const Item* it = db.item(itemId);
     if (!it || gs.party.empty()) return;
-    PartyMember& m = gs.party[0];
     if (it->kind == 2) {                                   // 장비: equip into its body slot
-        int slot = (it->bodySlot >= 1 && it->bodySlot <= 7) ? it->bodySlot : 2;
-        unequipSlot(slot);                                 // return whatever's there
-        gs.equipped[slot] = itemId;
-        gs.inventory.removeItem(itemId, 1);
-        m.atk += it->bonusAtk; m.def += it->bonusDef; m.spd += it->bonusSpd;
-        toast_ = "장착: " + it->name; toastTimer_ = 1.5f;
+        if (gs.equipItem(db, itemId)) { toast_ = "장착: " + it->name; toastTimer_ = 1.5f; }
     } else {                                               // 식품/기타: consume
-        m.hunger = std::min(m.maxHunger, m.hunger + it->satiety);
-        m.thirst = std::min(m.maxThirst, m.thirst + it->hydration);
-        int hh = it->healHp + (it->effect == ItemEffect::HealHP ? it->power : 0);
-        int gg = it->healGp + (it->effect == ItemEffect::HealMP ? it->power : 0);
-        m.hp = std::min(m.maxHp, m.hp + hh);
-        m.mp = std::min(m.maxMp, m.mp + gg);
-        m.atk += it->bonusAtk; m.def += it->bonusDef; m.spd += it->bonusSpd; // 식품 영구 버프(단순화)
-        gs.inventory.removeItem(itemId, 1);
-        toast_ = (it->kind == 1 ? "먹음: " : "사용: ") + it->name; toastTimer_ = 1.5f;
+        if (gs.consumeFood(db, itemId)) {
+            toast_ = (it->kind == 1 ? "먹음: " : "사용: ") + it->name;
+            if (it->buffSecs > 0 && (it->bonusAtk || it->bonusDef || it->bonusSpd))
+                toast_ += TextFormat(" (%d초 버프)", it->buffSecs);
+            toastTimer_ = 1.5f;
+        }
     }
 }
 
 void GamePlay::unequipSlot(int slot) {
-    GameState& gs = engine_.state();
-    auto e = gs.equipped.find(slot);
-    if (e == gs.equipped.end() || e->second < 0) return;
-    const Item* it = engine_.project().database.item(e->second);
-    gs.inventory.addItem(e->second, 1);
-    if (it && !gs.party.empty()) {
-        PartyMember& m = gs.party[0];
-        m.atk -= it->bonusAtk; m.def -= it->bonusDef; m.spd -= it->bonusSpd;
-    }
-    gs.equipped.erase(e);
+    engine_.state().unequipSlot(engine_.project().database, slot);
 }
 
 // ---- I: rectangular inventory grid (식품 / 장비 / 기타) ----

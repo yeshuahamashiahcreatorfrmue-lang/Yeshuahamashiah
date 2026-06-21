@@ -760,6 +760,26 @@
       "bonusDef": 1,
       "bonusSpd": 2,
       "buffSecs": 0
+    },
+    {
+      "id": 13,
+      "name": "전투식량",
+      "description": "",
+      "price": 120,
+      "iconAsset": -1,
+      "effect": "none",
+      "power": 0,
+      "consumable": true,
+      "kind": 1,
+      "satiety": 6000,
+      "hydration": 3000,
+      "healHp": 0,
+      "healGp": 0,
+      "bodySlot": 0,
+      "bonusAtk": 5,
+      "bonusDef": 0,
+      "bonusSpd": 0,
+      "buffSecs": 60
     }
   ],
   "skills": [

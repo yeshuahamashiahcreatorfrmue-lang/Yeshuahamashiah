@@ -62,6 +62,7 @@ void GamePlay::updateField(float dt) {
             if (h.thirst > 0) --h.thirst;
             if ((h.hunger == 0 || h.thirst == 0) && h.hp > 1) --h.hp;
         }
+        engine_.state().tickBuffs(dt);   // count down temporary food buffs
     }
 
     if (IsKeyPressed(KEY_ESCAPE)) { menu_->open(); phase_ = Phase::Menu; return; }

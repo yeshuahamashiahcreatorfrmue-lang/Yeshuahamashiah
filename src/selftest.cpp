@@ -408,6 +408,40 @@ static void testFoodAndSurvival() {
     PartyMember m; m.maxHunger = m.hunger = 42000; m.maxThirst = m.thirst = 42000;
     PartyMember m2 = PartyMember::fromJson(m.toJson());
     CHECK(m2.maxHunger == 42000 && m2.thirst == 42000, "포만/수분(42000) 직렬화");
+
+    // --- shared consume / equip / timed-buff logic (used by both the field
+    //     windows and the ESC menu) ---
+    Item buffFood; buffFood.id = 9; buffFood.name = "전투식량"; buffFood.kind = 1;
+    buffFood.satiety = 6000; buffFood.hydration = 3000; buffFood.bonusAtk = 5; buffFood.buffSecs = 60;
+    db.items.push_back(buffFood);
+    GameState gs;
+    PartyMember pm; pm.actorId = 1; pm.maxHp = 100; pm.hp = 50; pm.atk = 10;
+    pm.maxHunger = pm.hunger = 42000; pm.maxThirst = pm.thirst = 42000;
+    gs.party.push_back(pm);
+    // eat a 식품 with hunger 42000 already full -> no overflow; bonusAtk timed buff applies
+    gs.party[0].hunger = 40000; gs.party[0].thirst = 40000;
+    gs.inventory.addItem(9, 1);
+    gs.consumeFood(db, 9);
+    CHECK(gs.party[0].hunger == 42000 && gs.party[0].thirst == 42000, "식품 섭취: 포만/수분 회복(최대 클램프)");
+    CHECK(gs.party[0].atk == 15 && gs.buffs.size() == 1, "식품 버프: 공격력 +5 즉시 적용 + 버프 등록");
+    CHECK(gs.inventory.count(9) == 0, "식품 섭취 후 인벤토리에서 소비");
+    gs.tickBuffs(61.0f);   // expire the 60s buff
+    CHECK(gs.party[0].atk == 10 && gs.buffs.empty(), "식품 버프 만료 후 공격력 원복");
+
+    // equip / unequip an item into a body slot
+    gs.inventory.addItem(8, 1);            // 강철투구 (bodySlot 1, def +12)
+    gs.equipItem(db, 8);
+    CHECK(gs.equipped[1] == 8 && gs.party[0].def == 12 && gs.inventory.count(8) == 0,
+          "장비 장착: 부위 슬롯 등록 + 방어 +12 + 인벤토리 차감");
+    gs.unequipSlot(db, 1);
+    CHECK(gs.equipped.count(1) == 0 && gs.party[0].def == 0 && gs.inventory.count(8) == 1,
+          "장비 해제: 슬롯 비움 + 스탯 원복 + 인벤토리 반환");
+
+    // buffs survive a save/load round-trip
+    gs.buffs.push_back(ActiveBuff{ 3, 0, 0, 30.0f, "테스트버프" });
+    GameState gs2; gs2.fromJson(gs.toJson());
+    CHECK(gs2.buffs.size() == 1 && gs2.buffs[0].atk == 3 && gs2.buffs[0].name == "테스트버프",
+          "활성 버프 세이브/로드 직렬화");
 }
 
 int main() {

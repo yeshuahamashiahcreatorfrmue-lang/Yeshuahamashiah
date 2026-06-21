@@ -37,13 +37,37 @@ struct PartyMember {
     static PartyMember fromJson(const nlohmann::json& j);
 };
 
+// A temporary stat buff granted by eating food with a non-zero 버프 지속(buffSecs).
+// While active the bonus is also folded into party[0]'s atk/def/spd so totalAtk()
+// reflects it; when it expires the bonus is subtracted back out.
+struct ActiveBuff {
+    int atk = 0, def = 0, spd = 0;
+    float remain = 0;       // seconds left
+    std::string name;       // source food name (HUD label)
+    nlohmann::json toJson() const {
+        return {{"atk",atk},{"def",def},{"spd",spd},{"remain",remain},{"name",name}};
+    }
+    static ActiveBuff fromJson(const nlohmann::json& j) {
+        ActiveBuff b; b.atk=j.value("atk",0); b.def=j.value("def",0); b.spd=j.value("spd",0);
+        b.remain=j.value("remain",0.0f); b.name=j.value("name",std::string()); return b;
+    }
+};
+
 class GameState {
 public:
     Inventory inventory;
     std::vector<PartyMember> party;
     // body-part equipment: slot 1..7 (머리/몸통/손/다리/발/무기/장신구) -> item id
     std::map<int,int> equipped;
+    std::vector<ActiveBuff> buffs;   // active timed food buffs
     int equipBonus(const Database& db, int which) const; // which: 0 atk,1 def,2 spd — sum of equipped items
+
+    // Shared item actions (used by both the in-field windows and the ESC menu so
+    // every on-screen surface reflects the same food/equipment systems).
+    bool consumeFood(const Database& db, int itemId);   // restore 포만/수분/HP/GP + bonus(timed/perm)
+    bool equipItem(const Database& db, int itemId);     // equip an item into its body slot
+    void unequipSlot(const Database& db, int slot);     // return a body-slot item to the inventory
+    void tickBuffs(float dt);                           // count down + revert expired buffs
 
     int  currentMap = -1;
     int  playerX = 0, playerY = 0;

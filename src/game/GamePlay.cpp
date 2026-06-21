@@ -28,6 +28,12 @@ void GamePlay::onEnter() {
     if (!menu_) menu_ = std::make_unique<Menu>(engine_);
     if (getenv("TSUKURU_INV")) invOpen_ = true;       // debug: open inventory window
     if (getenv("TSUKURU_EQUIP")) equipOpen_ = true;   // debug: open equipment window
+    if (getenv("TSUKURU_BUFF")) {                      // debug: eat a buff food so the HUD badge shows
+        const Database& db = engine_.project().database;
+        for (const auto& it : db.items)
+            if (it.kind == 1 && it.buffSecs > 0) { engine_.state().inventory.addItem(it.id, 1);
+                engine_.state().consumeFood(db, it.id); break; }
+    }
     firedOnce_.clear();
     GameState& gs = engine_.state();
     loadMap(gs.currentMap);
@@ -47,7 +53,11 @@ void GamePlay::onEnter() {
     runAutoruns();
     if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
         startEncounterBattle();   // debug: jump straight into a turn-based battle
-    if (getenv("TSUKURU_MENU") && menu_) { menu_->open(); phase_ = Phase::Menu; }  // debug
+    if (getenv("TSUKURU_MENU") && menu_) {                  // debug: open ESC menu
+        menu_->open();
+        if (const char* p = getenv("TSUKURU_MENUPAGE")) menu_->openPage(atoi(p));
+        phase_ = Phase::Menu;
+    }
 }
 
 void GamePlay::loadMap(int id) {

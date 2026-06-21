@@ -106,6 +106,65 @@ int GameState::equipBonus(const Database& db, int which) const {
     return t;
 }
 
+// Eat/use a non-equipment item: restore 포만/수분/HP/GP and grant its bonus stats.
+// If the food carries a buffSecs duration the bonus is temporary (tracked in buffs)
+// otherwise it is a simple permanent gain. Returns true if something was consumed.
+bool GameState::consumeFood(const Database& db, int itemId) {
+    const Item* it = db.item(itemId);
+    if (!it || party.empty()) return false;
+    PartyMember& m = party[0];
+    m.hunger = std::min(m.maxHunger, m.hunger + it->satiety);
+    m.thirst = std::min(m.maxThirst, m.thirst + it->hydration);
+    int hh = it->healHp + (it->effect == ItemEffect::HealHP ? it->power : 0);
+    int gg = it->healGp + (it->effect == ItemEffect::HealMP ? it->power : 0);
+    m.hp = std::min(m.maxHp, m.hp + hh);
+    m.mp = std::min(m.maxMp, m.mp + gg);
+    if (it->bonusAtk || it->bonusDef || it->bonusSpd) {
+        m.atk += it->bonusAtk; m.def += it->bonusDef; m.spd += it->bonusSpd;
+        if (it->buffSecs > 0)                               // temporary: schedule revert
+            buffs.push_back(ActiveBuff{ it->bonusAtk, it->bonusDef, it->bonusSpd,
+                                        (float)it->buffSecs, it->name });
+    }
+    inventory.removeItem(itemId, 1);
+    return true;
+}
+
+bool GameState::equipItem(const Database& db, int itemId) {
+    const Item* it = db.item(itemId);
+    if (!it || party.empty()) return false;
+    int slot = (it->bodySlot >= 1 && it->bodySlot <= 7) ? it->bodySlot : 2;
+    unequipSlot(db, slot);                                  // return whatever's there first
+    equipped[slot] = itemId;
+    inventory.removeItem(itemId, 1);
+    PartyMember& m = party[0];
+    m.atk += it->bonusAtk; m.def += it->bonusDef; m.spd += it->bonusSpd;
+    return true;
+}
+
+void GameState::unequipSlot(const Database& db, int slot) {
+    auto e = equipped.find(slot);
+    if (e == equipped.end() || e->second < 0) return;
+    const Item* it = db.item(e->second);
+    inventory.addItem(e->second, 1);
+    if (it && !party.empty()) {
+        PartyMember& m = party[0];
+        m.atk -= it->bonusAtk; m.def -= it->bonusDef; m.spd -= it->bonusSpd;
+    }
+    equipped.erase(e);
+}
+
+void GameState::tickBuffs(float dt) {
+    if (buffs.empty() || party.empty()) return;
+    PartyMember& m = party[0];
+    for (size_t i = 0; i < buffs.size();) {
+        buffs[i].remain -= dt;
+        if (buffs[i].remain <= 0) {
+            m.atk -= buffs[i].atk; m.def -= buffs[i].def; m.spd -= buffs[i].spd;
+            buffs.erase(buffs.begin() + i);
+        } else ++i;
+    }
+}
+
 bool GameState::partyWiped() const {
     for (const auto& m : party) if (m.alive()) return false;
     return true;
@@ -120,10 +179,12 @@ json GameState::toJson() const {
     for (const auto& m : party) pt.push_back(m.toJson());
     json eq = json::array();
     for (const auto& kv : equipped) eq.push_back({{"slot", kv.first}, {"item", kv.second}});
+    json bf = json::array();
+    for (const auto& b : buffs) bf.push_back(b.toJson());
     return {{"inventory", inventory.toJson()}, {"party", pt},
             {"currentMap", currentMap}, {"playerX", playerX}, {"playerY", playerY},
             {"playerDir", playerDir}, {"switches", sw}, {"variables", vr},
-            {"objective", objective}, {"equipped", eq}};
+            {"objective", objective}, {"equipped", eq}, {"buffs", bf}};
 }
 
 void GameState::fromJson(const json& j) {
@@ -140,6 +201,8 @@ void GameState::fromJson(const json& j) {
     for (const auto& v : j.value("variables", json::array())) variables_[v.value("id",-1)] = v.value("v", 0);
     equipped.clear();
     for (const auto& e : j.value("equipped", json::array())) equipped[e.value("slot",0)] = e.value("item",-1);
+    buffs.clear();
+    for (const auto& b : j.value("buffs", json::array())) buffs.push_back(ActiveBuff::fromJson(b));
 }
 
 } // namespace tsukuru

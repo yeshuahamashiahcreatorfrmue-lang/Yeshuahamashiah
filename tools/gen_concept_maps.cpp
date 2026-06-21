@@ -618,9 +618,10 @@ int main(int argc,char**argv){
         auto& items = p->database.items;
         auto exists = [&](const std::string& n){ for (auto& it : items) if (it.name == n) return true; return false; };
         int iid = 1; for (auto& it : items) iid = std::max(iid, it.id + 1);
-        auto food = [&](const char* n, int sat, int hyd, int hp, int atk, int price){
+        auto food = [&](const char* n, int sat, int hyd, int hp, int atk, int price, int buffSecs=0){
             if (exists(n)) return; Item it; it.id = iid++; it.name = n; it.kind = 1;
             it.satiety = sat; it.hydration = hyd; it.healHp = hp; it.bonusAtk = atk; it.price = price;
+            it.buffSecs = buffSecs;   // >0 => bonusAtk applies as a timed buff
             items.push_back(it); };
         auto gear = [&](const char* n, int slot, int atk, int def, int spd, int price){
             if (exists(n)) return; Item it; it.id = iid++; it.name = n; it.kind = 2;
@@ -630,6 +631,7 @@ int main(int argc,char**argv){
         food("물병", 0, 9000, 0, 0, 15);
         food("고기구이", 15000, 0, 40, 1, 60);
         food("회복포션", 0, 2000, 120, 0, 80);
+        food("전투식량", 6000, 3000, 0, 5, 120, 60);   // 60초간 공격+5 버프 식량
         gear("철검", 6, 8, 0, 0, 120);
         gear("가죽갑옷", 2, 0, 6, 0, 100);
         gear("강철투구", 1, 0, 4, 0, 70);
