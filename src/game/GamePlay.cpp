@@ -80,6 +80,18 @@ void GamePlay::onEnter() {
         dbm.dialogues.push_back(d);
         startDialogue(9001);
     }
+    if (getenv("TSUKURU_SCENE")) {                      // debug: seed + play a story scene
+        Database& dbm = engine_.project().database;
+        DialogueScenario d; d.id = 9002; d.name = "장면 대사";
+        DialogueLine l; l.speaker = "내레이션"; l.text = "그날, 마을에 그림자가 드리웠다...";
+        d.lines.push_back(l); dbm.dialogues.push_back(d);
+        Scene sc; sc.id = 9002; sc.name = "도입 장면";
+        sc.actions.push_back({ SA_MoveChar, 0, -1, destX_+2, destY_, 0.6f });
+        sc.actions.push_back({ SA_Dialogue, -1, 9002, 0, 0, 0.0f });
+        sc.actions.push_back({ SA_Wait, -1, -1, 0, 0, 0.5f });
+        dbm.scenes.push_back(sc);
+        startScene(9002);
+    }
     if (getenv("TSUKURU_CHAT")) {                       // debug: seed chat + open input
         chatLog_ = { "촌장: 어서 오게!", "나: 안녕하세요", "마을사람: 좋은 날씨네요" };
         chatBubble_ = "안녕하세요!"; chatBubbleT_ = 5.0f; chatOpen_ = true; chatInput_ = "반갑습니다";

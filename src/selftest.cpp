@@ -56,11 +56,40 @@ static void testDatabase() {
     db.actors.push_back({1, "Hero", -1, 120, 30, 14, 7, 6});
     db.enemies.push_back({1, "Slime", -1, 30, 8, 3, 4, 12, 8});
 
+    // mob (CharacterDef + monster fields)
+    CharacterDef mob; mob.id = 1; mob.name = "슬라임"; mob.maxHp = 24; mob.expReward = 7;
+    mob.respawnSecs = 5; mob.spawnFreezeSecs = 1.5f; mob.dropItemId = 1; mob.dropRate = 30;
+    db.mobs.push_back(mob);
+    // dialogue scenario with a branching answer + response
+    DialogueScenario d; d.id = 1; d.name = "촌장 대화";
+    DialogueLine l; l.speaker = "촌장"; l.text = "도와줄까?";
+    DialogueAnswer a; a.text = "보상"; a.respType = DR_Reward; a.rewardGold = 100; a.gotoLine = 2;
+    DialogueAnswer a2; a2.text = "동료"; a2.respType = DR_NpcFollow; a2.npcCharId = 1; a2.durationSecs = 30; a2.dismissFollowers = false;
+    l.answers.push_back(a); l.answers.push_back(a2);
+    d.lines.push_back(l);
+    db.dialogues.push_back(d);
+    // scene with a few action types
+    Scene sc; sc.id = 1; sc.name = "도입부";
+    sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f });
+    sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f });
+    sc.actions.push_back({ SA_Spawn, 3, 1, 8, 8, 0.0f });
+    db.scenes.push_back(sc);
+
     Database db2;
     db2.fromJson(db.toJson());
     CHECK(db2.item(1) && db2.item(1)->power == 50, "item round-trip");
     CHECK(db2.actor(1) && db2.actor(1)->maxHp == 120, "actor round-trip");
     CHECK(db2.enemy(1) && db2.enemy(1)->goldReward == 8, "enemy round-trip");
+    CHECK(db2.mob(1) && db2.mob(1)->respawnSecs == 5 && db2.mob(1)->dropRate == 30, "mob round-trip");
+    CHECK(db2.dialogue(1) && db2.dialogue(1)->lines.size() == 1 &&
+          db2.dialogue(1)->lines[0].answers.size() == 2, "dialogue round-trip");
+    CHECK(db2.dialogue(1)->lines[0].answers[0].respType == DR_Reward &&
+          db2.dialogue(1)->lines[0].answers[0].rewardGold == 100, "dialogue answer response round-trip");
+    CHECK(db2.dialogue(1)->lines[0].answers[1].respType == DR_NpcFollow &&
+          db2.dialogue(1)->lines[0].answers[1].durationSecs == 30, "dialogue follow answer round-trip");
+    CHECK(db2.scenes.size() == 1 && db2.scenes[0].actions.size() == 3 &&
+          db2.scenes[0].actions[1].type == SA_Dialogue && db2.scenes[0].actions[1].refId == 1,
+          "scene round-trip");
 }
 
 static void testInventory(Database& db) {

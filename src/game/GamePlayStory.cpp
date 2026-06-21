@@ -22,7 +22,7 @@ void GamePlay::showDialogueLine() {
     const DialogueScenario* d = engine_.project().database.dialogue(dlgRunId_);
     if (!d || dlgRunLine_ < 0 || dlgRunLine_ >= (int)d->lines.size()) {  // end
         dlgRunId_ = -1; dlgAnswerTexts_.clear();
-        if (sceneRunId_ < 0) phase_ = Phase::Field;   // a scene may be waiting on us
+        phase_ = Phase::Field;   // return control (a running scene resumes from Field)
         return;
     }
     dlgAnswerTexts_.clear();
@@ -33,9 +33,15 @@ void GamePlay::showDialogueLine() {
 void GamePlay::updateDialogue() {
     const DialogueScenario* d = engine_.project().database.dialogue(dlgRunId_);
     if (!d) { phase_ = Phase::Field; return; }
-    bool hasAns = dlgRunLine_ < (int)d->lines.size() && !d->lines[dlgRunLine_].answers.empty();
-    if (hasAns) return;   // wait for an answer click (drawDialogueOverlay)
     static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
+    bool hasAns = dlgRunLine_ < (int)d->lines.size() && !d->lines[dlgRunLine_].answers.empty();
+    if (hasAns) {
+        // ESC cancels the whole conversation (never leaves the player stuck);
+        // autowalk auto-picks the first answer so headless smoke never hangs.
+        if (IsKeyPressed(KEY_ESCAPE)) { dlgRunId_ = -1; phase_ = Phase::Field; }
+        else if (autodismiss) applyDialogueAnswer(0);
+        return;
+    }
     if (autodismiss || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
         ++dlgRunLine_;
         showDialogueLine();

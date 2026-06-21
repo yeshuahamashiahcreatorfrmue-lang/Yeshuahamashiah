@@ -15,6 +15,9 @@ namespace tsukuru {
 void GamePlay::updateField(float dt) {
     if (!map_) return;
     if (helpOpen_) { if (IsKeyPressed(KEY_ESCAPE)) helpOpen_ = false; return; }  // F1 help pauses
+    // story cutscene: the scene script drives the world — ignore player input,
+    // just keep visuals (motion/projectiles/fx) ticking.
+    if (sceneRunId_ >= 0) { updateMotion(dt); updateProjectiles(dt); updateFx(dt); return; }
     int TS = map_->tileset.tileWidth;
 
     static const bool autowalk = getenv("TSUKURU_AUTOWALK") != nullptr;
