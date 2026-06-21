@@ -114,7 +114,8 @@ public:
     const std::map<int,int>&  variables() const { return variables_; }
 
     // Start a brand-new game from the database/start settings.
-    void newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy);
+    void newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy,
+                 int startGold = 0, const std::vector<std::pair<int,int>>& startItems = {});
 
     bool partyWiped() const;
 

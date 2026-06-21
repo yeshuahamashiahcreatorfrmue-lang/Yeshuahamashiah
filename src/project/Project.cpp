@@ -121,6 +121,10 @@ bool Project::load(const std::string& projectDir) {
     playerFrames= meta.value("playerFrames", 4);
     playerAtkFrames = meta.value("playerAtkFrames", 0);
     playerCharId = meta.value("playerCharId", -1);
+    startGold    = meta.value("startGold", 0);
+    startItems.clear();
+    for (const auto& it : meta.value("startItems", json::array()))
+        startItems.push_back({ it.value("id", -1), it.value("count", 1) });
     if (meta.contains("assets")) assets.fromJson(meta["assets"]);
 
     json db;
@@ -153,12 +157,15 @@ bool Project::save() const {
     std::vector<int> ids;
     for (const auto& m : maps) { ids.push_back(m->id); saveMap(*m); }
 
+    json startItemsJ = json::array();
+    for (const auto& it : startItems) startItemsJ.push_back({ {"id", it.first}, {"count", it.second} });
     json meta = {
         {"name", name},
         {"startMap", startMap}, {"startX", startX}, {"startY", startY},
         {"startActor", startActor}, {"playerSprite", playerSprite},
         {"playerFrames", playerFrames}, {"playerAtkFrames", playerAtkFrames},
         {"playerCharId", playerCharId},
+        {"startGold", startGold}, {"startItems", startItemsJ},
         {"assets", assets.toJson()},
         {"maps", ids}
     };

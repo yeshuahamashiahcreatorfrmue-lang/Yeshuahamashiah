@@ -204,6 +204,7 @@ void GamePlay::drawField() {
 
     drawNpcs();
     drawMonsters();
+    drawEventMarkers();   // !/?/$/+ over interactable events (world space)
 
     // player: a custom CharacterDef motion flipbook, else the walk/attack sheet
     Color ptint = playerHurt_ > 0 ? Color{ 255, 130, 130, 255 } : WHITE;
@@ -400,6 +401,10 @@ void GamePlay::drawInventoryOverlay() {
         DrawTextU(it->name.c_str(), (int)r.x+6, (int)r.y+cell-24, 13, ui::kText);
         DrawTextU(TextFormat("x%d", pr.second), (int)r.x+cell-30, (int)r.y+6, 13, ui::kAccentHi);
         if (hov && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) useOrEquipItem(pr.first);
+        if (hov && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {   // 우클릭: 1개 버리기
+            gs.inventory.removeItem(pr.first, 1);
+            toast_ = (it->name + " 1개 버림"); toastTimer_ = 1.0f;
+        }
         ++idx;
     }
     if (idx == 0) DrawTextU("이 분류에 아이템이 없습니다. (DB 탭의 아이템에서 식품/장비를 만들고 획득)",
@@ -426,7 +431,7 @@ void GamePlay::drawInventoryOverlay() {
         if (!hovItem->description.empty())
             DrawTextU(hovItem->description.c_str(), 20, sh - 48, 14, ui::kText);
     }
-    DrawTextU("아이템 클릭: 식품=먹기(포만/수분/HP/GP 회복) · 장비=장착",
+    DrawTextU("좌클릭: 식품=먹기 · 장비=장착   |   우클릭: 1개 버리기",
               20, sh - 26, 14, ui::kTextDim);
 }
 

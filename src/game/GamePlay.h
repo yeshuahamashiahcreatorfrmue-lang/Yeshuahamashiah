@@ -131,6 +131,7 @@ private:
     void refreshQuestObjective();   // sync HUD objective to the first active quest
     void drawQuestLog();            // J: list of active/finished quests
     void drawDebugVars();           // F3: switch/variable inspector (event testing)
+    void drawEventMarkers();        // floating !/?/$/+/bubble over interactable events
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();

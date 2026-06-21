@@ -15,6 +15,7 @@ namespace tsukuru {
 
 void Editor::drawWorldTab() {
     if (worldPreviewFull_) { drawWorldPreviewOverlay(); return; }  // blocks the tab while open
+    if (worldStartSettings_) { drawStartSettingsOverlay(); return; }
     Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
@@ -234,6 +235,8 @@ void Editor::drawWorldTab() {
     }
     dy += 38;
     if (ui::button({ dx, dy, 220, 30 }, "이 맵 편집")) { activeMapId_ = m->id; tab_ = Tab::Map; }
+    dy += 38;
+    if (ui::button({ dx, dy, 220, 30 }, "새 게임 시작 설정…", false)) worldStartSettings_ = true;
     dy += 38;
     if ((int)p.maps.size() > 1) {
         if (ui::button({ dx, dy, 220, 30 }, "맵 삭제", false)) {
@@ -475,6 +478,32 @@ void Editor::buildMapThumb(Map& m) {
 // Shows the map plus markers for NPCs / events / mob spawns / building entrances;
 // clicking an entrance (텔레포트) dives into that interior map — recursively, with
 // the same markers. Click the dark margin, X, or ESC to close; ← 뒤로 steps back.
+// New-game starting loadout editor (gold + items). Applied by GameState::newGame.
+void Editor::drawStartSettingsOverlay() {
+    Project& p = engine_.project();
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Color{ 18, 20, 28, 255 });
+    Rectangle box = { sw/2.0f - 260, 60, 520, (float)sh - 140 };
+    ui::panel(box);
+    DrawTextU("새 게임 시작 설정", (int)box.x + 18, (int)box.y + 14, 24, ui::kAccent);
+    if (ui::button({ box.x + box.width - 110, box.y + 12, 96, 30 }, "닫기")) { worldStartSettings_ = false; p.save(); }
+    float dx = box.x + 18, dy = box.y + 56;
+    ui::intStepper({ dx, dy, 300, 28 }, "시작 골드", p.startGold, 50, 0, 9999999); dy += 40;
+    DrawTextU("시작 아이템 (없으면 기본 꾸러미 자동 지급)", (int)dx, (int)dy, 14, ui::kAccentHi); dy += 24;
+    for (int i = 0; i < (int)p.startItems.size(); ++i) {
+        ui::intStepper({ dx, dy, 180, 26 }, "아이템ID", p.startItems[i].first, 1, 0, 999);
+        ui::intStepper({ dx + 190, dy, 150, 26 }, "수량", p.startItems[i].second, 1, 1, 999);
+        if (ui::button({ dx + 348, dy, 60, 26 }, "삭제")) { p.startItems.erase(p.startItems.begin() + i); --i; dy += 30; continue; }
+        const Item* it = p.database.item(p.startItems[i].first);
+        DrawTextU(("→ " + (it ? it->name : std::string("(없는 아이템)"))).c_str(),
+                  (int)(dx + 416), (int)dy + 4, 13, it ? ui::kAccentHi : ui::kDanger);
+        dy += 32;
+    }
+    if (ui::button({ dx, dy, 300, 26 }, "+ 시작 아이템 추가")) p.startItems.push_back({ 1, 1 });
+    dy += 36;
+    DrawTextU("플레이(F5)로 새 게임을 시작하면 위 소지품으로 시작합니다.", (int)dx, (int)(box.y + box.height - 30), 13, ui::kTextDim);
+}
+
 void Editor::drawWorldPreviewOverlay() {
     Project& p = engine_.project();
     int sw = screenW(), sh = screenH();

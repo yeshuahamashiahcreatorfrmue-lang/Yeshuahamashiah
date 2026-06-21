@@ -29,6 +29,10 @@ public:
     int playerAtkFrames = 0;        // attack frames appended after the walk frames
     int playerCharId = -1;          // custom CharacterDef driving the player (-1 = use sheet)
 
+    // New-game starting loadout (editable in the editor; applied by GameState::newGame).
+    int startGold = 0;
+    std::vector<std::pair<int,int>> startItems;  // (itemId, count)
+
     // Loaded maps (lazy-managed; the editor keeps the active one).
     std::vector<std::shared_ptr<Map>> maps;
 

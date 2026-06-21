@@ -32,7 +32,8 @@ bool TitleScreen::hasSave() const {
 
 void TitleScreen::startSingle() {
     Project& p = engine_.project();
-    engine_.state().newGame(p.database, p.startActor, p.playerCharId, p.startMap, p.startX, p.startY);
+    engine_.state().newGame(p.database, p.startActor, p.playerCharId, p.startMap, p.startX, p.startY,
+                            p.startGold, p.startItems);
     engine_.setMode(Mode::Play);
 }
 

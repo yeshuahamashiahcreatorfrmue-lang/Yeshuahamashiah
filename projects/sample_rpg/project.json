@@ -523,5 +523,16 @@
   "startActor": 1,
   "startMap": 1,
   "startX": 22,
-  "startY": 20
+  "startY": 20,
+  "startGold": 100,
+  "startItems": [
+    {
+      "id": 1,
+      "count": 2
+    },
+    {
+      "id": 5,
+      "count": 3
+    }
+  ]
 }

@@ -402,6 +402,45 @@ void GamePlay::drawQuestLog() {
     DrawTextU(TextFormat("진행 %d · 완료 %d", active, done), (int)box.x + 18, (int)(box.y + box.height - 30), 14, ui::kTextDim);
 }
 
+// Floating markers over interactable events so the player can tell at a glance
+// what can be talked to / bought / healed at — a core RPG affordance.
+void GamePlay::drawEventMarkers() {
+    if (!map_) return;
+    GameState& gs = engine_.state();
+    int TS = map_->tileset.tileWidth;
+    float bob = sinf(worldTime_ * 4.0f) * 2.0f;
+    for (auto& e : map_->events) {
+        if (e.trigger != TriggerType::ActionButton) continue;
+        if (!eventConditionMet(gs, e)) continue;
+        std::string mk; Color c = WHITE; bool bubble = false;
+        if (e.type == EventType::Quest) {
+            bool hasReward = e.rewardGold || e.rewardExp || e.rewardItemId >= 0;
+            auto it = gs.quests.find(GameState::questKey(map_->id, e.id));
+            int st = it == gs.quests.end() ? 0 : it->second.status;
+            if (st == 2) continue;                                   // claimed
+            if (st == 0) { if (e.questObjective == 0 && !hasReward) continue; mk = "!"; c = Color{255,210,80,255}; }
+            else if (questObjectiveMet(e, it->second)) { mk = "?"; c = Color{120,230,120,255}; }
+            else continue;                                           // in progress: no clutter
+        } else if (e.type == EventType::Shop) { mk = "$"; c = Color{230,200,90,255}; }
+        else if (e.type == EventType::Heal)  { mk = "+"; c = Color{120,230,120,255}; }
+        else if (e.type == EventType::Message || e.type == EventType::GiveItem || e.type == EventType::SetSwitch)
+            bubble = true;
+        else continue;
+        float mx = e.x * TS + TS * 0.5f, my = e.y * TS - 8 + bob;
+        if (bubble) {
+            DrawRectangleRounded({ mx - 9, my - 14, 18, 13 }, 0.4f, 4, Fade(WHITE, 0.92f));
+            DrawTriangle({ mx - 3, my - 1 }, { mx, my + 4 }, { mx + 3, my - 1 }, Fade(WHITE, 0.92f));
+            DrawCircle((int)(mx - 4), (int)(my - 8), 1.2f, BLACK);
+            DrawCircle((int)mx,       (int)(my - 8), 1.2f, BLACK);
+            DrawCircle((int)(mx + 4), (int)(my - 8), 1.2f, BLACK);
+        } else {
+            int w = MeasureTextU(mk.c_str(), 18);
+            DrawTextU(mk.c_str(), (int)(mx - w / 2 + 1), (int)(my - 20) + 1, 18, Fade(BLACK, 0.6f));
+            DrawTextU(mk.c_str(), (int)(mx - w / 2),     (int)(my - 20),     18, c);
+        }
+    }
+}
+
 // F3: a read-only inspector of all switches & variables — invaluable for testing
 // event logic (conditions, quest flags, choice results) without guesswork.
 void GamePlay::drawDebugVars() {

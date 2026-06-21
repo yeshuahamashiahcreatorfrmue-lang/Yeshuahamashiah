@@ -495,6 +495,11 @@ static void testEventFields() {
     Database ed2; ed2.fromJson(edb.toJson());
     const EnemyDef* e2 = ed2.enemy(1);
     CHECK(e2 && e2->dropItemId == 5 && e2->dropRate == 30, "적 드롭(아이템/확률) 직렬화");
+    // new-game starting loadout (gold + items)
+    Database sdb; Item si; si.id = 1; si.name = "포션"; sdb.items.push_back(si);
+    ActorDef sa; sa.id = 1; sa.maxHp = 100; sdb.actors.push_back(sa);
+    GameState sg; sg.newGame(sdb, 1, -1, 1, 0, 0, 250, {{1, 3}});
+    CHECK(sg.inventory.gold == 250 && sg.inventory.count(1) == 3, "새 게임 시작 골드/아이템 적용");
 }
 
 int main() {

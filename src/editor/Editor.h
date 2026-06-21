@@ -30,6 +30,7 @@ private:
     void drawWorldTab();
     void drawWorldViewTab();   // All-Map Viewer: lay maps on a zone grid for edge-to-edge travel
     void drawWorldPreviewOverlay();   // fullscreen map preview (click thumbnail to open, X/ESC to close)
+    void drawStartSettingsOverlay();  // 새 게임 시작 골드/아이템 편집 모달
     void drawMapZoomBar(Rectangle canvas);   // map-only zoom control (− / % / + / 전체보기)
     void drawMapScrollbars(Rectangle canvas);// draggable H/V scrollbars for large maps
     // map thumbnails (rendered to cached textures in update(), drawn on World/WorldView)
@@ -139,6 +140,7 @@ private:
     Vector2 wvDragStart_{};         // press point (screen) used to detect a drag
     // World tab: fullscreen map preview overlay
     bool worldPreviewFull_ = false;
+    bool worldStartSettings_ = false;  // start-loadout editor modal open
     RenderTexture2D worldBigThumb_{}; // hi-res preview texture (built on demand)
     int  worldBigId_ = -1;            // map id the big preview was built for
     int  worldPreviewMapId_ = -1;     // map currently shown in the overlay (navigable)

@@ -66,7 +66,8 @@ PartyMember PartyMember::fromJson(const json& j) {
     return m;
 }
 
-void GameState::newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy) {
+void GameState::newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy,
+                        int startGold, const std::vector<std::pair<int,int>>& startItems) {
     party.clear();
     switches_.clear();
     variables_.clear();
@@ -85,12 +86,17 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
         party[0].applyCharacter(*c);
     }
     if (party.empty()) party.push_back(PartyMember{});   // never leave the party empty
-    // starter kit: a few of the first food + equipment items, IF the game defines
-    // any (so the inventory/equip windows are populated; no-op for games without).
-    int foodN = 0, equipN = 0;
-    for (const auto& it : db.items) {
-        if (it.kind == 1 && foodN  < 3) { inventory.addItem(it.id, 5); ++foodN; }
-        if (it.kind == 2 && equipN < 4) { inventory.addItem(it.id, 1); ++equipN; }
+    // Starting loadout: project-configured gold + items take priority. If the
+    // project defines no starting items, fall back to a small auto starter kit so
+    // the inventory/equip windows are populated out of the box.
+    inventory.gold = startGold;
+    for (const auto& kv : startItems) if (kv.first >= 0) inventory.addItem(kv.first, kv.second);
+    if (startItems.empty()) {
+        int foodN = 0, equipN = 0;
+        for (const auto& it : db.items) {
+            if (it.kind == 1 && foodN  < 3) { inventory.addItem(it.id, 5); ++foodN; }
+            if (it.kind == 2 && equipN < 4) { inventory.addItem(it.id, 1); ++equipN; }
+        }
     }
     currentMap = startMap;
     playerX = sx; playerY = sy; playerDir = 0;
