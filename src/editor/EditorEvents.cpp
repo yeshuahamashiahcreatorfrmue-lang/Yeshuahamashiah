@@ -210,6 +210,7 @@ static const ObjPreset kObjPresets[] = {
     { "스위치",       EventType::SetSwitch,  false, NpcFaction::Neutral, TriggerType::ActionButton, "" },
     { "퀘스트",       EventType::Quest,      false, NpcFaction::Neutral, TriggerType::Autorun,      "목표: " },
     { "엔딩",         EventType::Ending,     false, NpcFaction::Neutral, TriggerType::Autorun,      "" },
+    { "회복 지점",    EventType::Heal,       false, NpcFaction::Neutral, TriggerType::ActionButton, "충분히 쉬어 기운을 모두 회복했다!" },
 };
 static const int kObjCount = (int)(sizeof(kObjPresets)/sizeof(kObjPresets[0]));
 } // namespace
@@ -280,12 +281,12 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
 
     // ---- event type, laid out as a labelled grid so every kind is visible ----
     DrawTextU("이벤트 종류 (탭에서 선택)", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 20;
-    const char* typeNames[8] = { "메시지", "이동", "아이템지급", "스위치", "전투", "상점", "퀘스트·보상", "엔딩" };
-    for (int i = 0; i < 8; ++i) {
+    const char* typeNames[9] = { "메시지", "이동", "아이템지급", "스위치", "전투", "상점", "퀘스트·보상", "엔딩", "회복" };
+    for (int i = 0; i < 9; ++i) {
         Rectangle b = { panel.x + 12 + (i % 2) * 150.0f, y + (i / 2) * 30.0f, 144, 26 };
         if (ui::button(b, typeNames[i], (int)ev->type == i)) ev->type = (EventType)i;
     }
-    y += 4 * 30 + 8;
+    y += 5 * 30 + 8;
     const char* trigNames[3] = { "말걸기", "접촉", "자동실행" };
     for (int i = 0; i < 3; ++i)
         if (ui::button({ panel.x + 12 + i * 100.0f, y, 96, 24 }, trigNames[i], (int)ev->trigger == i))
@@ -402,6 +403,10 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         case EventType::Ending:
             DrawTextU("게임 클리어 화면을 표시합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
             break;
+        case EventType::Heal:
+            DrawTextU("파티 전체를 완전 회복합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 16;
+            DrawTextU("(체력·기력·포만·수분) — 여관/세이브 지점용.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
+            break;
         default: break;
     }
     y += 6;
@@ -463,8 +468,38 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
 }
 
 void Editor::drawEventsTab() {
-    Rectangle canvasArea = { 0, kToolbarH, (float)screenW() - 320, (float)screenH() - kToolbarH };
     auto m = activeMap();
+    // ---- left: list of every event on this map (click to select/jump) ----
+    const float listW = 210;
+    Rectangle listP = { 0, kToolbarH, listW, (float)screenH() - kToolbarH };
+    ui::panel(listP, ui::kPanel);
+    ui::label("이벤트 목록", (int)listP.x + 10, (int)listP.y + 8, 18, ui::kAccent);
+    const char* tShort[10] = { "메시지","이동","지급","스위치","전투","상점","퀘스트","엔딩","회복","?" };
+    if (m) {
+        DrawTextU(TextFormat("총 %d개", (int)m->events.size()), (int)listP.x + 10, (int)listP.y + 32, 13, ui::kTextDim);
+        Rectangle rows = { listP.x, listP.y + 52, listP.width, listP.height - 60 };
+        uiScissor((int)rows.x, (int)rows.y, (int)rows.width, (int)rows.height);
+        if (ui::mouseIn(rows)) eventListScroll_ -= GetMouseWheelMove() * 40;
+        if (eventListScroll_ < 0) eventListScroll_ = 0;
+        float ly = rows.y - eventListScroll_;
+        for (auto& e : m->events) {
+            if (ly + 26 >= rows.y && ly <= rows.y + rows.height) {
+                int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
+                Rectangle r = { listP.x + 6, ly, listP.width - 12, 24 };
+                std::string lbl = TextFormat("#%d %s @%d,%d", e.id, tShort[ti], e.x, e.y);
+                if (ui::button(r, lbl, e.id == editingEventId_)) {
+                    editingEventId_ = e.id;
+                    cam_.target = { (e.x + 0.5f) * m->tileset.tileWidth, (e.y + 0.5f) * m->tileset.tileHeight };
+                }
+            }
+            ly += 26;
+        }
+        EndScissorMode();
+        float maxS = std::max(0.0f, (ly + eventListScroll_) - (rows.y + rows.height));
+        if (eventListScroll_ > maxS) eventListScroll_ = maxS;
+    }
+
+    Rectangle canvasArea = { listW, kToolbarH, (float)screenW() - listW - 320, (float)screenH() - kToolbarH };
     uiScissor((int)canvasArea.x, (int)canvasArea.y, (int)canvasArea.width, (int)canvasArea.height);
     DrawRectangleRec(canvasArea, Color{ 24, 26, 34, 255 });
     if (m) {

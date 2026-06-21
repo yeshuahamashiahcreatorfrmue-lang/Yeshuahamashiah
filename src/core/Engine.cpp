@@ -45,6 +45,14 @@ void Engine::startPlaytest() {
     setMode(Mode::Play);
 }
 
+// Playtest starting on a specific map/tile (editor "이 맵에서 플레이 F6").
+void Engine::startPlaytestAt(int mapId, int x, int y) {
+    state_.newGame(project_->database, project_->startActor, project_->playerCharId,
+                   project_->startMap, project_->startX, project_->startY);
+    state_.currentMap = mapId; state_.playerX = x; state_.playerY = y;
+    setMode(Mode::Play);
+}
+
 int Engine::run(const std::string& projectDir, int maxFrames) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1280, 720, "쯔꾸르 엔진 — RPG 메이커");

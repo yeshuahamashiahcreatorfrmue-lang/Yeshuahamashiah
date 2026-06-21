@@ -295,7 +295,9 @@
       "maxMp": 0,
       "name": "슬라임",
       "spd": 4,
-      "spriteAsset": 7
+      "spriteAsset": 7,
+      "dropItemId": 1,
+      "dropRate": 30
     },
     {
       "atk": 12,
@@ -307,7 +309,9 @@
       "maxMp": 0,
       "name": "박쥐",
       "spd": 7,
-      "spriteAsset": 8
+      "spriteAsset": 8,
+      "dropItemId": 5,
+      "dropRate": 20
     },
     {
       "atk": 15,
@@ -319,7 +323,9 @@
       "maxMp": 0,
       "name": "멧돼지",
       "spd": 5,
-      "spriteAsset": 9
+      "spriteAsset": 9,
+      "dropItemId": 7,
+      "dropRate": 40
     },
     {
       "atk": 18,

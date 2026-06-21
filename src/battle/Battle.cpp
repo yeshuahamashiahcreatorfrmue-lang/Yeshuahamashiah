@@ -152,6 +152,15 @@ void Battle::grantRewards() {
     for (auto& m : state_.party) if (m.alive()) m.gainExp(exp);
     log_.push_back("Victory! Gained " + std::to_string(exp) + " EXP and " +
                    std::to_string(gold) + " gold.");
+    // item drops per defeated enemy
+    for (const auto& e : enemies_) {
+        const EnemyDef* def = db_.enemy(e.enemyId);
+        if (def && def->dropItemId >= 0 && def->dropRate > 0 && (std::rand() % 100) < def->dropRate) {
+            state_.inventory.addItem(def->dropItemId, 1);
+            const Item* it = db_.item(def->dropItemId);
+            log_.push_back((it ? it->name : std::string("Item")) + " 획득!");
+        }
+    }
 }
 
 } // namespace tsukuru

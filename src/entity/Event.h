@@ -15,7 +15,8 @@ enum class EventType {
     StartBattle,// spawn field monsters (switchId = defeat switch, set when cleared)
     Shop,       // open a shop
     Quest,      // set the on-screen quest objective (and show the text)
-    Ending      // roll the victory / game-clear screen
+    Ending,     // roll the victory / game-clear screen
+    Heal        // fully restore the party (HP/GP/포만/수분) — inn / save point
 };
 
 enum class TriggerType {

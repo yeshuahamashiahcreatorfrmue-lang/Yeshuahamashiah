@@ -117,6 +117,7 @@ private:
     int  eventFieldFocus_ = 0; // which event text field is focused (0 none,1 text,2 speaker,3 choiceA,4 choiceB)
     float eventScroll_ = 0;   // event inspector vertical scroll (tall quest panels)
     int   eventScrollId_ = -1;// which event eventScroll_ belongs to (reset on change)
+    float eventListScroll_ = 0; // left event-list panel scroll
     // Database editing
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;

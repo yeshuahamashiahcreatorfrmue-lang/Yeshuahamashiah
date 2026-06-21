@@ -39,6 +39,7 @@ public:
 
     // Start a fresh playtest immediately (used by the editor's Play / F5).
     void startPlaytest();
+    void startPlaytestAt(int mapId, int x, int y);  // editor "이 맵에서 플레이" (F6)
 
     Project&      project()  { return *project_; }
     GameState&    state()    { return state_; }

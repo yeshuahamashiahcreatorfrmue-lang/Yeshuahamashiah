@@ -176,6 +176,13 @@ void Editor::drawDatabaseTab() {
             step("속도", e.spd, 1, 0, 999);
             step("경험치", e.expReward, 5, 0, 99999);
             step("골드", e.goldReward, 5, 0, 99999);
+            step("드롭 아이템ID(-1없음)", e.dropItemId, 1, -1, 999);
+            if (e.dropItemId >= 0) {
+                const Item* di = db.item(e.dropItemId);
+                DrawTextU(("→ " + (di ? di->name : std::string("(없는 아이템)"))).c_str(),
+                          (int)dx + 4, (int)dy, 12, di ? ui::kAccentHi : ui::kDanger); dy += 18;
+                step("드롭 확률 %", e.dropRate, 5, 0, 100);
+            }
             break; }
     }
     DrawTextU(TextFormat("id: %d   (Ctrl+S로 프로젝트 저장)",

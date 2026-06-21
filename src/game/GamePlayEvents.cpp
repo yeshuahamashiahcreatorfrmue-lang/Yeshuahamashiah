@@ -196,6 +196,14 @@ void GamePlay::runEvent(Event& e) {
             engine_.audio().playSfx("levelup");
             phase_ = Phase::GameClear;
             break;
+        case EventType::Heal:
+            for (auto& mm : gs.party) {
+                mm.hp = mm.maxHp; mm.mp = mm.maxMp;
+                mm.hunger = mm.maxHunger; mm.thirst = mm.maxThirst;
+            }
+            engine_.audio().playSfx("levelup");
+            showMessage(e.text.empty() ? "충분히 쉬어 기운을 모두 회복했다!" : e.text);
+            break;
     }
     if (e.once) firedOnce_.insert(key);
 }

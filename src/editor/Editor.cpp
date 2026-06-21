@@ -99,6 +99,21 @@ void Editor::update(float dt) {
         if (IsKeyPressed(KEY_C)) collisionMode_ = !collisionMode_;
     }
     if (IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
+    if (IsKeyPressed(KEY_F6)) {   // playtest starting on the current map (nearest walkable tile)
+        if (auto m = activeMap()) {
+            engine_.project().save();
+            int cx = m->tilemap.width() / 2, cy = m->tilemap.height() / 2;
+            int bx = cx, by = cy, best = 1 << 30;
+            for (int yy = 0; yy < m->tilemap.height(); ++yy)
+                for (int xx = 0; xx < m->tilemap.width(); ++xx)
+                    if (!m->tilemap.blocked(xx, yy)) {
+                        int d = (xx - cx) * (xx - cx) + (yy - cy) * (yy - cy);
+                        if (d < best) { best = d; bx = xx; by = yy; }
+                    }
+            engine_.startPlaytestAt(m->id, bx, by);
+        }
+        return;
+    }
 
     // Camera pan (arrow keys) & zoom (wheel) when not typing
     bool typing = eventTextFocus_ || dbNameFocus_ >= 0 || skillNameFocus_;
@@ -179,6 +194,17 @@ void Editor::drawToolbar() {
     if (ui::button({ x, 6, 90, 28 }, "저장")) { engine_.project().save(); setStatus("저장됨."); }
     x += 94;
     if (ui::button({ x, 6, 110, 28 }, "플레이 (F5)", false)) { engine_.project().save(); engine_.startPlaytest(); }
+    x += 114;
+    if (ui::button({ x, 6, 130, 28 }, "이 맵 테스트 (F6)", false)) {
+        if (auto m = activeMap()) {
+            engine_.project().save();
+            int cx = m->tilemap.width()/2, cy = m->tilemap.height()/2, bx = cx, by = cy, best = 1<<30;
+            for (int yy = 0; yy < m->tilemap.height(); ++yy)
+                for (int xx = 0; xx < m->tilemap.width(); ++xx)
+                    if (!m->tilemap.blocked(xx, yy)) { int d=(xx-cx)*(xx-cx)+(yy-cy)*(yy-cy); if(d<best){best=d;bx=xx;by=yy;} }
+            engine_.startPlaytestAt(m->id, bx, by);
+        }
+    }
 
     // Map-specific tools on the right
     if (tab_ == Tab::Map) {

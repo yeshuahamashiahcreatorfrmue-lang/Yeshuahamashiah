@@ -487,6 +487,14 @@ static void testEventFields() {
     CHECK(r.shopItems.size() == 3 && r.shopItems[2] == 8, "상점 다품목 직렬화");
     CHECK(r.rewardSwitch == 41, "퀘스트 완료 스위치 직렬화");
     CHECK(r.conditionVar == 4 && r.conditionVarMin == 2, "변수 발동조건 직렬화");
+    Event h; h.type = EventType::Heal;
+    CHECK(Event::fromJson(h.toJson()).type == EventType::Heal, "회복 이벤트 타입 직렬화");
+    // enemy item drops
+    Database edb; EnemyDef en; en.id = 1; en.name = "슬라임"; en.dropItemId = 5; en.dropRate = 30;
+    edb.enemies.push_back(en);
+    Database ed2; ed2.fromJson(edb.toJson());
+    const EnemyDef* e2 = ed2.enemy(1);
+    CHECK(e2 && e2->dropItemId == 5 && e2->dropRate == 30, "적 드롭(아이템/확률) 직렬화");
 }
 
 int main() {

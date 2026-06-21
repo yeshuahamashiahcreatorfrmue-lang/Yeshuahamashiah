@@ -138,6 +138,8 @@ struct EnemyDef {
     int         atk = 8, def = 3, spd = 4;
     int         expReward = 10;
     int         goldReward = 5;
+    int         dropItemId = -1;   // item dropped on kill (-1 = none)
+    int         dropRate   = 0;    // drop chance, 0..100 (%)
 };
 
 class Database {

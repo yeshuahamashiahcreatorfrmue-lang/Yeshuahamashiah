@@ -129,7 +129,8 @@ json Database::toJson() const {
     for (const auto& e : enemies)
         j["enemies"].push_back({{"id", e.id}, {"name", e.name}, {"spriteAsset", e.spriteAsset},
             {"maxHp", e.maxHp}, {"maxMp", e.maxMp}, {"atk", e.atk}, {"def", e.def},
-            {"spd", e.spd}, {"expReward", e.expReward}, {"goldReward", e.goldReward}});
+            {"spd", e.spd}, {"expReward", e.expReward}, {"goldReward", e.goldReward},
+            {"dropItemId", e.dropItemId}, {"dropRate", e.dropRate}});
 
     j["fieldSkills"] = json::array();
     for (const auto& s : fieldSkills) j["fieldSkills"].push_back(skillToJson(s));
@@ -197,6 +198,7 @@ void Database::fromJson(const json& j) {
         en.maxHp = e.value("maxHp", 30); en.maxMp = e.value("maxMp", 0);
         en.atk = e.value("atk", 8); en.def = e.value("def", 3); en.spd = e.value("spd", 4);
         en.expReward = e.value("expReward", 10); en.goldReward = e.value("goldReward", 5);
+        en.dropItemId = e.value("dropItemId", -1); en.dropRate = e.value("dropRate", 0);
         enemies.push_back(en);
     }
     for (const auto& s : j.value("fieldSkills", json::array())) fieldSkills.push_back(skillFromJson(s));

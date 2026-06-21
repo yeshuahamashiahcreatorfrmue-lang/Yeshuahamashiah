@@ -88,6 +88,14 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
     }
     toast_ = m.name + " 처치!  +" + std::to_string(m.expReward) + " EXP  +" +
              std::to_string(m.goldReward) + " G";
+    // item drop roll (from EnemyDef)
+    if (const EnemyDef* def = engine_.project().database.enemy(m.enemyId)) {
+        if (def->dropItemId >= 0 && def->dropRate > 0 && (std::rand() % 100) < def->dropRate) {
+            gs.inventory.addItem(def->dropItemId, 1);
+            const Item* it = engine_.project().database.item(def->dropItemId);
+            toast_ += "   [" + (it ? it->name : std::string("아이템")) + " 획득!]";
+        }
+    }
     toastTimer_ = 1.8f;
     TraceLog(LOG_INFO, "KILL: %s  party gold=%d exp=%d lv=%d", m.name.c_str(),
              gs.inventory.gold, gs.party.empty()?0:gs.party[0].exp,

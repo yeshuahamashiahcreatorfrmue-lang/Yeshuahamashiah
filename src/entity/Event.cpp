@@ -14,6 +14,7 @@ static const char* eventTypeName(EventType t) {
         case EventType::Shop:        return "shop";
         case EventType::Quest:       return "quest";
         case EventType::Ending:      return "ending";
+        case EventType::Heal:        return "heal";
     }
     return "message";
 }
@@ -25,6 +26,7 @@ static EventType eventTypeFrom(const std::string& s) {
     if (s == "shop")        return EventType::Shop;
     if (s == "quest")       return EventType::Quest;
     if (s == "ending")      return EventType::Ending;
+    if (s == "heal")        return EventType::Heal;
     return EventType::Message;
 }
 static const char* triggerName(TriggerType t) {
