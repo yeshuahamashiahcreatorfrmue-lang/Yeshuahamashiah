@@ -295,10 +295,13 @@ void Editor::drawCharsTab() {
     DrawRectangleRec({ 0, kToolbarH, W, H - kToolbarH }, Color{ 24, 26, 34, 255 });
     Project& p = engine_.project();
     Database& db = p.database;
+    // The Mob tab reuses this exact builder against db.mobs (mobs are CharacterDefs).
+    std::vector<CharacterDef>& list = mobMode_ ? db.mobs : db.characters;
+    int& sel = mobMode_ ? mobSel_ : charDefSel_;
     bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     handleAssetDrop();   // drag&drop still works anywhere on this tab
 
-    ui::label("캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
+    ui::label(mobMode_ ? "몹 제작 (이미지·모션·이펙트)" : "캐릭터 제작", 14, (int)kToolbarH + 8, 20, ui::kAccent);
     DrawTextU(seg_.ready() ? (std::string(kBuildTag) + " · AI배경제거 ON").c_str()
                            : (std::string(kBuildTag) + " · AI배경제거 미탑재").c_str(),
               168, (int)kToolbarH + 14, 13, ui::kGood);
@@ -314,22 +317,22 @@ void Editor::drawCharsTab() {
     ui::panel({ rightX, panelTop, rightW, panelH }, ui::kPanel);
 
     auto imgs = p.assets.byType(AssetType::Image);
-    if (charDefSel_ < 0 && !db.characters.empty()) charDefSel_ = 0;
-    bool building = (charDefSel_ >= 0 && charDefSel_ < (int)db.characters.size());
+    if (sel < 0 && !list.empty()) sel = 0;
+    bool building = (sel >= 0 && sel < (int)list.size());
 
     // ============================ LEFT: 캐릭터 ============================
     {
         float x = leftX + 10, w = leftW - 20;
-        ui::label("캐릭터", (int)x, (int)panelTop + 8, 15, ui::kAccent);
+        ui::label(mobMode_ ? "몹" : "캐릭터", (int)x, (int)panelTop + 8, 15, ui::kAccent);
         float listTop = panelTop + 32, listH = panelH - 290;
         Rectangle listReg = { leftX, listTop, leftW, listH };
-        int rows = (int)db.characters.size();
+        int rows = (int)list.size();
         uiScissor((int)leftX, (int)listTop, (int)leftW, (int)listH);
         float ly = listTop - charListScroll_;
         for (int i = 0; i < rows; ++i) {
             if (ly + 28 > listTop && ly < listTop + listH)
-                if (ui::button({ x, ly, w - 12, 26 }, db.characters[i].name, charDefSel_ == i)) {
-                    charDefSel_ = i; charDefNameFocus_ = false; charFrameSel_ = -1;
+                if (ui::button({ x, ly, w - 12, 26 }, list[i].name, sel == i)) {
+                    sel = i; charDefNameFocus_ = false; charFrameSel_ = -1;
                 }
             ly += 30;
         }
@@ -338,55 +341,59 @@ void Editor::drawCharsTab() {
         if (rows == 0) DrawTextU("(없음)", (int)x, (int)listTop + 6, 13, ui::kTextDim);
 
         float by = listTop + listH + 6;
-        if (ui::button({ x, by, w, 30 }, "+ 새 캐릭터")) {
-            CharacterDef cd; cd.id = (int)db.characters.size() + 1;
-            cd.name = "캐릭터" + std::to_string(cd.id); cd.motions[MO_Walk].loop = true;
-            db.characters.push_back(cd); charDefSel_ = (int)db.characters.size() - 1;
+        if (ui::button({ x, by, w, 30 }, mobMode_ ? "+ 새 몹" : "+ 새 캐릭터")) {
+            CharacterDef cd; cd.id = (int)list.size() + 1;
+            cd.name = (mobMode_ ? "몹" : "캐릭터") + std::to_string(cd.id); cd.motions[MO_Walk].loop = true;
+            list.push_back(cd); sel = (int)list.size() - 1;
             charFrameSel_ = -1; charMotionTab_ = 0; p.save(); building = true;
         }
         by += 38;
         DrawLine((int)x, (int)by, (int)(x + w), (int)by, ui::kPanelHi); by += 8;
         if (building) {
-            CharacterDef& cd = db.characters[charDefSel_];
+            CharacterDef& cd = list[sel];
             DrawTextU("이름", (int)x, (int)by + 5, 12, ui::kTextDim);
             Rectangle nf = { x + 42, by, w - 42, 26 };
             if (ui::mouseIn(nf) && lclick) charDefNameFocus_ = true;
             else if (lclick && !ui::mouseIn(nf)) charDefNameFocus_ = false;
-            ui::textField(nf, cd.name, charDefNameFocus_, 20); by += 32;
-            if (ui::button({ x, by, w, 30 }, "⚙ 캐릭터 데이터 수정 (능력치·스킬)", false)) { charDataEdit_ = true; charDataNameFocus_ = -1; return; }
+            ui::textField(nf, cd.name, charDefNameFocus_, 40); by += 32;
+            if (ui::button({ x, by, w, 30 }, mobMode_ ? "⚙ 몹 데이터 수정 (능력치·보상·탄생)" : "⚙ 캐릭터 데이터 수정 (능력치·스킬)", false)) { charDataEdit_ = true; charDataNameFocus_ = -1; return; }
             by += 36;
-            bool isP = (p.playerCharId == cd.id);
-            if (ui::button({ x, by, w, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
-                p.playerCharId = cd.id; p.save();
-                setStatus(cd.motions[MO_Walk].frames.empty()
-                    ? "주의: '걷기' 모션이 비어 인게임에서 안 보일 수 있습니다."
-                    : "이 캐릭터를 플레이어로 설정.");
+            if (!mobMode_) {                              // 플레이어 설정은 캐릭터 전용
+                bool isP = (p.playerCharId == cd.id);
+                if (ui::button({ x, by, w, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
+                    p.playerCharId = cd.id; p.save();
+                    setStatus(cd.motions[MO_Walk].frames.empty()
+                        ? "주의: '걷기' 모션이 비어 인게임에서 안 보일 수 있습니다."
+                        : "이 캐릭터를 플레이어로 설정.");
+                }
+                by += 32;
             }
-            by += 32;
             if (ui::button({ x, by, w/2 - 2, 26 }, "복제")) {
-                CharacterDef cp = cd; cp.id = (int)db.characters.size() + 1; cp.name = cd.name + " 사본";
-                db.characters.push_back(cp); charDefSel_ = (int)db.characters.size() - 1; charFrameSel_ = -1; p.save(); return;
+                CharacterDef cp = cd; cp.id = (int)list.size() + 1; cp.name = cd.name + " 사본";
+                list.push_back(cp); sel = (int)list.size() - 1; charFrameSel_ = -1; p.save(); return;
             }
             if (ui::button({ x + w/2 + 2, by, w/2 - 2, 26 }, "삭제")) {
-                if (p.playerCharId == cd.id) p.playerCharId = -1;
-                db.characters.erase(db.characters.begin() + charDefSel_);
-                charDefSel_ = -1; charFrameSel_ = -1; p.save(); return;
+                if (!mobMode_ && p.playerCharId == cd.id) p.playerCharId = -1;
+                list.erase(list.begin() + sel);
+                sel = -1; charFrameSel_ = -1; p.save(); return;
             }
             by += 34;
         }
         DrawLine((int)x, (int)by, (int)(x + w), (int)by, ui::kPanelHi); by += 8;
+        if (!mobMode_) {   // 시트 자동 생성 도구는 캐릭터 전용
         DrawTextU("빠른 생성 도구", (int)x, (int)by + 2, 12, ui::kTextDim); by += 20;
         if (ui::button({ x, by, w, 26 }, "+ 시트 캐릭터 자동 생성")) generateCharacter();
         by += 30;
         ui::intStepper({ x, by, w, 24 }, "시트 걷기수", p.playerFrames, 1, 4, 7); by += 27;
         ui::intStepper({ x, by, w, 24 }, "시트 공격수", p.playerAtkFrames, 1, 0, 4);
+        }  // !mobMode_ 빠른 생성 도구
     }
 
     // ================== CENTER: 모션 · 프레임 · 재생 ==================
     if (!building) {
-        ui::label("← 왼쪽에서 '+ 새 캐릭터'를 눌러 시작하세요.", (int)midX + 14, (int)panelTop + 14, 15, ui::kTextDim);
+        ui::label(mobMode_ ? "← 왼쪽에서 '+ 새 몹'을 눌러 시작하세요." : "← 왼쪽에서 '+ 새 캐릭터'를 눌러 시작하세요.", (int)midX + 14, (int)panelTop + 14, 15, ui::kTextDim);
     } else {
-        CharacterDef& cd = db.characters[charDefSel_];
+        CharacterDef& cd = list[sel];
         float x = midX + 10, w = midW - 20;
         DrawTextU("모션 (탭 선택)", (int)x, (int)panelTop + 6, 13, ui::kTextDim);
         float tabsY = panelTop + 26, tw = w / MO_COUNT;
@@ -516,7 +523,7 @@ void Editor::drawCharsTab() {
         auto addToMotion = [&](int assetId){
             if (!building) return 0;
             const AssetEntry* a = p.assets.find(assetId); if (!a) return 0;
-            MotionClip& mc = db.characters[charDefSel_].motions[charMotionTab_];
+            MotionClip& mc = list[sel].motions[charMotionTab_];
             charUndo_ = mc; charUndoSet_ = true;
             auto& mf = dirVecOf(mc, charDirTab_);
             int pos = (charFrameSel_ >= 0 && charFrameSel_ < (int)mf.size()) ? charFrameSel_ + 1 : (int)mf.size();
@@ -609,7 +616,7 @@ void Editor::drawCharsTab() {
             float bhalf = (cell - 10) / 2;
             if (building && !blocked && ui::button({ cx + 4, cy + cardH - 16, bhalf, 14 }, "자동구성")) {
                 charLibPressOnCard_ = true;
-                CharacterDef& c = db.characters[charDefSel_];
+                CharacterDef& c = list[sel];
                 std::vector<int> fr = sliceSheetRow0(a->id);
                 int wlk = std::min((int)fr.size(), 4);
                 c.motions[MO_Walk].frames.assign(fr.begin(), fr.begin() + wlk);
@@ -725,8 +732,10 @@ void Editor::drawCharSkillEditor() {
     Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
 
-    if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charSkillEdit_ = false; return; }
-    CharacterDef& cd = db.characters[charDefSel_];
+    std::vector<CharacterDef>& list = mobMode_ ? db.mobs : db.characters;
+    int& sel = mobMode_ ? mobSel_ : charDefSel_;
+    if (sel < 0 || sel >= (int)list.size()) { charSkillEdit_ = false; return; }
+    CharacterDef& cd = list[sel];
     // The slot is set explicitly on entry (Z/X/C/V motions or the F/G cards);
     // fall back to the motion tab for safety.
     int slot = charSkillSlot_ >= 0 ? charSkillSlot_ : castSlotForMotion(charMotionTab_);
@@ -807,12 +816,14 @@ void Editor::drawCharDataEditor() {
     Database& db = p.database;
     Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 22, 24, 32, 255 });
-    if (charDefSel_ < 0 || charDefSel_ >= (int)db.characters.size()) { charDataEdit_ = false; return; }
-    CharacterDef& cd = db.characters[charDefSel_];
+    std::vector<CharacterDef>& list = mobMode_ ? db.mobs : db.characters;
+    int& sel = mobMode_ ? mobSel_ : charDefSel_;
+    if (sel < 0 || sel >= (int)list.size()) { charDataEdit_ = false; return; }
+    CharacterDef& cd = list[sel];
     bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     if (lclick) charDataNameFocus_ = -1;   // a click elsewhere drops text focus (set again below if on a field)
 
-    ui::label(TextFormat("캐릭터 데이터 — %s", cd.name.c_str()), 20, (int)kToolbarH + 10, 20, ui::kAccent);
+    ui::label(TextFormat(mobMode_ ? "몹 데이터 — %s" : "캐릭터 데이터 — %s", cd.name.c_str()), 20, (int)kToolbarH + 10, 20, ui::kAccent);
     if (ui::button({ area.width - 180, kToolbarH + 8, 160, 28 }, "← 저장하고 닫기")) { p.save(); charDataEdit_ = false; return; }
 
     // ===================== LEFT: 능력치 =====================
@@ -837,9 +848,23 @@ void Editor::drawCharDataEditor() {
     }
     DrawTextU("※ 공격력은 모든 스킬에 공통 적용됩니다.", (int)lx, (int)ly, 12, ui::kAccentHi); ly += 16;
     DrawTextU("   실제 데미지 = 공격력 × (스킬 위력 배수%)", (int)lx, (int)ly, 12, ui::kTextDim); ly += 26;
-    bool isP = (p.playerCharId == cd.id);
-    if (ui::button({ lx, ly, lw, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
-        p.playerCharId = cd.id; p.save(); setStatus("이 캐릭터를 플레이어로 설정 (데이터 적용).");
+    if (!mobMode_) {
+        bool isP = (p.playerCharId == cd.id);
+        if (ui::button({ lx, ly, lw, 28 }, isP ? "★ 플레이어 (현재)" : "플레이어로 설정", isP)) {
+            p.playerCharId = cd.id; p.save(); setStatus("이 캐릭터를 플레이어로 설정 (데이터 적용).");
+        }
+    } else {
+        // mob-only: 보상 / 드롭 / 탄생(스폰) 타이밍
+        DrawTextU("─ 몹 설정 ─", (int)lx, (int)ly, 13, ui::kAccentHi); ly += 20;
+        ui::intStepper({ lx, ly, lw, 26 }, "처치 경험치", cd.expReward, 1, 0, 99999); ly += 30;
+        ui::intStepper({ lx, ly, lw, 26 }, "처치 골드",   cd.goldReward, 1, 0, 99999); ly += 30;
+        ui::intStepper({ lx, ly, lw, 26 }, "드롭 아이템ID", cd.dropItemId, 1, -1, 9999); ly += 30;
+        ui::intStepper({ lx, ly, lw, 26 }, "드롭 확률 %",  cd.dropRate, 5, 0, 100); ly += 30;
+        int freezeMs = (int)(cd.spawnFreezeSecs * 1000);
+        if (ui::intStepper({ lx, ly, lw, 26 }, "탄생 정지(ms)", freezeMs, 100, 0, 10000)) cd.spawnFreezeSecs = freezeMs / 1000.0f;
+        ly += 30;
+        ui::intStepper({ lx, ly, lw, 26 }, "탄생 주기(초·0=없음)", cd.respawnSecs, 1, 0, 3600); ly += 30;
+        DrawTextU("탄생 정지: 등장 직후 이 시간 동안 무적·비공격(갑툭튀 방지)", (int)lx, (int)ly, 11, ui::kTextDim);
     }
 
     // ===================== RIGHT: 스킬 일괄 =====================

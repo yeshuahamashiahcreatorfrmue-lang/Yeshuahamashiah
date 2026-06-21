@@ -37,7 +37,8 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "map") tab_ = Tab::Map;
         else if (s == "npc") tab_ = Tab::Npc;
         else if (s == "events") tab_ = Tab::Events;
-        else if (s == "chars") tab_ = Tab::Chars; else if (s == "assets") tab_ = Tab::Assets;
+        else if (s == "chars") tab_ = Tab::Chars; else if (s == "mob") tab_ = Tab::Mob;
+        else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* c = getenv("TSUKURU_DBCAT")) { // debug: pick DB category + first entry
@@ -176,7 +177,8 @@ void Editor::draw() {
         case Tab::Map:      drawMapTab();      break;
         case Tab::Npc:      drawNpcTab();      break;
         case Tab::Events:   drawEventsTab();   break;
-        case Tab::Chars:    drawCharsTab();    break;
+        case Tab::Chars:    mobMode_ = false; drawCharsTab(); break;
+        case Tab::Mob:      mobMode_ = true;  drawCharsTab(); break;   // same builder, db.mobs
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
@@ -229,6 +231,7 @@ void Editor::drawToolbar() {
     tabBtn("NPC", Tab::Npc);
     tabBtn("이벤트", Tab::Events);
     tabBtn("캐릭터", Tab::Chars);
+    tabBtn("몹", Tab::Mob);
     tabBtn("에셋", Tab::Assets);
     tabBtn("DB", Tab::Database);
 

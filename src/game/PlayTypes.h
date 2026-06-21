@@ -25,6 +25,7 @@ struct FieldMonster {
     float moveCd = 0;          // time until next move decision
     float atkCd = 0;           // time until it can hit the player again
     float hurtFlash = 0;       // white/red flash timer when struck
+    float spawnFreeze = 0;     // 탄생 직후 무적·비공격 시간(초): 갑툭튀해서 바로 때리지 않게
     int  defeatSwitch = -1;    // when this troop is cleared, set this switch (boss gate)
     bool alive() const { return hp > 0; }
 };

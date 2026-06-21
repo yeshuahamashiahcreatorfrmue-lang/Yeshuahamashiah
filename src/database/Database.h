@@ -103,6 +103,14 @@ struct CharacterDef {
     MotionClip motions[MO_COUNT]; // walk/attack/skill1/skill2/ultimate/death
     std::vector<FieldSkill> skills; // this character's own skills (by slot); override
                                     // the global field skills when it drives the player
+
+    // --- mob-only fields (used when this def lives in Database::mobs) ---
+    int  expReward = 10;     // 처치 시 경험치
+    int  goldReward = 5;     // 처치 시 골드
+    int  dropItemId = -1;    // 드롭 아이템 (-1 = 없음)
+    int  dropRate = 0;       // 드롭 확률 0..100 (%)
+    float spawnFreezeSecs = 1.2f; // 탄생 직후 무적·비공격(갑툭튀 방지) 시간(초)
+    int  respawnSecs = 0;    // 탄생 주기(초): >0 이면 처치 후 이 시간마다 재생성 (0=재생성 없음)
 };
 
 struct ActorDef {
@@ -131,10 +139,12 @@ public:
     std::vector<ActorDef>   actors;
     std::vector<EnemyDef>   enemies;
     std::vector<FieldSkill> fieldSkills;
-    std::vector<CharacterDef> characters;   // custom multi-motion characters
+    std::vector<CharacterDef> characters;   // custom multi-motion characters (players/NPCs)
+    std::vector<CharacterDef> mobs;         // monsters — same motion/effect/image system as characters
 
     const Item*      item(int id) const;
     const CharacterDef* character(int id) const;
+    const CharacterDef* mob(int id) const;
     const ActorDef*  actor(int id) const;
     const EnemyDef*  enemy(int id) const;
     const FieldSkill* fieldSkillForSlot(int slot) const; // first bound skill for a key

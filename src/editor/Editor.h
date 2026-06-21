@@ -27,7 +27,7 @@ public:
     bool wantsCtrlWheel() const;
 
 private:
-    enum class Tab { World, WorldView, Map, Npc, Events, Chars, Assets, Database };
+    enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
 
     void drawToolbar();
@@ -167,7 +167,11 @@ private:
     bool skillNameFocus_ = false;
     int  skillPatSize_ = 3;            // range/radius used by shape presets
     bool editEfxLayer_ = false;        // grid edits the EFFECT tiles instead of damage tiles
-    // Character builder (custom multi-motion characters)
+    // Character builder (custom multi-motion characters). The SAME builder drives
+    // the Mob tab: when mobMode_ is true it edits db.mobs[mobSel_] instead of
+    // db.characters[charDefSel_] (mobs are CharacterDefs + monster fields).
+    bool mobMode_ = false;            // true while the 몹 tab is active
+    int  mobSel_  = -1;               // selected mob index (parallels charDefSel_)
     int  charDefSel_ = -1;            // selected custom character index
     int  charMotionTab_ = 0;          // selected motion tab (0..5)
     int  charSkillSlot_ = -1;         // skill slot being edited (0..5 Z/X/C/V/F/G; -1 = derive from motion)

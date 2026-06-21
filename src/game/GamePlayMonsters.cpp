@@ -119,6 +119,7 @@ void GamePlay::updateMonsters(float dt) {
     for (auto& m : monsters_) {
         if (m.hurtFlash > 0) m.hurtFlash -= dt;
         if (m.atkCd > 0)     m.atkCd -= dt;
+        if (m.spawnFreeze > 0) m.spawnFreeze -= dt;   // 탄생 정지: 끝나기 전엔 공격 금지
 
         // smooth move
         if (m.moving) {
@@ -157,9 +158,9 @@ void GamePlay::updateMonsters(float dt) {
             }
         }
 
-        // attack the player when adjacent
+        // attack the player when adjacent (not during the spawn-freeze grace)
         int cheb = chebyshev(m.x, m.y, destX_, destY_);
-        if (cheb <= 1 && m.atkCd <= 0 && !gs.party.empty()) {
+        if (cheb <= 1 && m.atkCd <= 0 && m.spawnFreeze <= 0 && !gs.party.empty()) {
             m.atkCd = 1.1f;
             int dmg = std::max(1, m.atk - pdef);
             PartyMember& hero = gs.party[0];
@@ -192,7 +193,9 @@ void GamePlay::updateMonsters(float dt) {
 void GamePlay::drawMonsters() {
     int TS = map_->tileset.tileWidth;
     for (auto& m : monsters_) {
-        Color tint = m.hurtFlash > 0 ? Color{ 255, 120, 120, 255 } : WHITE;
+        // fade in over the spawn-freeze so a mob materializes instead of popping in
+        float a = m.spawnFreeze > 0 ? std::clamp(1.0f - m.spawnFreeze / 1.2f, 0.25f, 1.0f) : 1.0f;
+        Color tint = Fade(m.hurtFlash > 0 ? Color{ 255, 120, 120, 255 } : WHITE, a);
         if (m.spriteAsset >= 0) {
             const Texture2D& tex = engine_.assetTexture(m.spriteAsset);
             float size = TS * 1.15f;
@@ -201,8 +204,9 @@ void GamePlay::drawMonsters() {
             DrawTexturePro(tex, src, dst, {0,0}, 0, tint);
         } else {
             DrawCircle((int)m.px + TS/2, (int)m.py + TS/2, TS*0.4f,
-                       m.hurtFlash > 0 ? RED : Color{ 180, 90, 90, 255 });
+                       Fade(m.hurtFlash > 0 ? RED : Color{ 180, 90, 90, 255 }, a));
         }
+        if (m.spawnFreeze > 0) DrawCircleLines((int)m.px + TS/2, (int)m.py + TS/2, TS*0.5f, Fade(ui::kAccentHi, a*0.7f));
         // HP bar when damaged
         if (m.hp < m.maxHp) {
             float w = TS, ratio = (float)m.hp / m.maxHp;
@@ -263,6 +267,10 @@ void GamePlay::startBattleWith(const std::vector<int>& enemyIds) {
         m.px = fx * (float)TS; m.py = fy * (float)TS;
         m.hp = m.maxHp = def->maxHp; m.atk = def->atk; m.def = def->def;
         m.expReward = def->expReward; m.goldReward = def->goldReward;
+        // anti-갑툭튀: a same-named mob def carries the configured spawn-freeze;
+        // otherwise a default short grace so newly spawned mobs can't insta-hit.
+        m.spawnFreeze = 1.2f;
+        for (const auto& md : db.mobs) if (md.name == def->name) { m.spawnFreeze = md.spawnFreezeSecs; break; }
         monsters_.push_back(m);
         targetMonsters_ = std::max(targetMonsters_, (int)monsters_.size());
         any = true;

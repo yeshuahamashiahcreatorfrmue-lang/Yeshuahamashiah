@@ -68,6 +68,10 @@ const FieldSkill* Database::fieldSkillForSlot(int slot) const {
     for (const auto& s : fieldSkills) if (s.slot == slot) return &s;
     return nullptr;
 }
+const CharacterDef* Database::mob(int id) const {
+    for (const auto& c : mobs) if (c.id == id) return &c;
+    return nullptr;
+}
 const CharacterDef* Database::character(int id) const {
     for (const auto& c : characters) if (c.id == id) return &c;
     return nullptr;
@@ -85,6 +89,46 @@ std::vector<FieldSkill> Database::defaultFieldSkills() {
         for (int dy=-2; dy<=2; ++dy) for (int dx=-2; dx<=2; ++dx)   // 5x5 area
             { ult.patX.push_back(dx); ult.patY.push_back(dy); }
     return { atk, rng, dsh, ult };
+}
+
+// ---- CharacterDef (de)serialization (shared by characters AND mobs) ----
+static json charToJson(const CharacterDef& c) {
+    json mo = json::array();
+    for (const auto& m : c.motions) mo.push_back({{"frames", m.frames},
+        {"left", m.left}, {"right", m.right}, {"up", m.up}, {"fps", m.fps}, {"loop", m.loop}});
+    json sk = json::array();
+    for (const auto& s : c.skills) sk.push_back(skillToJson(s));
+    return {{"id", c.id}, {"name", c.name},
+        {"maxHp", c.maxHp}, {"maxGp", c.maxGp}, {"maxHunger", c.maxHunger}, {"maxThirst", c.maxThirst},
+        {"atk", c.atk}, {"def", c.def}, {"spd", c.spd},
+        {"drawPct", c.drawPct}, {"drawTilesW", c.drawTilesW}, {"drawTilesH", c.drawTilesH},
+        {"motions", mo}, {"skills", sk},
+        {"expReward", c.expReward}, {"goldReward", c.goldReward},
+        {"dropItemId", c.dropItemId}, {"dropRate", c.dropRate},
+        {"spawnFreezeSecs", c.spawnFreezeSecs}, {"respawnSecs", c.respawnSecs}};
+}
+static CharacterDef charFromJson(const json& c) {
+    CharacterDef cd;
+    cd.id = c.value("id", -1); cd.name = c.value("name", "캐릭터");
+    cd.maxHp = c.value("maxHp", 100); cd.maxGp = c.value("maxGp", 30);
+    cd.maxHunger = c.value("maxHunger", 42000); cd.maxThirst = c.value("maxThirst", 42000);
+    cd.atk = c.value("atk", 12); cd.def = c.value("def", 5); cd.spd = c.value("spd", 5);
+    cd.drawPct = c.value("drawPct", 125);
+    cd.drawTilesW = c.value("drawTilesW", 1); cd.drawTilesH = c.value("drawTilesH", 1);
+    const auto& mo = c.value("motions", json::array());
+    for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
+        cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});
+        cd.motions[i].left   = mo[i].value("left",  std::vector<int>{});
+        cd.motions[i].right  = mo[i].value("right", std::vector<int>{});
+        cd.motions[i].up     = mo[i].value("up",    std::vector<int>{});
+        cd.motions[i].fps = mo[i].value("fps", 8);
+        cd.motions[i].loop = mo[i].value("loop", i == MO_Walk);
+    }
+    for (const auto& s : c.value("skills", json::array())) cd.skills.push_back(skillFromJson(s));
+    cd.expReward = c.value("expReward", 10); cd.goldReward = c.value("goldReward", 5);
+    cd.dropItemId = c.value("dropItemId", -1); cd.dropRate = c.value("dropRate", 0);
+    cd.spawnFreezeSecs = c.value("spawnFreezeSecs", 1.2f); cd.respawnSecs = c.value("respawnSecs", 0);
+    return cd;
 }
 
 // ---- serialization ----
@@ -116,18 +160,9 @@ json Database::toJson() const {
     for (const auto& s : fieldSkills) j["fieldSkills"].push_back(skillToJson(s));
 
     j["characters"] = json::array();
-    for (const auto& c : characters) {
-        json mo = json::array();
-        for (const auto& m : c.motions) mo.push_back({{"frames", m.frames},
-            {"left", m.left}, {"right", m.right}, {"up", m.up}, {"fps", m.fps}, {"loop", m.loop}});
-        json sk = json::array();
-        for (const auto& s : c.skills) sk.push_back(skillToJson(s));
-        j["characters"].push_back({{"id", c.id}, {"name", c.name},
-            {"maxHp", c.maxHp}, {"maxGp", c.maxGp}, {"maxHunger", c.maxHunger}, {"maxThirst", c.maxThirst},
-            {"atk", c.atk}, {"def", c.def}, {"spd", c.spd},
-            {"drawPct", c.drawPct}, {"drawTilesW", c.drawTilesW}, {"drawTilesH", c.drawTilesH},
-            {"motions", mo}, {"skills", sk}});
-    }
+    for (const auto& c : characters) j["characters"].push_back(charToJson(c));
+    j["mobs"] = json::array();
+    for (const auto& c : mobs) j["mobs"].push_back(charToJson(c));
     return j;
 }
 
@@ -167,27 +202,9 @@ void Database::fromJson(const json& j) {
     }
     for (const auto& s : j.value("fieldSkills", json::array())) fieldSkills.push_back(skillFromJson(s));
     characters.clear();
-    for (const auto& c : j.value("characters", json::array())) {
-        CharacterDef cd;
-        cd.id = c.value("id", -1); cd.name = c.value("name", "캐릭터");
-        cd.maxHp = c.value("maxHp", 100); cd.maxGp = c.value("maxGp", 30);
-        cd.maxHunger = c.value("maxHunger", 42000); cd.maxThirst = c.value("maxThirst", 42000);
-        cd.atk = c.value("atk", 12); cd.def = c.value("def", 5); cd.spd = c.value("spd", 5);
-        cd.drawPct = c.value("drawPct", 125);
-        cd.drawTilesW = c.value("drawTilesW", 1);
-        cd.drawTilesH = c.value("drawTilesH", 1);
-        const auto& mo = c.value("motions", json::array());
-        for (int i = 0; i < MO_COUNT && i < (int)mo.size(); ++i) {
-            cd.motions[i].frames = mo[i].value("frames", std::vector<int>{});
-            cd.motions[i].left   = mo[i].value("left",  std::vector<int>{});
-            cd.motions[i].right  = mo[i].value("right", std::vector<int>{});
-            cd.motions[i].up     = mo[i].value("up",    std::vector<int>{});
-            cd.motions[i].fps = mo[i].value("fps", 8);
-            cd.motions[i].loop = mo[i].value("loop", i == MO_Walk); // walk loops by default
-        }
-        for (const auto& s : c.value("skills", json::array())) cd.skills.push_back(skillFromJson(s));
-        characters.push_back(cd);
-    }
+    for (const auto& c : j.value("characters", json::array())) characters.push_back(charFromJson(c));
+    mobs.clear();
+    for (const auto& c : j.value("mobs", json::array())) mobs.push_back(charFromJson(c));
 }
 
 } // namespace tsukuru
