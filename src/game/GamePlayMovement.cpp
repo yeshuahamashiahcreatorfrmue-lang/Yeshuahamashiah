@@ -45,10 +45,11 @@ void GamePlay::updateField(float dt) {
 
     // inventory (I) / equipment (C) windows freeze the field while open; they
     // handle their own clicks in draw(). Bottom HUD buttons toggle them too.
-    if (IsKeyPressed(KEY_I)) { invOpen_ = !invOpen_; equipOpen_ = false; }
-    if (IsKeyPressed(KEY_C)) { equipOpen_ = !equipOpen_; invOpen_ = false; }
-    if (invOpen_ || equipOpen_) {
-        if (IsKeyPressed(KEY_ESCAPE)) { invOpen_ = equipOpen_ = false; }
+    if (IsKeyPressed(KEY_I)) { invOpen_ = !invOpen_; equipOpen_ = false; questLogOpen_ = false; }
+    if (IsKeyPressed(KEY_C)) { equipOpen_ = !equipOpen_; invOpen_ = false; questLogOpen_ = false; }
+    if (IsKeyPressed(KEY_J)) { questLogOpen_ = !questLogOpen_; invOpen_ = equipOpen_ = false; }
+    if (invOpen_ || equipOpen_ || questLogOpen_) {
+        if (IsKeyPressed(KEY_ESCAPE)) { invOpen_ = equipOpen_ = questLogOpen_ = false; }
         return;
     }
 

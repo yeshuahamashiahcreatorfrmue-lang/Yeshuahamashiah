@@ -55,7 +55,12 @@ json Event::toJson() const {
         {"wander", behavior == NpcBehavior::Wander},
         {"faction", (int)faction}, {"behavior", (int)behavior},
         {"drawPct", drawPct}, {"drawTilesW", drawTilesW}, {"drawTilesH", drawTilesH},
-        {"npcHp", npcHp}, {"npcAtk", npcAtk}, {"npcDef", npcDef}
+        {"npcHp", npcHp}, {"npcAtk", npcAtk}, {"npcDef", npcDef},
+        {"questObjective", questObjective}, {"questTarget", questTarget},
+        {"questCount", questCount}, {"questDoneText", questDoneText},
+        {"rewardGold", rewardGold}, {"rewardExp", rewardExp},
+        {"rewardItemId", rewardItemId}, {"rewardItemCount", rewardItemCount},
+        {"questTakeItems", questTakeItems}
     };
 }
 
@@ -89,6 +94,15 @@ Event Event::fromJson(const json& j) {
     e.npcHp           = j.value("npcHp", 20);
     e.npcAtk          = j.value("npcAtk", 8);
     e.npcDef          = j.value("npcDef", 2);
+    e.questObjective  = j.value("questObjective", 0);
+    e.questTarget     = j.value("questTarget", -1);
+    e.questCount      = j.value("questCount", 1);
+    e.questDoneText   = j.value("questDoneText", "");
+    e.rewardGold      = j.value("rewardGold", 0);
+    e.rewardExp       = j.value("rewardExp", 0);
+    e.rewardItemId    = j.value("rewardItemId", -1);
+    e.rewardItemCount = j.value("rewardItemCount", 1);
+    e.questTakeItems  = j.value("questTakeItems", true);
     return e;
 }
 

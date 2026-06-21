@@ -65,6 +65,20 @@ struct Event {
     bool once = false; // run only one time (sets a hidden flag)
     bool wander = false; // legacy roam flag (kept in sync with behavior==Wander)
 
+    // --- Quest / reward (EventType::Quest) ---
+    // A self-contained quest: the giver NPC offers it on first talk, the player
+    // fulfils the objective, then talks again to claim the reward. No separate
+    // quest registry needed — everything a quest needs lives on its event.
+    int  questObjective = 0; // 0 즉시지급 / 1 몬스터 처치 / 2 아이템 수집 / 3 지역 도달
+    int  questTarget    = -1;// 처치: 적ID(-1=아무거나) · 수집: 아이템ID · 도달: 맵ID
+    int  questCount     = 1; // required kills / items
+    std::string questDoneText;     // shown when the reward is claimed (optional)
+    int  rewardGold     = 0;
+    int  rewardExp      = 0;
+    int  rewardItemId   = -1;
+    int  rewardItemCount= 1;
+    bool questTakeItems = true;    // remove collected items on turn-in (수집형)
+
     // --- NPC presentation & behaviour (only used when graphicAsset >= 0) ---
     NpcFaction  faction  = NpcFaction::Neutral;
     NpcBehavior behavior = NpcBehavior::Idle;

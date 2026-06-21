@@ -71,6 +71,8 @@ void GameState::newGame(const Database& db, int startActorId, int playerCharId, 
     switches_.clear();
     variables_.clear();
     equipped.clear();
+    quests.clear();
+    buffs.clear();
     inventory = Inventory{};
     if (const ActorDef* a = db.actor(startActorId))
         party.push_back(PartyMember::fromActor(*a));
@@ -165,6 +167,22 @@ void GameState::tickBuffs(float dt) {
     }
 }
 
+void GameState::addKillProgress(int enemyId) {
+    for (auto& kv : quests) {
+        QuestState& q = kv.second;
+        if (q.status == 1 && q.objective == 1 && (q.target < 0 || q.target == enemyId))
+            if (q.count < q.need) ++q.count;
+    }
+}
+
+void GameState::markReached(int mapId) {
+    for (auto& kv : quests) {
+        QuestState& q = kv.second;
+        if (q.status == 1 && q.objective == 3 && q.target == mapId)
+            q.count = std::max(q.count, q.need);
+    }
+}
+
 bool GameState::partyWiped() const {
     for (const auto& m : party) if (m.alive()) return false;
     return true;
@@ -181,10 +199,12 @@ json GameState::toJson() const {
     for (const auto& kv : equipped) eq.push_back({{"slot", kv.first}, {"item", kv.second}});
     json bf = json::array();
     for (const auto& b : buffs) bf.push_back(b.toJson());
+    json qs = json::array();
+    for (const auto& kv : quests) { json e = kv.second.toJson(); e["key"] = kv.first; qs.push_back(e); }
     return {{"inventory", inventory.toJson()}, {"party", pt},
             {"currentMap", currentMap}, {"playerX", playerX}, {"playerY", playerY},
             {"playerDir", playerDir}, {"switches", sw}, {"variables", vr},
-            {"objective", objective}, {"equipped", eq}, {"buffs", bf}};
+            {"objective", objective}, {"equipped", eq}, {"buffs", bf}, {"quests", qs}};
 }
 
 void GameState::fromJson(const json& j) {
@@ -203,6 +223,9 @@ void GameState::fromJson(const json& j) {
     for (const auto& e : j.value("equipped", json::array())) equipped[e.value("slot",0)] = e.value("item",-1);
     buffs.clear();
     for (const auto& b : j.value("buffs", json::array())) buffs.push_back(ActiveBuff::fromJson(b));
+    quests.clear();
+    for (const auto& q : j.value("quests", json::array()))
+        quests[(long)q.value("key", 0)] = QuestState::fromJson(q);
 }
 
 } // namespace tsukuru

@@ -114,6 +114,8 @@ private:
     // Event editing
     int  editingEventId_ = -1;
     bool eventTextFocus_ = false;
+    float eventScroll_ = 0;   // event inspector vertical scroll (tall quest panels)
+    int   eventScrollId_ = -1;// which event eventScroll_ belongs to (reset on change)
     // Database editing
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;

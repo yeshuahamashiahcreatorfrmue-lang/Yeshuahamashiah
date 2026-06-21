@@ -59,6 +59,8 @@ bool GamePlay::damageNpc(NpcInst& n, int dmg) {
 void GamePlay::onNpcKilled(NpcInst& n) {
     GameState& gs = engine_.state();
     if (n.switchOnDeath >= 0) gs.setSwitch(n.switchOnDeath, true);
+    gs.addKillProgress(-1);    // 적 NPC 처치도 "아무거나 처치" 퀘스트에 반영
+    refreshQuestObjective();
     toast_ = "적 처치!"; toastTimer_ = 1.5f;
     engine_.audio().playSfx("defeat", 0.8f);
 }

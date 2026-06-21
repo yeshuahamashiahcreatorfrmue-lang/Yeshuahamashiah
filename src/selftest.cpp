@@ -444,6 +444,31 @@ static void testFoodAndSurvival() {
           "활성 버프 세이브/로드 직렬화");
 }
 
+static void testQuests() {
+    std::printf("== Quests / NPC rewards ==\n");
+    GameState gs;
+    long k1 = GameState::questKey(1, 17);
+    { QuestState& q = gs.quests[k1]; q.status=1; q.objective=1; q.target=1; q.need=3; q.title="슬라임 처치"; }
+    gs.addKillProgress(2);                                   // wrong enemy
+    CHECK(gs.quests[k1].count == 0, "다른 적 처치는 진행되지 않음");
+    for (int i = 0; i < 4; ++i) gs.addKillProgress(1);       // 4 kills, need 3
+    CHECK(gs.quests[k1].count == 3, "처치 진행 + 필요수량에서 캡");
+
+    long k2 = GameState::questKey(2, 5);
+    { QuestState& r = gs.quests[k2]; r.status=1; r.objective=3; r.target=9; r.need=1; }
+    gs.markReached(8); CHECK(gs.quests[k2].count == 0, "다른 맵 도달은 무시");
+    gs.markReached(9); CHECK(gs.quests[k2].count >= 1, "목표 맵 도달 반영");
+
+    long k3 = GameState::questKey(3, 1);
+    { QuestState& a = gs.quests[k3]; a.status=1; a.objective=1; a.target=-1; a.need=2; }
+    gs.addKillProgress(99); CHECK(gs.quests[k3].count == 1, "'아무거나 처치' 퀘스트 반영");
+
+    GameState g2; g2.fromJson(gs.toJson());
+    CHECK(g2.quests.size() == gs.quests.size() && g2.quests[k1].need == 3 &&
+          g2.quests[k1].title == "슬라임 처치" && g2.quests[k2].objective == 3,
+          "퀘스트 상태 세이브/로드 직렬화");
+}
+
 int main() {
     std::printf("===== Tsukuru Engine Core Self-Test =====\n");
     testTilemap();
@@ -462,6 +487,7 @@ int main() {
     testCharacterBuilder();
     testResidueStress();
     testFoodAndSurvival();
+    testQuests();
     testNetCapacity();
 
     std::printf("=========================================\n");

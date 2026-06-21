@@ -53,6 +53,27 @@ struct ActiveBuff {
     }
 };
 
+// Per-quest runtime state. A quest is keyed by its giver event (mapId<<16|evId)
+// and snapshots the objective at accept time so progress can be tracked even when
+// the giver's map isn't loaded (e.g. killing monsters elsewhere).
+struct QuestState {
+    int status = 0;      // 0 미수락 / 1 진행중 / 2 완료(보상수령)
+    int count  = 0;      // 처치/도달 진행도
+    int objective = 0;   // 0 즉시 / 1 처치 / 2 수집 / 3 도달
+    int target = -1;     // 적/아이템/맵 id
+    int need   = 1;      // 필요 수량
+    std::string title;   // 로그 표시용 퀘스트 안내문
+    nlohmann::json toJson() const {
+        return {{"status",status},{"count",count},{"objective",objective},
+                {"target",target},{"need",need},{"title",title}};
+    }
+    static QuestState fromJson(const nlohmann::json& j) {
+        QuestState q; q.status=j.value("status",0); q.count=j.value("count",0);
+        q.objective=j.value("objective",0); q.target=j.value("target",-1);
+        q.need=j.value("need",1); q.title=j.value("title",std::string()); return q;
+    }
+};
+
 class GameState {
 public:
     Inventory inventory;
@@ -73,6 +94,12 @@ public:
     int  playerX = 0, playerY = 0;
     int  playerDir = 0; // Direction
     std::string objective;   // current quest objective shown on the HUD
+
+    // --- quests (keyed by giver event) ---
+    std::map<long,QuestState> quests;
+    static long questKey(int mapId, int evId) { return ((long)mapId << 16) | (evId & 0xffff); }
+    void addKillProgress(int enemyId);   // bump active 처치 quests targeting enemyId (or any)
+    void markReached(int mapId);         // satisfy active 도달 quests for mapId
 
     void setSwitch(int id, bool value) { switches_[id] = value; }
     bool getSwitch(int id) const {

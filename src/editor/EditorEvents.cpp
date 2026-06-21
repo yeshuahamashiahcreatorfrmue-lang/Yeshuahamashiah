@@ -249,18 +249,39 @@ void Editor::drawObjectPalette(Rectangle area) {
 // the Map-tab 오브젝트 inspector.
 void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     Event* ev = &evRef;
-    float y = panel.y + 44;
-    const char* typeNames[] = { "메시지", "이동", "아이템지급", "스위치설정", "전투", "상점", "퀘스트", "엔딩" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("종류: %s", typeNames[(int)ev->type]))) {
-        ev->type = (EventType)(((int)ev->type + 1) % 8);
+    Database& db = engine_.project().database;
+    if (ev->id != eventScrollId_) { eventScroll_ = 0; eventScrollId_ = ev->id; } // reset on select
+    // The quest panel can be tall — make the whole inspector scrollable.
+    Rectangle clipR = { panel.x, panel.y + 40, panel.width, panel.height - 40 };
+    if (ui::mouseIn(clipR)) eventScroll_ -= GetMouseWheelMove() * 40;
+    if (eventScroll_ < 0) eventScroll_ = 0;
+    uiScissor((int)clipR.x, (int)clipR.y, (int)clipR.width, (int)clipR.height);
+    float y = panel.y + 44 - eventScroll_;
+
+    auto stepN = [&](const char* lbl, int& v, int s, int lo, int hi) {
+        ui::intStepper({ panel.x + 12, y, 296, 24 }, lbl, v, s, lo, hi); y += 26;
+    };
+    auto nameHint = [&](const std::string& s, Color c) {
+        DrawTextU(("→ " + s).c_str(), (int)panel.x + 16, (int)y, 12, c); y += 18;
+    };
+
+    // ---- event type, laid out as a labelled grid so every kind is visible ----
+    DrawTextU("이벤트 종류 (탭에서 선택)", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 20;
+    const char* typeNames[8] = { "메시지", "이동", "아이템지급", "스위치", "전투", "상점", "퀘스트·보상", "엔딩" };
+    for (int i = 0; i < 8; ++i) {
+        Rectangle b = { panel.x + 12 + (i % 2) * 150.0f, y + (i / 2) * 30.0f, 144, 26 };
+        if (ui::button(b, typeNames[i], (int)ev->type == i)) ev->type = (EventType)i;
     }
+    y += 4 * 30 + 8;
+    const char* trigNames[3] = { "말걸기", "접촉", "자동실행" };
+    for (int i = 0; i < 3; ++i)
+        if (ui::button({ panel.x + 12 + i * 100.0f, y, 96, 24 }, trigNames[i], (int)ev->trigger == i))
+            ev->trigger = (TriggerType)i;
     y += 32;
-    const char* trigNames[] = { "말걸기", "접촉", "자동실행" };
-    if (ui::button({ panel.x + 12, y, 296, 26 }, TextFormat("트리거: %s", trigNames[(int)ev->trigger]))) {
-        ev->trigger = (TriggerType)(((int)ev->trigger + 1) % 3);
-    }
-    y += 36;
-    ui::label("텍스트:", (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
+
+    const char* txtLbl = ev->type == EventType::Quest ? "안내문 (말 걸 때 대사):"
+                       : ev->type == EventType::Shop  ? "상점 이름:" : "텍스트 / 대사:";
+    ui::label(txtLbl, (int)panel.x + 12, (int)y, 14, ui::kTextDim); y += 18;
     Rectangle tf = { panel.x + 12, y, 296, 26 };
     if (ui::mouseIn(tf) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) eventTextFocus_ = true;
     else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(tf)) eventTextFocus_ = false;
@@ -295,10 +316,42 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         case EventType::Shop:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
             break;
-        case EventType::Quest:
-            DrawTextU("텍스트 = HUD에 표시되는 목표.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 20;
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "스위치설정", ev->switchId, 1, -1, 999); y += 28;
+        case EventType::Quest: {
+            DrawTextU("─ 완료 조건 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            const char* objs[4] = { "즉시 지급(대화)", "몬스터 처치", "아이템 수집", "지역 도달" };
+            if (ui::button({ panel.x + 12, y, 296, 24 }, TextFormat("조건: %s", objs[ev->questObjective % 4])))
+                ev->questObjective = (ev->questObjective + 1) % 4;
+            y += 28;
+            if (ev->questObjective == 1) {            // 처치
+                stepN("대상 적ID(-1=아무거나)", ev->questTarget, 1, -1, 999);
+                const EnemyDef* en = db.enemy(ev->questTarget);
+                nameHint(ev->questTarget < 0 ? "아무 몬스터나" : (en ? en->name : "(없는 적)"),
+                         ev->questTarget < 0 || en ? ui::kAccentHi : ui::kDanger);
+                stepN("처치 수", ev->questCount, 1, 1, 99);
+            } else if (ev->questObjective == 2) {     // 수집
+                stepN("대상 아이템ID", ev->questTarget, 1, -1, 999);
+                const Item* it = db.item(ev->questTarget);
+                nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
+                stepN("수집 수", ev->questCount, 1, 1, 99);
+                if (ui::button({ panel.x + 12, y, 296, 24 }, ev->questTakeItems ? "제출 시 아이템 회수: 예" : "제출 시 아이템 회수: 아니오"))
+                    ev->questTakeItems = !ev->questTakeItems;
+                y += 28;
+            } else if (ev->questObjective == 3) {     // 도달
+                stepN("대상 맵ID", ev->questTarget, 1, -1, 999);
+                std::shared_ptr<Map> tm = engine_.project().map(ev->questTarget);
+                nameHint(tm ? tm->name : "(없는 맵)", tm ? ui::kAccentHi : ui::kDanger);
+            }
+            DrawTextU("─ 보상 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
+            stepN("골드", ev->rewardGold, 10, 0, 999999);
+            stepN("경험치", ev->rewardExp, 5, 0, 99999);
+            stepN("보상 아이템ID(-1=없음)", ev->rewardItemId, 1, -1, 999);
+            if (ev->rewardItemId >= 0) {
+                const Item* it = db.item(ev->rewardItemId);
+                nameHint(it ? it->name : "(없는 아이템)", it ? ui::kAccentHi : ui::kDanger);
+                stepN("보상 수량", ev->rewardItemCount, 1, 1, 99);
+            }
             break;
+        }
         case EventType::Ending:
             DrawTextU("게임 클리어 화면을 표시합니다.", (int)panel.x+12, (int)y, 12, ui::kTextDim); y += 22;
             break;
@@ -335,6 +388,10 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
                   [&](const Event& e){ return e.id == editingEventId_; }), evs.end());
         editingEventId_ = -1;
     }
+    y += 36;
+    EndScissorMode();
+    float maxScroll = std::max(0.0f, (y + eventScroll_) - (panel.y + panel.height));
+    if (eventScroll_ > maxScroll) eventScroll_ = maxScroll;
 }
 
 void Editor::drawEventsTab() {

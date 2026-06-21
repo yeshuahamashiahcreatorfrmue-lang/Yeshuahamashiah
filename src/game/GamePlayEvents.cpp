@@ -109,9 +109,7 @@ void GamePlay::runEvent(Event& e) {
             openShop(e.itemId, e.text.empty() ? "상점" : e.text);
             break;
         case EventType::Quest:
-            gs.objective = e.text;
-            if (e.switchId >= 0) gs.setSwitch(e.switchId, true);
-            showMessage(e.text);
+            runQuestEvent(e);
             break;
         case EventType::Ending:
             gs.objective.clear();
@@ -179,6 +177,139 @@ void GamePlay::drawShop() {
         DrawRectangle(sw/2 - tw/2 - 10, (int)box.y - 36, tw + 20, 28, Fade(ui::kAccent, 0.92f));
         DrawTextU(toast_.c_str(), sw/2 - tw/2, (int)box.y - 30, 18, BLACK);
     }
+}
+
+// ----------------------------- quests / NPC rewards -----------------------------
+bool GamePlay::questObjectiveMet(const Event& e, const QuestState& q) const {
+    switch (e.questObjective) {
+        case 1: return q.count >= e.questCount;                                       // 처치
+        case 2: return engine_.state().inventory.count(e.questTarget) >= e.questCount;// 수집
+        case 3: return q.count >= 1;                                                  // 도달
+        default: return true;                                                         // 즉시
+    }
+}
+
+std::string GamePlay::questProgressText(const Event& e, const QuestState& q) const {
+    const Database& db = engine_.project().database;
+    switch (e.questObjective) {
+        case 1: { const EnemyDef* en = db.enemy(e.questTarget);
+            return TextFormat("%s 처치 %d/%d", en ? en->name.c_str() : "적군", q.count, e.questCount); }
+        case 2: { const Item* it = db.item(e.questTarget);
+            return TextFormat("%s 수집 %d/%d", it ? it->name.c_str() : "아이템",
+                              engine_.state().inventory.count(e.questTarget), e.questCount); }
+        case 3: { std::shared_ptr<Map> m = engine_.project().map(e.questTarget);
+            return std::string("목표 지역 도달: ") + (m ? m->name : "?") + (q.count >= 1 ? " (완료)" : ""); }
+        default: return "보상 받기";
+    }
+}
+
+void GamePlay::grantQuestReward(const Event& e) {
+    GameState& gs = engine_.state();
+    const Database& db = engine_.project().database;
+    std::string r;
+    if (e.rewardGold > 0) { gs.inventory.gold += e.rewardGold; r += TextFormat("골드 +%d   ", e.rewardGold); }
+    if (e.rewardExp > 0 && !gs.party.empty()) { gs.party[0].gainExp(e.rewardExp); r += TextFormat("경험치 +%d   ", e.rewardExp); }
+    if (e.rewardItemId >= 0) {
+        gs.inventory.addItem(e.rewardItemId, std::max(1, e.rewardItemCount));
+        const Item* it = db.item(e.rewardItemId);
+        r += (it ? it->name : std::string("아이템")) + TextFormat(" x%d", std::max(1, e.rewardItemCount));
+    }
+    engine_.audio().playSfx("levelup");
+    toast_ = "보상 획득!"; toastTimer_ = 1.6f;
+    std::string head = e.questDoneText.empty() ? "퀘스트 완료! 보상을 받았다." : e.questDoneText;
+    showMessage(r.empty() ? head : (head + "|" + r));
+}
+
+void GamePlay::runQuestEvent(Event& e) {
+    GameState& gs = engine_.state();
+    bool hasReward = e.rewardGold > 0 || e.rewardExp > 0 || e.rewardItemId >= 0;
+    // Pure announcement: objective 0 with no reward just sets the HUD goal & shows
+    // its text (the classic "quest objective" event) — it never enters the log.
+    if (e.questObjective == 0 && !hasReward) {
+        if (!e.text.empty()) { gs.objective = e.text; showMessage(e.text); }
+        if (e.switchId >= 0) gs.setSwitch(e.switchId, true);
+        return;
+    }
+    long key = GameState::questKey(map_->id, e.id);
+    QuestState& q = gs.quests[key];
+    if (q.status == 0) {                         // 미수락
+        if (e.questObjective == 0) {             // 즉시 보상형 NPC
+            grantQuestReward(e); q.status = 2; q.title = e.text; return;
+        }
+        q.status = 1; q.count = 0;
+        q.objective = e.questObjective; q.target = e.questTarget;
+        q.need = std::max(1, e.questCount); q.title = e.text;
+        refreshQuestObjective();
+        showMessage((e.text.empty() ? "의뢰를 맡았다." : e.text) + "|[수락] " + questProgressText(e, q));
+    } else if (q.status == 1) {                  // 진행중 -> 완료 검사
+        if (questObjectiveMet(e, q)) {
+            if (e.questObjective == 2 && e.questTakeItems && e.questTarget >= 0)
+                gs.inventory.removeItem(e.questTarget, e.questCount);   // 수집형: 제출하면 소비
+            grantQuestReward(e);
+            q.status = 2; gs.objective.clear(); refreshQuestObjective();
+        } else {
+            showMessage("아직 끝나지 않았네. (" + questProgressText(e, q) + ")");
+        }
+    } else {                                     // 완료됨
+        showMessage(e.questDoneText.empty() ? "고맙네, 모험가여!" : e.questDoneText);
+    }
+}
+
+void GamePlay::refreshQuestObjective() {
+    GameState& gs = engine_.state();
+    const Database& db = engine_.project().database;
+    for (auto& kv : gs.quests) {
+        QuestState& q = kv.second;
+        if (q.status != 1) continue;
+        std::string s;
+        if (q.objective == 1) { const EnemyDef* en = db.enemy(q.target);
+            s = TextFormat("%s %d/%d 처치", en ? en->name.c_str() : "적군", q.count, q.need); }
+        else if (q.objective == 2) { const Item* it = db.item(q.target);
+            s = TextFormat("%s %d/%d 수집", it ? it->name.c_str() : "아이템", gs.inventory.count(q.target), q.need); }
+        else if (q.objective == 3) { std::shared_ptr<Map> m = engine_.project().map(q.target);
+            s = std::string("목표 지역 도달: ") + (m ? m->name : "?"); }
+        else s = q.title;
+        gs.objective = s;
+        return;
+    }
+}
+
+void GamePlay::drawQuestLog() {
+    GameState& gs = engine_.state();
+    const Database& db = engine_.project().database;
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
+    Rectangle box = { sw/2.0f - 280, 60, 560, (float)sh - 160 };
+    ui::panel(box);
+    DrawTextU("퀘스트 일지   (J 또는 ESC 로 닫기)", (int)box.x + 18, (int)box.y + 14, 22, ui::kAccent);
+    if (ui::button({ box.x + box.width - 52, box.y + 12, 40, 28 }, "X")) questLogOpen_ = false;
+    int y = (int)box.y + 56;
+    int active = 0, done = 0;
+    for (auto& kv : gs.quests) {
+        const QuestState& q = kv.second;
+        if (q.status == 0) continue;
+        bool fin = q.status == 2;
+        if (fin) ++done; else ++active;
+        Color c = fin ? ui::kTextDim : ui::kText;
+        DrawTextU(fin ? "[완료]" : "[진행]", (int)box.x + 18, y, 16, fin ? ui::kGood : ui::kAccentHi);
+        DrawTextU(q.title.empty() ? "(이름 없는 의뢰)" : q.title.c_str(), (int)box.x + 86, y, 16, c);
+        y += 22;
+        if (!fin) {
+            std::string p;
+            if (q.objective == 1) { const EnemyDef* en = db.enemy(q.target);
+                p = TextFormat("- %s 처치 %d/%d", en ? en->name.c_str() : "적군", q.count, q.need); }
+            else if (q.objective == 2) { const Item* it = db.item(q.target);
+                p = TextFormat("- %s 수집 %d/%d", it ? it->name.c_str() : "아이템", gs.inventory.count(q.target), q.need); }
+            else if (q.objective == 3) { std::shared_ptr<Map> m = engine_.project().map(q.target);
+                p = std::string("- 목표 지역 도달: ") + (m ? m->name : "?") + (q.count >= 1 ? " (완료)" : ""); }
+            else p = "- 보상 받기";
+            DrawTextU(p.c_str(), (int)box.x + 36, y, 14, ui::kTextDim); y += 24;
+        }
+        if (y > box.y + box.height - 40) break;
+    }
+    if (active == 0 && done == 0)
+        DrawTextU("받은 의뢰가 없습니다. NPC에게 말을 걸어보세요.", (int)box.x + 18, (int)box.y + 60, 16, ui::kTextDim);
+    DrawTextU(TextFormat("진행 %d · 완료 %d", active, done), (int)box.x + 18, (int)(box.y + box.height - 30), 14, ui::kTextDim);
 }
 
 void GamePlay::drawMessage() {

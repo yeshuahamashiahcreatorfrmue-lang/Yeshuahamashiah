@@ -55,6 +55,17 @@ void GamePlay::onEnter() {
         startEncounterBattle();   // debug: jump straight into a turn-based battle
     if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop for item id s
         openShop(atoi(s), "상점: 포션을 사시겠어요?");
+    if (getenv("TSUKURU_QUESTLOG") && map_) {     // debug: accept all quests + open log
+        GameState& gs = engine_.state();
+        for (auto& e : map_->events) {
+            if (e.type != EventType::Quest || e.questObjective == 0) continue;
+            QuestState& q = gs.quests[GameState::questKey(map_->id, e.id)];
+            q.status = 1; q.objective = e.questObjective; q.target = e.questTarget;
+            q.need = std::max(1, e.questCount); q.title = e.text;
+        }
+        refreshQuestObjective();
+        questLogOpen_ = true;
+    }
     if (getenv("TSUKURU_MENU") && menu_) {                  // debug: open ESC menu
         menu_->open();
         if (const char* p = getenv("TSUKURU_MENUPAGE")) menu_->openPage(atoi(p));
@@ -66,6 +77,7 @@ void GamePlay::loadMap(int id) {
     map_ = engine_.project().map(id);
     if (!map_ && !engine_.project().maps.empty()) map_ = engine_.project().maps.front();
     engine_.state().currentMap = map_ ? map_->id : -1;
+    if (map_) { engine_.state().markReached(map_->id); refreshQuestObjective(); } // 도달형 퀘스트
     monsters_.clear();
     weatherP_.clear();
     if (minimapValid_) { UnloadTexture(minimapTex_); minimapValid_ = false; }
@@ -142,6 +154,7 @@ void GamePlay::draw() {
     drawField();
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();
+    if (questLogOpen_) drawQuestLog();
     if (phase_ == Phase::Message) drawMessage();
     if (phase_ == Phase::Menu && menu_) menu_->draw();
 }

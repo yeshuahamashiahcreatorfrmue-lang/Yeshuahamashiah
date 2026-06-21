@@ -13,6 +13,7 @@
 #include "core/Types.h"
 #include "database/Database.h"
 #include "game/PlayTypes.h"
+#include "game/GameState.h"
 #include "battle/Battle.h"
 
 namespace tsukuru {
@@ -114,6 +115,14 @@ private:
     void updateShop(float dt);
     void drawShop();
 
+    // --- quests / NPC rewards (EventType::Quest) ---
+    void runQuestEvent(Event& e);   // accept / check progress / claim reward flow
+    bool questObjectiveMet(const Event& e, const QuestState& q) const;
+    std::string questProgressText(const Event& e, const QuestState& q) const;
+    void grantQuestReward(const Event& e); // gold/exp/item + toast
+    void refreshQuestObjective();   // sync HUD objective to the first active quest
+    void drawQuestLog();            // J: list of active/finished quests
+
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float wScale = 1.0f, float hScale = 1.0f);
@@ -159,6 +168,7 @@ private:
     // shop screen state
     int   shopItemId_ = -1;     // item the current shop sells
     std::string shopTitle_;     // shop window title (event text)
+    bool  questLogOpen_ = false;// J: quest log overlay
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

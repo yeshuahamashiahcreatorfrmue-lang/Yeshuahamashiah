@@ -319,13 +319,15 @@ void GamePlay::drawField() {
     if (engine_.net().active())
         DrawTextU(TextFormat("MMO %d/%d명 · %s", engine_.net().playerCount(), engine_.net().maxPlayers(),
                   engine_.net().status().c_str()), 12, 58, 14, ui::kGood);
-    DrawTextU("Z/X/V:스킬  I:인벤토리  C:장비  방향키/WASD:이동  Enter:대화  ESC:메뉴",
+    DrawTextU("Z/X/V:스킬  I:인벤토리  C:장비  J:퀘스트  Enter:대화  ESC:메뉴",
              12, screenH() - 24, 14, Fade(ui::kText, 0.7f));
-    // bottom buttons: inventory (I) / equipment (C)
+    // bottom buttons: inventory (I) / equipment (C) / quests (J)
     invBtn_   = { 12,  (float)screenH() - 58, 116, 28 };
     equipBtn_ = { 134, (float)screenH() - 58, 96,  28 };
-    if (ui::button(invBtn_,   "인벤토리 (I)", invOpen_))   { invOpen_ = !invOpen_; equipOpen_ = false; }
-    if (ui::button(equipBtn_, "장비 (C)",     equipOpen_)) { equipOpen_ = !equipOpen_; invOpen_ = false; }
+    Rectangle questBtn = { 236, (float)screenH() - 58, 112, 28 };
+    if (ui::button(invBtn_,   "인벤토리 (I)", invOpen_))   { invOpen_ = !invOpen_; equipOpen_ = false; questLogOpen_ = false; }
+    if (ui::button(equipBtn_, "장비 (C)",     equipOpen_)) { equipOpen_ = !equipOpen_; invOpen_ = false; questLogOpen_ = false; }
+    if (ui::button(questBtn,  "퀘스트 (J)",   questLogOpen_)) { questLogOpen_ = !questLogOpen_; invOpen_ = equipOpen_ = false; }
 
     drawSkillPanel();
 

@@ -611,6 +611,14 @@ int main(int argc,char**argv){
       foeNpc(m,14,14,A_foe); foeNpc(m,26,18,A_foe);
       npc(m,8,8,"동굴 깊은 곳엔 뭔가 있어…",NWRK); sign(m,W/2,4,"깊은 동굴"); }
 
+    // Glyph anchors: sample quest text lives in maps/*.json (data), which the font
+    // baker (tools/gen_glyphset.py) does not scan — so the exact strings are kept
+    // here in source too, ensuring every Korean glyph they use is baked.
+    //   "마을 근처 슬라임 3마리만 처치해 주겠나? 사례는 두둑이 하지!"
+    //   "오, 슬라임을 정리했군! 정말 고맙네."
+    //   "배고픈 아이들을 위해 빵 2개만 모아다 주실래요?"
+    //   "고마워요! 덕분에 아이들이 배불리 먹겠어요."
+
     // sample 식품(food/drink) + 장비(equipment) items so the inventory(I)/장비(C)
     // windows are populated out of the box (also keeps these Korean names in
     // source so the font bakes their glyphs). Skipped if a name already exists.

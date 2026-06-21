@@ -70,6 +70,8 @@ void GamePlay::onMonsterKilled(const FieldMonster& m) {
     gs.inventory.gold += m.goldReward;
     int beforeLv = gs.party.empty() ? 0 : gs.party[0].level;
     for (auto& p : gs.party) if (p.alive()) p.gainExp(m.expReward);
+    gs.addKillProgress(m.enemyId);    // 처치형 퀘스트 진행
+    refreshQuestObjective();
     engine_.audio().playSfx("defeat", 0.8f);
     if (!gs.party.empty() && gs.party[0].level > beforeLv) engine_.audio().playSfx("levelup");
     // boss gate: when the last monster of a tagged troop dies, flip its switch
