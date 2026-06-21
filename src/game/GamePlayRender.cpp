@@ -125,8 +125,9 @@ void GamePlay::drawMinimap() {
 // M: a large overview of the whole current map (reuses the cached minimap texture
 // plus event/NPC/monster/player markers and a legend).
 void GamePlay::drawFullMap() {
-    if (!map_) return;
-    drawMinimap();   // ensures minimapTex_ is built/valid for this map
+    // drawField() (which runs just before this) already (re)built minimapTex_ via
+    // drawMinimap(), so the cached terrain texture is valid here.
+    if (!map_ || !minimapValid_) return;
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.78f));
     int w = map_->tilemap.width(), h = map_->tilemap.height();

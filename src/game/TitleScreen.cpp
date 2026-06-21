@@ -32,8 +32,13 @@ static fs::path latestSave(const std::string& projectDir) {
     return best;
 }
 
-bool TitleScreen::hasSave() const {
-    return !latestSave(engine_.project().dir).empty();
+// Re-read the most-recent save's headline fields into the cache (cheap to call
+// on a timer; not every frame).
+void TitleScreen::refreshContinueMeta() {
+    SaveMeta m = readSaveMeta(latestSave(engine_.project().dir));
+    continueExists_ = m.exists;
+    continueLevel_ = m.level;
+    continueSeconds_ = m.playSeconds;
 }
 
 void TitleScreen::startSingle() {
@@ -44,6 +49,10 @@ void TitleScreen::startSingle() {
 }
 
 void TitleScreen::update(float dt) {
+    // refresh the continue-save cache immediately, then every 0.5s
+    metaTimer_ -= dt;
+    if (metaTimer_ <= 0) { refreshContinueMeta(); metaTimer_ = 0.5f; }
+
     if (IsKeyPressed(KEY_ESCAPE)) { engine_.setMode(Mode::Editor); return; }
 
     const int count = 5;
@@ -105,10 +114,8 @@ void TitleScreen::draw() {
         Color c = !enabled[i] ? ui::kTextDim : (i == selection_ ? ui::kAccentHi : ui::kText);
         std::string text = (i == selection_ ? "> " : "  ") + std::string(opts[i]);
         // annotate "이어하기" with the most recent save's headline (Lv / 플레이타임)
-        if (i == 1 && enabled[1]) {
-            SaveMeta m = readSaveMeta(latestSave(engine_.project().dir));
-            if (m.exists) text += "  (Lv " + std::to_string(m.level) + " · " + formatPlayTime(m.playSeconds) + ")";
-        }
+        if (i == 1 && continueExists_)
+            text += "  (Lv " + std::to_string(continueLevel_) + " · " + formatPlayTime(continueSeconds_) + ")";
         int w = MeasureTextU(text.c_str(), 26);
         DrawTextU(text.c_str(), (sw - w) / 2, oy + i * 40, 26, c);
     }

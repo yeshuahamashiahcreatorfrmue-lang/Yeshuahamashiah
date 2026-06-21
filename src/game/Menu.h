@@ -18,6 +18,7 @@ public:
         page_ = p==1?Page::Items : p==2?Page::Equip : p==3?Page::Status
               : p==4?Page::Settings : p==5?Page::Save : Page::Root;
         selection_ = 0;
+        saveCacheValid_ = false;
     }
 
 private:
@@ -34,6 +35,12 @@ private:
     int  selection_ = 0;     // Root/Items: list index · Equip: body-slot index (0..6)
     std::string toast_;
     float toastTimer_ = 0;
+
+    // Cached save-slot summaries so drawSave() doesn't read 3 JSON files per frame.
+    // Rebuilt on entering the Save page or after writing a slot.
+    bool saveCacheValid_ = false;
+    std::string saveSlotLine_[3];
+    void buildSaveCache();
 };
 
 } // namespace tsukuru

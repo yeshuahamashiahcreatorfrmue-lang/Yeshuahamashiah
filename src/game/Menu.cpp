@@ -43,7 +43,7 @@ bool Menu::update(float dt) {
                 case 1: page_ = Page::Equip;    selection_ = 0; break;
                 case 2: page_ = Page::Status;   selection_ = 0; break;
                 case 3: page_ = Page::Settings; selection_ = 0; break;
-                case 4: page_ = Page::Save;     selection_ = 0; break;
+                case 4: page_ = Page::Save;     selection_ = 0; saveCacheValid_ = false; break;
                 case 5: return false;
             }
         }
@@ -63,6 +63,7 @@ bool Menu::update(float dt) {
         if (IsKeyPressed(KEY_UP))   selection_ = (selection_ + 2) % 3;
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
             saveGame(engine_, selection_ + 1);
+            saveCacheValid_ = false;   // reflect the new save next draw
             toast_ = TextFormat("슬롯 %d에 저장되었습니다!", selection_ + 1); toastTimer_ = 2.0f;
         }
     } else if (page_ == Page::Items) {
@@ -146,25 +147,33 @@ void Menu::drawSettings() {
     DrawTextU("위/아래: 선택   좌/우: 조절   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
 }
 
+// Read the 3 slot files once into cached summary lines (avoids per-frame disk I/O).
+void Menu::buildSaveCache() {
+    for (int i = 0; i < 3; ++i) {
+        fs::path f = fs::path(engine_.project().dir) / "save" / ("slot" + std::to_string(i + 1) + ".json");
+        SaveMeta m = readSaveMeta(f);
+        if (m.exists) {
+            std::string mapName = "맵 " + std::to_string(m.currentMap);
+            if (auto mp = engine_.project().map(m.currentMap)) mapName = mp->name;
+            saveSlotLine_[i] = TextFormat("Lv %d   %s   %s   %d G", m.level, mapName.c_str(),
+                                          formatPlayTime(m.playSeconds).c_str(), m.gold);
+        } else {
+            saveSlotLine_[i] = "(비어 있음)";
+        }
+    }
+    saveCacheValid_ = true;
+}
+
 void Menu::drawSave() {
+    if (!saveCacheValid_) buildSaveCache();
     Rectangle r = { 40, 40, 520, 300 };
     ui::panel(r);
     ui::label("저장 — 슬롯 선택", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
     for (int i = 0; i < 3; ++i) {
         int y = (int)r.y + 56 + i * 60;
         Color c = i == selection_ ? ui::kAccentHi : ui::kText;
-        fs::path f = fs::path(engine_.project().dir) / "save" / ("slot" + std::to_string(i + 1) + ".json");
-        SaveMeta m = readSaveMeta(f);
         DrawTextU(TextFormat("%s 슬롯 %d", i == selection_ ? ">" : " ", i + 1), (int)r.x + 16, y, 20, c);
-        if (m.exists) {
-            std::string mapName = "맵 " + std::to_string(m.currentMap);
-            if (auto mp = engine_.project().map(m.currentMap)) mapName = mp->name;
-            DrawTextU(TextFormat("Lv %d   %s   %s   %d G", m.level, mapName.c_str(),
-                      formatPlayTime(m.playSeconds).c_str(), m.gold),
-                      (int)r.x + 40, y + 26, 15, ui::kTextDim);
-        } else {
-            DrawTextU("(비어 있음)", (int)r.x + 40, y + 26, 15, ui::kTextDim);
-        }
+        DrawTextU(saveSlotLine_[i].c_str(), (int)r.x + 40, y + 26, 15, ui::kTextDim);
     }
     DrawTextU("위/아래: 선택   Enter: 저장   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 26), 14, ui::kTextDim);
 }

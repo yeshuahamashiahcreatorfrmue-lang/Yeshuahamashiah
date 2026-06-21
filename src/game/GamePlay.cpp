@@ -22,6 +22,7 @@ GamePlay::GamePlay(Engine& engine) : engine_(engine) {
     monsters_.reserve(16);
     projectiles_.reserve(16);
     fx_.reserve(64);
+    popups_.reserve(32);
     npcs_.reserve(32);
 }
 GamePlay::~GamePlay() = default;
