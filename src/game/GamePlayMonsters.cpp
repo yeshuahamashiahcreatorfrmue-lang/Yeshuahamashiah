@@ -26,7 +26,6 @@ void GamePlay::spawnMonsters() {
     if (!map_) { targetMonsters_ = 0; return; }
     // only maps that explicitly list encounter enemies spawn random field monsters
     if (map_->encounterEnemies.empty()) { targetMonsters_ = 0; return; }
-    if (map_->encounterRate > 0) { targetMonsters_ = 0; return; } // turn-based encounters instead
     int area = map_->tilemap.width() * map_->tilemap.height();
     targetMonsters_ = std::min(8, std::max(3, area / 45));
     for (int i = 0; i < targetMonsters_; ++i) spawnOne();
@@ -219,7 +218,9 @@ bool GamePlay::damageMonster(FieldMonster& m, int dmg) {
     return false;
 }
 
-// ----------------------------- turn-based battle -----------------------------
+// ----------------------------- field engagement (no turn-based) -----------------------------
+// Random encounter: enemies appear ON THE FIELD around the player and are fought
+// in real time (this game has no turn-based battle screen).
 void GamePlay::startEncounterBattle() {
     if (!map_ || map_->encounterEnemies.empty()) return;
     std::vector<int> ids;
@@ -229,12 +230,39 @@ void GamePlay::startEncounterBattle() {
     startBattleWith(ids);
 }
 
+// Spawn the given enemy troop on the field near the player (used by random
+// encounters AND StartBattle events — everything is field combat now).
 void GamePlay::startBattleWith(const std::vector<int>& enemyIds) {
-    if (enemyIds.empty()) return;
-    battle_ = std::make_unique<Battle>(engine_.project().database, engine_.state(), enemyIds);
-    battleMenu_ = 0;
-    phase_ = Phase::Battle;
-    engine_.audio().playSfx("select");
+    if (!map_ || enemyIds.empty()) return;
+    const Database& db = engine_.project().database;
+    int TS = map_->tileset.tileWidth;
+    int W = map_->tilemap.width(), H = map_->tilemap.height();
+    bool any = false;
+    for (int i = 0; i < (int)enemyIds.size(); ++i) {
+        const EnemyDef* def = db.enemy(enemyIds[i]);
+        if (!def) continue;
+        // search a free tile near the player (ring out from a small offset)
+        int sx = destX_, sy = destY_, fx = sx, fy = sy; bool found = false;
+        for (int r = 1; r <= 5 && !found; ++r)
+            for (int dy = -r; dy <= r && !found; ++dy)
+                for (int dx = -r; dx <= r && !found; ++dx) {
+                    int x = sx + dx, y = sy + dy;
+                    if (x < 0 || y < 0 || x >= W || y >= H) continue;
+                    if ((x == sx && y == sy) || !walkable(x, y) || monsterAt(x, y)) continue;
+                    fx = x; fy = y; found = true;
+                }
+        if (!found) continue;
+        FieldMonster m;
+        m.enemyId = def->id; m.name = def->name; m.spriteAsset = def->spriteAsset;
+        m.x = m.destX = fx; m.y = m.destY = fy;
+        m.px = fx * (float)TS; m.py = fy * (float)TS;
+        m.hp = m.maxHp = def->maxHp; m.atk = def->atk; m.def = def->def;
+        m.expReward = def->expReward; m.goldReward = def->goldReward;
+        monsters_.push_back(m);
+        targetMonsters_ = std::max(targetMonsters_, (int)monsters_.size());
+        any = true;
+    }
+    if (any) { toast_ = "적이 나타났다!"; toastTimer_ = 1.5f; engine_.audio().playSfx("select"); }
 }
 
 void GamePlay::updateBattle(float dt) {

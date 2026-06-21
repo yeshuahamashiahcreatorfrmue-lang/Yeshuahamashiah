@@ -120,6 +120,7 @@ void GamePlay::runEvent(Event& e) {
     if (e.once && firedOnce_.count(key)) return;
     gs.addTalkProgress(e.id);   // "NPC와 대화" 퀘스트 진행 (말 건 이벤트 기준)
     refreshQuestObjective();
+    if (!e.sfx.empty()) engine_.audio().playSfx(e.sfx);   // 이벤트별 효과음
 
     switch (e.type) {
         case EventType::Message:
@@ -158,11 +159,10 @@ void GamePlay::runEvent(Event& e) {
             if (!e.text.empty()) showMessage(e.text);
             break;
         case EventType::StartBattle: {
-            // Troop: explicit mixed list if given, else itemId repeated `amount` times.
+            // Always field combat: spawn the troop as live monsters near the event,
+            // then (if any) show the dialogue — "대화 후 교전".
             std::vector<int> troop = e.battleEnemies;
             if (troop.empty()) for (int i = 0; i < std::max(1, e.amount); ++i) troop.push_back(e.itemId);
-            if (e.battleTurnBased) { startBattleWith(troop); break; }   // 즉시 턴제 전투
-            // Otherwise: spawn the troop as live monsters on the field near the event.
             const Database& db = engine_.project().database;
             int TS = map_->tileset.tileWidth;
             for (int i = 0; i < (int)troop.size(); ++i) {
@@ -179,6 +179,7 @@ void GamePlay::runEvent(Event& e) {
                 monsters_.push_back(m);
                 targetMonsters_ = std::max(targetMonsters_, (int)monsters_.size());
             }
+            if (!e.text.empty()) showMessage(e.text);   // 교전 전 대사
             break;
         }
         case EventType::Shop: {

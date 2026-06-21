@@ -346,9 +346,7 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             }
             break;
         case EventType::StartBattle: {
-            if (ui::button({ panel.x + 12, y, 296, 24 }, ev->battleTurnBased ? "방식: 턴제 전투(즉시)" : "방식: 필드 몹 소환"))
-                ev->battleTurnBased = !ev->battleTurnBased;
-            y += 28;
+            DrawTextU("필드에 적을 소환합니다 (실시간 전투).", (int)panel.x + 12, (int)y, 12, ui::kTextDim); y += 18;
             DrawTextU("─ 적 구성 ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             if (ev->battleEnemies.empty()) {   // simple mode: one enemy × count
                 stepN("적ID", ev->itemId, 1, -1, 999);
@@ -364,7 +362,7 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             }
             if (ui::button({ panel.x + 12, y, 296, 24 }, "+ 적 추가(혼합 구성)")) ev->battleEnemies.push_back(1);
             y += 28;
-            if (!ev->battleTurnBased) stepN("처치 스위치(-1없음)", ev->switchId, 1, -1, 999);
+            stepN("처치 스위치(-1없음)", ev->switchId, 1, -1, 999);
             break;
         }
         case EventType::Shop: {
@@ -439,6 +437,15 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     }
     stepN("조건 변수(-1없음)", ev->conditionVar, 1, -1, 999);
     if (ev->conditionVar >= 0) stepN("변수 ≥", ev->conditionVarMin, 1, -99999, 99999);
+    // per-event sound effect (cycle through common built-in sfx)
+    {
+        static const char* kSfx[] = { "", "select", "coin", "levelup", "defeat", "slash", "magic", "boom" };
+        const int N = (int)(sizeof(kSfx) / sizeof(kSfx[0]));
+        int cur = 0; for (int i = 0; i < N; ++i) if (ev->sfx == kSfx[i]) cur = i;
+        if (ui::button({ panel.x + 12, y, 296, 24 }, std::string("효과음: ") + (cur == 0 ? "기본" : kSfx[cur]), cur != 0))
+            ev->sfx = kSfx[(cur + 1) % N];
+        y += 28;
+    }
     if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
     if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
         auto imgs = engine_.project().assets.byType(AssetType::Image);
@@ -462,8 +469,8 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     y += 8;
     DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
     y += 22;
-    // duplicate: copy this event to the next free tile (fast authoring of many events)
-    if (ui::button({ panel.x + 12, y, 296, 26 }, "이벤트 복제 (옆 칸)", false)) {
+    // duplicate (same map) / copy to clipboard (paste on any map)
+    if (ui::button({ panel.x + 12, y, 144, 26 }, "복제 (옆 칸)", false)) {
         Event copy = *ev;                       // value copy BEFORE the vector may realloc
         copy.id = m.nextEventId();
         copy.x = std::min(m.tilemap.width() - 1, ev->x + 1);
@@ -473,6 +480,9 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         editingEventId_ = copy.id;              // ev is now dangling — do not use it below
         EndScissorMode();
         return;
+    }
+    if (ui::button({ panel.x + 164, y, 144, 26 }, "복사(클립보드)", false)) {
+        eventClip_ = *ev; eventClipHas_ = true; setStatus("이벤트 복사됨 (다른 맵에 붙여넣기 가능)");
     }
     y += 30;
     if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트(오브젝트) 삭제", false)) {
@@ -496,7 +506,17 @@ void Editor::drawEventsTab() {
     ui::label("이벤트 목록", (int)listP.x + 10, (int)listP.y + 8, 18, ui::kAccent);
     const char* tShort[10] = { "메시지","이동","지급","스위치","전투","상점","퀘스트","엔딩","회복","?" };
     if (m) {
-        DrawTextU(TextFormat("총 %d개", (int)m->events.size()), (int)listP.x + 10, (int)listP.y + 32, 13, ui::kTextDim);
+        DrawTextU(TextFormat("총 %d개", (int)m->events.size()), (int)listP.x + 10, (int)listP.y + 30, 13, ui::kTextDim);
+        if (eventClipHas_ && ui::button({ listP.x + 78, listP.y + 26, 124, 22 }, "여기 붙여넣기", false)) {
+            Event pasted = eventClip_;
+            pasted.id = m->nextEventId();
+            int cx = m->tilemap.width()/2, cy = m->tilemap.height()/2;
+            while (m->eventAt(cx, cy) && cx + 1 < m->tilemap.width()) cx++;  // find a free tile
+            pasted.x = cx; pasted.y = cy;
+            m->events.push_back(pasted);
+            editingEventId_ = pasted.id;
+            setStatus("이벤트 붙여넣음");
+        }
         Rectangle rows = { listP.x, listP.y + 52, listP.width, listP.height - 60 };
         uiScissor((int)rows.x, (int)rows.y, (int)rows.width, (int)rows.height);
         if (ui::mouseIn(rows)) eventListScroll_ -= GetMouseWheelMove() * 40;
@@ -554,23 +574,29 @@ void Editor::drawEventsTab() {
         }
         uiEndWorld();
 
-        // click to select/create event
-        if (ui::mouseIn(canvasArea) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)
-            && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
+        // click to select/create, and drag an event marker to a new tile
+        if (ui::mouseIn(canvasArea) && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) {
             Vector2 world = GetScreenToWorld2D(GetMousePosition(), cam_);
             int tx = (int)(world.x / TS), ty = (int)(world.y / TS);
-            if (m->tilemap.inBounds(tx, ty)) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && m->tilemap.inBounds(tx, ty)) {
                 Event* existing = m->eventAt(tx, ty);
-                if (existing) editingEventId_ = existing->id;
+                if (existing) { editingEventId_ = existing->id; dragEventId_ = existing->id; }
                 else {
                     Event ne; ne.id = m->nextEventId(); ne.x = tx; ne.y = ty;
                     ne.text = "안녕하세요!";
                     m->events.push_back(ne);
-                    editingEventId_ = ne.id;
+                    editingEventId_ = ne.id; dragEventId_ = ne.id;
                 }
                 eventTextFocus_ = false;
             }
+            // dragging: relocate the held event onto an empty tile
+            if (dragEventId_ >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON) && m->tilemap.inBounds(tx, ty)) {
+                Event* at = m->eventAt(tx, ty);
+                if (!at || at->id == dragEventId_)
+                    for (auto& e : m->events) if (e.id == dragEventId_) { e.x = tx; e.y = ty; }
+            }
         }
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) dragEventId_ = -1;
     }
     EndScissorMode();
 

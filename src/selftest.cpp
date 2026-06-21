@@ -491,9 +491,9 @@ static void testEventFields() {
     CHECK(Event::fromJson(h.toJson()).type == EventType::Heal, "회복 이벤트 타입 직렬화");
     // event label, 4-way choices, mixed battle troop
     Event ev2; ev2.label = "슬라임 의뢰"; ev2.choiceC = "선택C"; ev2.choiceD = "선택D";
-    ev2.choiceVar = 7; ev2.battleEnemies = { 1, 2, 3 };
+    ev2.choiceVar = 7; ev2.battleEnemies = { 1, 2, 3 }; ev2.sfx = "coin";
     Event rr = Event::fromJson(ev2.toJson());
-    CHECK(rr.label == "슬라임 의뢰", "이벤트 이름표 직렬화");
+    CHECK(rr.label == "슬라임 의뢰" && rr.sfx == "coin", "이벤트 이름표/효과음 직렬화");
     CHECK(rr.choiceC == "선택C" && rr.choiceD == "선택D" && rr.choiceVar == 7, "4지선다/선택변수 직렬화");
     CHECK(rr.battleEnemies.size() == 3 && rr.battleEnemies[2] == 3, "혼합 전투 적 목록 직렬화");
     // talk-quest progress

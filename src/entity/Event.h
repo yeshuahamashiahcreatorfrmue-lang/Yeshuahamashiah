@@ -51,6 +51,8 @@ struct Event {
     TriggerType trigger = TriggerType::ActionButton;
     int         graphicAsset = -1; // optional sprite shown on the map
 
+    std::string sfx;         // optional sound effect played when the event runs (stem name)
+
     // Generic parameters (interpreted per type):
     std::string text;        // Message / Shop title
     int         targetMap = -1;       // Teleport

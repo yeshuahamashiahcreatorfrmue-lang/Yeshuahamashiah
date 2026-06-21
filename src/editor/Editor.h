@@ -119,6 +119,9 @@ private:
     float eventScroll_ = 0;   // event inspector vertical scroll (tall quest panels)
     int   eventScrollId_ = -1;// which event eventScroll_ belongs to (reset on change)
     float eventListScroll_ = 0; // left event-list panel scroll
+    Event eventClip_;           // copied event (paste works across maps)
+    bool  eventClipHas_ = false;
+    int   dragEventId_ = -1;     // event being dragged to a new tile (events tab)
     // Database editing
     int  dbCategory_ = 0;     // 0 items,1 equip,2 skills,3 actors,4 enemies
     int  dbSelected_ = -1;

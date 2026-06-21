@@ -45,7 +45,7 @@ static TriggerType triggerFrom(const std::string& s) {
 
 json Event::toJson() const {
     return {
-        {"id", id}, {"x", x}, {"y", y}, {"label", label},
+        {"id", id}, {"x", x}, {"y", y}, {"label", label}, {"sfx", sfx},
         {"type", eventTypeName(type)}, {"trigger", triggerName(trigger)},
         {"graphicAsset", graphicAsset},
         {"text", text},
@@ -80,6 +80,7 @@ Event Event::fromJson(const json& j) {
     e.x               = j.value("x", 0);
     e.y               = j.value("y", 0);
     e.label           = j.value("label", "");
+    e.sfx             = j.value("sfx", "");
     e.type            = eventTypeFrom(j.value("type", "message"));
     e.trigger         = triggerFrom(j.value("trigger", "action"));
     e.graphicAsset    = j.value("graphicAsset", -1);
