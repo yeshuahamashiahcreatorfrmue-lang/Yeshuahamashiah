@@ -90,6 +90,7 @@ void GamePlay::loadMap(int id) {
     if (!map_ && !engine_.project().maps.empty()) map_ = engine_.project().maps.front();
     engine_.state().currentMap = map_ ? map_->id : -1;
     if (map_) { engine_.state().markReached(map_->id); refreshQuestObjective(); } // 도달형 퀘스트
+    if (map_ && !map_->name.empty()) { areaBanner_ = map_->name; areaBannerT_ = 2.5f; } // 지역명 배너
     monsters_.clear();
     weatherP_.clear();
     if (minimapValid_) { UnloadTexture(minimapTex_); minimapValid_ = false; }
@@ -109,6 +110,7 @@ void GamePlay::update(float dt) {
     if (IsKeyPressed(KEY_F1)) helpOpen_ = !helpOpen_;             // controls help
 
     if (toastTimer_ > 0) toastTimer_ -= dt;
+    if (areaBannerT_ > 0) areaBannerT_ -= dt;
 
     switch (phase_) {
         case Phase::Field: updateField(dt); break;

@@ -203,6 +203,8 @@ private:
     int   targetMonsters_ = 0;
     std::string toast_;
     float toastTimer_ = 0;
+    std::string areaBanner_;   // map name shown briefly when entering a new area
+    float areaBannerT_ = 0;
 
     // message box (supports multiple pages split on '|')
     std::string message_;

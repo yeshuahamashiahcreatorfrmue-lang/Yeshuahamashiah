@@ -231,7 +231,15 @@ void GamePlay::drawField() {
         } else {
             col = moving_ ? frame_ : 0;
         }
-        drawCharacter(proj.playerSprite, dir_, col, pxX_, pxY_, ptint, total);
+        // on-map sprite: project playerSprite, else the party actor's spriteAsset
+        int pspr = proj.playerSprite;
+        if (pspr < 0) {
+            const GameState& gs = engine_.state();
+            if (!gs.party.empty())
+                if (const ActorDef* a = proj.database.actor(gs.party[0].actorId))
+                    if (a->spriteAsset >= 0) pspr = a->spriteAsset;
+        }
+        drawCharacter(pspr, dir_, col, pxX_, pxY_, ptint, total);
     }
 
     // remote players (MMO): everyone standing in this same map/zone
@@ -336,6 +344,15 @@ void GamePlay::drawField() {
         int tw = MeasureTextU(toast_.c_str(), 18);
         DrawRectangle(screenW()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
         DrawTextU(toast_.c_str(), screenW()/2 - tw/2, 46, 18, BLACK);
+    }
+    // area-name banner on entering a new map (fades out)
+    if (areaBannerT_ > 0 && !areaBanner_.empty()) {
+        float a = std::min(1.0f, areaBannerT_ / 0.6f);   // fade during the last 0.6s
+        int fs = 34, tw = MeasureTextU(areaBanner_.c_str(), fs);
+        int bx = screenW()/2 - tw/2, by = screenH()/5;
+        DrawRectangle(bx - 24, by - 8, tw + 48, fs + 18, Fade(Color{10,12,18,255}, 0.6f * a));
+        DrawTextU(areaBanner_.c_str(), bx + 2, by + 2, fs, Fade(BLACK, a));
+        DrawTextU(areaBanner_.c_str(), bx, by, fs, Fade(ui::kAccentHi, a));
     }
 }
 
