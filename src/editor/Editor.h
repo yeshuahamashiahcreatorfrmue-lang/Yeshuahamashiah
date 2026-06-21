@@ -119,6 +119,7 @@ private:
     int  dbSelected_ = -1;
     int  dbNameFocus_ = -1;
     int  dbDescFocus_ = -1;   // item description text-field focus
+    float dbScroll_ = 0;      // detail-panel vertical scroll (tall editors overflow)
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

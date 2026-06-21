@@ -53,6 +53,8 @@ void GamePlay::onEnter() {
     runAutoruns();
     if (getenv("TSUKURU_BATTLE") && map_ && !map_->encounterEnemies.empty())
         startEncounterBattle();   // debug: jump straight into a turn-based battle
+    if (const char* s = getenv("TSUKURU_SHOP"))   // debug: open a shop for item id s
+        openShop(atoi(s), "상점: 포션을 사시겠어요?");
     if (getenv("TSUKURU_MENU") && menu_) {                  // debug: open ESC menu
         menu_->open();
         if (const char* p = getenv("TSUKURU_MENUPAGE")) menu_->openPage(atoi(p));
@@ -102,6 +104,7 @@ void GamePlay::update(float dt) {
             if (menu_ && !menu_->update(dt)) phase_ = Phase::Field;
             break;
         case Phase::Battle: updateBattle(dt); break;
+        case Phase::Shop:   updateShop(dt); break;
         case Phase::GameOver:
         case Phase::GameClear:
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))
@@ -135,6 +138,7 @@ void GamePlay::draw() {
         return;
     }
     if (phase_ == Phase::Battle) { drawBattle(); return; }
+    if (phase_ == Phase::Shop)   { drawField(); drawShop(); return; }
     drawField();
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();

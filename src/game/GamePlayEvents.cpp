@@ -105,18 +105,9 @@ void GamePlay::runEvent(Event& e) {
             }
             break;
         }
-        case EventType::Shop: {
-            const Item* it = engine_.project().database.item(e.itemId);
-            if (it) {
-                if (gs.inventory.gold >= it->price) {
-                    gs.inventory.gold -= it->price;
-                    gs.inventory.addItem(it->id, 1);
-                    engine_.audio().playSfx("coin");
-                    showMessage(it->name + "을(를) 구입했다!");
-                } else showMessage("골드가 부족합니다...");
-            } else showMessage(e.text.empty() ? "어서 오세요!" : e.text);
+        case EventType::Shop:
+            openShop(e.itemId, e.text.empty() ? "상점" : e.text);
             break;
-        }
         case EventType::Quest:
             gs.objective = e.text;
             if (e.switchId >= 0) gs.setSwitch(e.switchId, true);
@@ -129,6 +120,65 @@ void GamePlay::runEvent(Event& e) {
             break;
     }
     if (e.once) firedOnce_.insert(key);
+}
+
+// ----------------------------- shop -----------------------------
+void GamePlay::openShop(int itemId, const std::string& title) {
+    shopItemId_ = itemId;
+    shopTitle_  = title;
+    phase_ = Phase::Shop;
+}
+
+void GamePlay::updateShop(float dt) {
+    (void)dt;
+    if (IsKeyPressed(KEY_ESCAPE)) phase_ = Phase::Field;
+}
+
+void GamePlay::drawShop() {
+    GameState& gs = engine_.state();
+    const Item* it = engine_.project().database.item(shopItemId_);
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.6f));
+    Rectangle box = { sw/2.0f - 230, sh/2.0f - 170, 460, 340 };
+    ui::panel(box);
+    DrawTextU(shopTitle_.c_str(), (int)box.x + 18, (int)box.y + 14, 24, ui::kAccent);
+    DrawTextU(TextFormat("골드: %d", gs.inventory.gold), (int)(box.x + box.width - 160), (int)box.y + 18, 18, Color{230,200,90,255});
+
+    if (!it) {
+        DrawTextU("판매 상품이 없습니다.", (int)box.x + 18, (int)box.y + 70, 18, ui::kTextDim);
+    } else {
+        // item icon
+        Rectangle ir = { box.x + 24, box.y + 70, 96, 96 };
+        DrawRectangleRec(ir, Color{26,30,40,255});
+        DrawRectangleLinesEx(ir, 1, ui::kAccent);
+        if (it->iconAsset >= 0) {
+            const Texture2D& tx = engine_.assetTexture(it->iconAsset);
+            DrawTexturePro(tx, {0,0,(float)tx.width,(float)tx.height}, {ir.x+6,ir.y+6,84,84}, {0,0},0,WHITE);
+        }
+        DrawTextU(it->name.c_str(), (int)box.x + 136, (int)box.y + 76, 22, ui::kText);
+        DrawTextU(TextFormat("가격: %d G", it->price), (int)box.x + 136, (int)box.y + 110, 18, Color{230,200,90,255});
+        DrawTextU(TextFormat("보유: %d개", gs.inventory.count(it->id)), (int)box.x + 136, (int)box.y + 136, 16, ui::kTextDim);
+        if (!it->description.empty())
+            DrawTextU(it->description.c_str(), (int)box.x + 24, (int)box.y + 180, 15, ui::kText);
+
+        bool canBuy = gs.inventory.gold >= it->price;
+        if (ui::button({ box.x + 24, box.y + 280, 200, 40 }, "구입", false) && canBuy) {
+            gs.inventory.gold -= it->price;
+            gs.inventory.addItem(it->id, 1);
+            engine_.audio().playSfx("coin");
+            toast_ = it->name + " 구입!"; toastTimer_ = 1.2f;
+        }
+        if (!canBuy)
+            DrawTextU("골드가 부족합니다", (int)box.x + 24, (int)box.y + 254, 14, ui::kDanger);
+    }
+    if (ui::button({ box.x + box.width - 224, box.y + 280, 200, 40 }, "닫기 (ESC)", false))
+        phase_ = Phase::Field;
+
+    if (toastTimer_ > 0) {
+        int tw = MeasureTextU(toast_.c_str(), 18);
+        DrawRectangle(sw/2 - tw/2 - 10, (int)box.y - 36, tw + 20, 28, Fade(ui::kAccent, 0.92f));
+        DrawTextU(toast_.c_str(), sw/2 - tw/2, (int)box.y - 30, 18, BLACK);
+    }
 }
 
 void GamePlay::drawMessage() {

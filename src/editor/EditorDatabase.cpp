@@ -22,7 +22,7 @@ void Editor::drawDatabaseTab() {
     const char* cats[] = { "아이템", "장비", "스킬", "액터", "적" };
     for (int i = 0; i < 5; ++i)
         if (ui::button({ 12.0f + i*120, kToolbarH + 10, 112, 28 }, cats[i], dbCategory_ == i)) {
-            dbCategory_ = i; dbSelected_ = -1; dbNameFocus_ = -1;
+            dbCategory_ = i; dbSelected_ = -1; dbNameFocus_ = -1; dbScroll_ = 0;
         }
 
     float listX = 12, listY = kToolbarH + 50, listW = 280;
@@ -43,7 +43,7 @@ void Editor::drawDatabaseTab() {
     float ly = listY + 44;
     auto listEntry = [&](int i, const std::string& name) {
         Rectangle r = { listX + 8, ly, listW - 16, 26 };
-        if (ui::button(r, name, dbSelected_ == i)) { dbSelected_ = i; dbNameFocus_ = -1; }
+        if (ui::button(r, name, dbSelected_ == i)) { dbSelected_ = i; dbNameFocus_ = -1; dbScroll_ = 0; }
         ly += 28;
     };
     int count = 0;
@@ -57,9 +57,14 @@ void Editor::drawDatabaseTab() {
 
     if (dbSelected_ < 0 || dbSelected_ >= count) return;
 
-    // ---- detail editor ----
-    float dx = listX + listW + 20, dy = listY + 8, dw = area.width - dx - 20;
-    ui::panel({ dx - 8, listY, dw + 16, area.height - 60 }, ui::kPanel);
+    // ---- detail editor (scrollable: tall editors like 식품 overflow the panel) ----
+    float dx = listX + listW + 20, dw = area.width - dx - 20;
+    Rectangle detailR = { dx - 8, listY, dw + 16, area.height - 60 };
+    ui::panel(detailR, ui::kPanel);
+    if (ui::mouseIn(detailR)) dbScroll_ -= GetMouseWheelMove() * 40;
+    if (dbScroll_ < 0) dbScroll_ = 0;
+    uiScissor((int)detailR.x, (int)detailR.y, (int)detailR.width, (int)detailR.height);
+    float dy = listY + 8 - dbScroll_;
 
     auto nameField = [&](std::string& name) {
         ui::label("이름:", (int)dx, (int)dy, 14, ui::kTextDim); dy += 18;
@@ -104,10 +109,11 @@ void Editor::drawDatabaseTab() {
                 step("수분 +",   it.hydration, 100, 0, 99999);
                 step("HP 회복 +", it.healHp, 5, 0, 99999);
                 step("기력 회복 +", it.healGp, 5, 0, 9999);
-                DrawTextU("─ 추가 효과(영구 버프) ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=18;
+                DrawTextU("─ 추가 효과(공/방/이동) ─", (int)dx, (int)dy, 13, ui::kAccentHi); dy+=18;
                 step("공격 +", it.bonusAtk, 1, -999, 999);
                 step("방어 +", it.bonusDef, 1, -999, 999);
                 step("이동 +", it.bonusSpd, 1, -99, 99);
+                step("버프 지속(초·0=영구)", it.buffSecs, 10, 0, 9999);
             } else if (it.kind == 2) {                           // 장비(equipment)
                 const char* bn[] = {"없음","머리","몸통","손","다리","발","무기","장신구"};
                 if (ui::button({dx,dy,260,26}, TextFormat("장착 부위: %s", bn[it.bodySlot%8]))) it.bodySlot=(it.bodySlot+1)%8;
@@ -178,6 +184,11 @@ void Editor::drawDatabaseTab() {
              dbCategory_==2?db.skills[dbSelected_].id:
              dbCategory_==3?db.actors[dbSelected_].id:db.enemies[dbSelected_].id),
              (int)dx, (int)dy + 6, 14, ui::kTextDim);
+    EndScissorMode();
+    // clamp scroll so you can't scroll past the content (uses this frame's end dy)
+    float contentBottom = dy + 6 + 20 + dbScroll_;          // absolute bottom of content
+    float maxScroll = std::max(0.0f, contentBottom - (detailR.y + detailR.height));
+    if (dbScroll_ > maxScroll) dbScroll_ = maxScroll;
 }
 
 

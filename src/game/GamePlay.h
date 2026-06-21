@@ -34,7 +34,7 @@ public:
     void draw();
 
 private:
-    enum class Phase { Field, Message, Menu, Battle, GameOver, GameClear };
+    enum class Phase { Field, Message, Menu, Battle, Shop, GameOver, GameClear };
 
     // --- lifecycle / dispatch (GamePlay.cpp) ---
     void loadMap(int id);
@@ -109,6 +109,11 @@ private:
     void useOrEquipItem(int itemId); // consume food (restore) or equip equipment
     void unequipSlot(int slot);
 
+    // --- shop (EventType::Shop opens an on-screen buy screen) ---
+    void openShop(int itemId, const std::string& title);
+    void updateShop(float dt);
+    void drawShop();
+
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
     void drawCharacter(int assetId, int dir, int frame, float px, float py, Color tint = WHITE, int frames = 4, float wScale = 1.0f, float hScale = 1.0f);
@@ -150,6 +155,10 @@ private:
     Rectangle invBtn_{}, equipBtn_{}; // bottom HUD buttons
     std::unique_ptr<Battle> battle_;  // active turn-based battle (null when none)
     int   battleMenu_ = 0;      // 0 root / 1 skill submenu / 2 item submenu
+
+    // shop screen state
+    int   shopItemId_ = -1;     // item the current shop sells
+    std::string shopTitle_;     // shop window title (event text)
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

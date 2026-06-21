@@ -267,11 +267,15 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     ui::textField(tf, ev->text, eventTextFocus_, 120);
     y += 34;
     switch (ev->type) {
-        case EventType::Teleport:
-            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 28;
+        case EventType::Teleport: {
+            ui::intStepper({ panel.x + 12, y, 296, 24 }, "대상맵", ev->targetMap, 1, -1, 999); y += 26;
+            std::shared_ptr<Map> tm = engine_.project().map(ev->targetMap);
+            DrawTextU(tm ? ("→ " + tm->name).c_str() : "→ (없는 맵)",
+                      (int)panel.x + 16, (int)y, 12, tm ? ui::kAccentHi : ui::kDanger); y += 20;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "X", ev->targetX, 1, 0, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "Y", ev->targetY, 1, 0, 999); y += 28;
             break;
+        }
         case EventType::GiveItem:
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "아이템ID", ev->itemId, 1, -1, 999); y += 28;
             ui::intStepper({ panel.x + 12, y, 296, 24 }, "수량", ev->amount, 1, 1, 99); y += 28;

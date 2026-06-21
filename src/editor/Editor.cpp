@@ -41,7 +41,10 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     }
     if (const char* c = getenv("TSUKURU_DBCAT")) { // debug: pick DB category + first entry
         tab_ = Tab::Database; dbCategory_ = atoi(c); dbSelected_ = 0;
+        if (const char* s = getenv("TSUKURU_DBSEL")) dbSelected_ = atoi(s);
+        if (const char* sc = getenv("TSUKURU_DBSCROLL")) dbScroll_ = (float)atoi(sc);
     }
+    if (const char* e = getenv("TSUKURU_EVSEL")) { tab_ = Tab::Events; editingEventId_ = atoi(e); } // debug
     if (const char* t = getenv("TSUKURU_TOOL")) { if (std::string(t) == "stamp") tool_ = Tool::Stamp; }
     if (getenv("TSUKURU_OBJ")) { tab_ = Tab::Map; objMode_ = true; }   // debug: object mode
     if (getenv("TSUKURU_PREVIEW")) {           // debug: open the fullscreen map preview
