@@ -530,14 +530,18 @@ void Editor::drawWorldPreviewOverlay() {
     DrawTextU(TextFormat("미리보기: %s   (빈 곳·X·ESC = 닫기)", pm ? pm->name.c_str() : "맵"),
               20, (int)kToolbarH + 10, 18, ui::kAccent);
 
+    // right-side add/delete edit panel
+    const float panelW = 320.0f;
+    Rectangle panelR = { (float)sw - panelW, (float)kToolbarH + 50, panelW, (float)sh - (kToolbarH + 50) - 10 };
+
     Rectangle imgR = { 0, 0, 0, 0 };
     int gotoMap = -1;
     if (worldBigThumb_.id && pm && worldBigId_ == worldPreviewMapId_) {
         float tw = (float)worldBigThumb_.texture.width, th = (float)worldBigThumb_.texture.height;
-        float maxW = sw - 60.0f, maxH = sh - kToolbarH - 120.0f;
+        float maxW = sw - 80.0f - panelW, maxH = sh - kToolbarH - 120.0f;
         float s = std::min(maxW / tw, maxH / th);
         float pw = tw * s, ph = th * s;
-        float bx = (sw - pw) / 2, by = kToolbarH + 50 + (sh - (kToolbarH + 50) - ph - 40) / 2;
+        float bx = (sw - panelW - pw) / 2, by = kToolbarH + 50 + (sh - (kToolbarH + 50) - ph - 40) / 2;
         imgR = { bx, by, pw, ph };
         DrawRectangle((int)bx-3, (int)by-3, (int)pw+6, (int)ph+6, Color{ 20, 22, 30, 255 });
         DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, imgR, {0,0}, 0, WHITE);
@@ -618,8 +622,10 @@ void Editor::drawWorldPreviewOverlay() {
         chip(ui::kGood, "건물입구(클릭=내부)"); chip(Color{90,210,230,255}, "존통로(클릭=이동)");
         chip(ui::factionColor(0), "NPC"); chip(ui::factionColor(2), "적/몹"); chip(Color{240,210,80,255}, "이벤트");
     } else {
-        DrawTextU("미리보기 생성 중…", sw/2 - 70, sh/2, 18, ui::kTextDim);
+        DrawTextU("미리보기 생성 중…", (int)((sw - panelW)/2 - 70), sh/2, 18, ui::kTextDim);
     }
+
+    if (pm) drawWorldPreviewPanel(*pm, panelR);   // right: add/delete NPC·object·event·mob
 
     // ---- top-right controls (below the toolbar so they're visible) ----
     bool back = false, close = false;
@@ -632,7 +638,8 @@ void Editor::drawWorldPreviewOverlay() {
     Vector2 mp = GetMousePosition();
     bool clickedEmpty = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && mp.y > kToolbarH
                       && !CheckCollisionPointRec(mp, imgR)
-                      && !CheckCollisionPointRec(mp, ctlZone);
+                      && !CheckCollisionPointRec(mp, ctlZone)
+                      && !CheckCollisionPointRec(mp, panelR);   // panel clicks don't close
 
     if (gotoMap >= 0) {                        // enter a building interior / cross a zone gate
         worldPreviewStack_.push_back(worldPreviewMapId_);

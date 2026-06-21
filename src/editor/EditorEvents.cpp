@@ -232,6 +232,63 @@ void Editor::newObjectAt(Map& m, int tx, int ty) {
     setStatus(std::string("오브젝트 추가: ") + pr.name);
 }
 
+// Right-side editor inside the fullscreen map preview: add any object/NPC/event/
+// mob and delete existing ones. Operates directly on the previewed map.
+void Editor::drawWorldPreviewPanel(Map& m, Rectangle area) {
+    ui::panel(area, ui::kPanel);
+    ui::label("오브젝트 편집", (int)area.x + 12, (int)area.y + 10, 18, ui::kAccent);
+
+    // ---- add: every placeable preset (click = place near map centre) ----
+    DrawTextU("추가 (클릭하면 맵 중앙에 배치)", (int)area.x + 12, (int)area.y + 36, 12, ui::kTextDim);
+    float ax = area.x + 10, ay = area.y + 56, bw = (area.width - 28) / 2;
+    for (int i = 0; i < kObjCount; ++i) {
+        Rectangle b = { ax + (i % 2) * (bw + 8), ay + (i / 2) * 28.0f, bw, 25 };
+        if (ui::button(b, kObjPresets[i].name, false)) {
+            objPlaceType_ = i;
+            int cx = m.tilemap.width() / 2, cy = m.tilemap.height() / 2, tx = cx, ty = cy;
+            for (int r = 0; r < 8 && m.eventAt(tx, ty); ++r) { tx = cx + r + 1; if (tx >= m.tilemap.width()) tx = cx; }
+            newObjectAt(m, tx, ty);
+            worldPrevSelEvent_ = editingEventId_;
+        }
+    }
+    float listTop = ay + ((kObjCount + 1) / 2) * 28.0f + 12;
+
+    // ---- existing objects: select / delete ----
+    DrawTextU(TextFormat("현재 오브젝트 (%d) — 클릭=선택, 삭제", (int)m.events.size()),
+              (int)area.x + 12, (int)listTop, 12, ui::kTextDim);
+    Rectangle rows = { area.x + 6, listTop + 18, area.width - 12, area.y + area.height - (listTop + 18) - 8 };
+    uiScissor((int)rows.x, (int)rows.y, (int)rows.width, (int)rows.height);
+    if (ui::mouseIn(rows)) worldPrevScroll_ -= GetMouseWheelMove() * 40;
+    if (worldPrevScroll_ < 0) worldPrevScroll_ = 0;
+    const char* tShort[10] = { "메시지","이동","지급","스위치","전투","상점","퀘스트","엔딩","회복","?" };
+    float ly = rows.y - worldPrevScroll_;
+    int delId = -1;
+    for (auto& e : m.events) {
+        if (ly + 26 >= rows.y && ly <= rows.y + rows.height) {
+            int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
+            const char* kind = e.graphicAsset >= 0
+                ? (e.faction == NpcFaction::Enemy ? "몹" : e.faction == NpcFaction::Ally ? "NPC아군" : "NPC")
+                : tShort[ti];
+            std::string lbl = e.label.empty()
+                ? std::string(TextFormat("#%d %s @%d,%d", e.id, kind, e.x, e.y))
+                : std::string(TextFormat("#%d %s", e.id, e.label.c_str()));
+            if (ui::button({ rows.x + 4, ly, rows.width - 62, 24 }, lbl, e.id == worldPrevSelEvent_))
+                worldPrevSelEvent_ = e.id;
+            if (ui::button({ rows.x + rows.width - 54, ly, 50, 24 }, "삭제", false)) delId = e.id;
+        }
+        ly += 26;
+    }
+    EndScissorMode();
+    float maxS = std::max(0.0f, (ly + worldPrevScroll_) - (rows.y + rows.height));
+    if (worldPrevScroll_ > maxS) worldPrevScroll_ = maxS;
+    if (delId >= 0) {
+        m.events.erase(std::remove_if(m.events.begin(), m.events.end(),
+                       [&](const Event& e){ return e.id == delId; }), m.events.end());
+        if (worldPrevSelEvent_ == delId) worldPrevSelEvent_ = -1;
+        setStatus("오브젝트 삭제됨");
+    }
+}
+
 // Left palette listing every placeable object type (Map-tab 오브젝트 모드).
 void Editor::drawObjectPalette(Rectangle area) {
     ui::panel(area, ui::kPanel);
