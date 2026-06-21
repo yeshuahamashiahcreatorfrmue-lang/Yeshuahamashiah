@@ -130,6 +130,7 @@ private:
     void grantQuestReward(const Event& e); // gold/exp/item + toast
     void refreshQuestObjective();   // sync HUD objective to the first active quest
     void drawQuestLog();            // J: list of active/finished quests
+    void drawDebugVars();           // F3: switch/variable inspector (event testing)
 
     // --- atmosphere / rendering (GamePlayRender.cpp) ---
     void drawField();
@@ -177,6 +178,7 @@ private:
     std::vector<int> shopItems_; // items the current shop sells
     std::string shopTitle_;      // shop window title (event text)
     bool  questLogOpen_ = false;// J: quest log overlay
+    bool  debugVarsOpen_ = false;// F3: switch/variable inspector
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

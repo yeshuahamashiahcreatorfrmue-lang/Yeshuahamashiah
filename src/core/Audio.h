@@ -23,12 +23,23 @@ public:
 
     bool ready() const { return ready_; }
 
+    // --- volume (0..1) — master scales everything; music/sfx are relative ---
+    void  setMasterVolume(float v);
+    void  setMusicVolume(float v);
+    void  setSfxVolume(float v);
+    float masterVolume() const { return masterVol_; }
+    float musicVolume()  const { return musicVol_; }
+    float sfxVolume()    const { return sfxVol_; }
+
 private:
     bool ready_ = false;
     std::unordered_map<std::string, Sound> sfx_;
     Music bgm_{};
     bool  bgmLoaded_ = false;
     std::string bgmPath_;
+    float masterVol_ = 0.75f;   // raylib master volume
+    float musicVol_  = 0.6f;    // relative BGM volume
+    float sfxVol_    = 1.0f;    // relative SFX volume
 };
 
 } // namespace tsukuru

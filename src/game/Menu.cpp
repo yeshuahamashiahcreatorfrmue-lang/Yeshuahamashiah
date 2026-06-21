@@ -1,5 +1,6 @@
 #include "game/Menu.h"
 #include "core/Engine.h"
+#include "core/Audio.h"
 #include "render/UI.h"
 #include "core/Text.h"
 #include <filesystem>
@@ -13,10 +14,10 @@ namespace tsukuru {
 
 Menu::Menu(Engine& engine) : engine_(engine) {}
 
-static void saveGame(Engine& e) {
+static void saveGame(Engine& e, int slot) {
     fs::path dir = fs::path(e.project().dir) / "save";
     std::error_code ec; fs::create_directories(dir, ec);
-    std::ofstream f((dir / "slot1.json").string());
+    std::ofstream f((dir / ("slot" + std::to_string(slot) + ".json")).string());
     if (f) f << e.state().toJson().dump(2);
 }
 
@@ -32,17 +33,36 @@ bool Menu::update(float dt) {
     Database&  db = engine_.project().database;
 
     if (page_ == Page::Root) {
-        const int N = 5; // Items, Equip, Status, Save, Close
+        const int N = 6; // Items, Equip, Status, Settings, Save, Close
         if (IsKeyPressed(KEY_DOWN)) selection_ = (selection_ + 1) % N;
         if (IsKeyPressed(KEY_UP))   selection_ = (selection_ + N - 1) % N;
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
             switch (selection_) {
-                case 0: page_ = Page::Items;  selection_ = 0; break;
-                case 1: page_ = Page::Equip;  selection_ = 0; break;
-                case 2: page_ = Page::Status; selection_ = 0; break;
-                case 3: saveGame(engine_); toast_ = "게임이 저장되었습니다!"; toastTimer_ = 2.0f; break;
-                case 4: return false;
+                case 0: page_ = Page::Items;    selection_ = 0; break;
+                case 1: page_ = Page::Equip;    selection_ = 0; break;
+                case 2: page_ = Page::Status;   selection_ = 0; break;
+                case 3: page_ = Page::Settings; selection_ = 0; break;
+                case 4: page_ = Page::Save;     selection_ = 0; break;
+                case 5: return false;
             }
+        }
+    } else if (page_ == Page::Settings) {
+        Audio& au = engine_.audio();
+        if (IsKeyPressed(KEY_DOWN)) selection_ = (selection_ + 1) % 3;
+        if (IsKeyPressed(KEY_UP))   selection_ = (selection_ + 2) % 3;
+        float d = IsKeyPressed(KEY_RIGHT) ? 0.1f : IsKeyPressed(KEY_LEFT) ? -0.1f : 0;
+        if (d != 0) {
+            if (selection_ == 0) au.setMasterVolume(au.masterVolume() + d);
+            else if (selection_ == 1) au.setMusicVolume(au.musicVolume() + d);
+            else au.setSfxVolume(au.sfxVolume() + d);
+            if (selection_ == 2) au.playSfx("select", 0.6f);   // audible feedback
+        }
+    } else if (page_ == Page::Save) {
+        if (IsKeyPressed(KEY_DOWN)) selection_ = (selection_ + 1) % 3;
+        if (IsKeyPressed(KEY_UP))   selection_ = (selection_ + 2) % 3;
+        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+            saveGame(engine_, selection_ + 1);
+            toast_ = TextFormat("슬롯 %d에 저장되었습니다!", selection_ + 1); toastTimer_ = 2.0f;
         }
     } else if (page_ == Page::Items) {
         auto items = gs.inventory.list();
@@ -93,15 +113,51 @@ bool Menu::update(float dt) {
 }
 
 void Menu::drawRoot() {
-    Rectangle r = { 40, 40, 220, 280 };
+    Rectangle r = { 40, 40, 220, 320 };
     ui::panel(r);
     ui::label("메뉴", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
-    const char* opts[5] = { "아이템", "장비", "상태", "저장", "닫기" };
-    for (int i = 0; i < 5; ++i) {
+    const char* opts[6] = { "아이템", "장비", "상태", "설정", "저장", "닫기" };
+    for (int i = 0; i < 6; ++i) {
         Color c = i == selection_ ? ui::kAccentHi : ui::kText;
         std::string t = (i == selection_ ? "> " : "  ") + std::string(opts[i]);
-        DrawTextU(t.c_str(), (int)r.x + 16, (int)r.y + 56 + i * 40, 22, c);
+        DrawTextU(t.c_str(), (int)r.x + 16, (int)r.y + 52 + i * 38, 22, c);
     }
+}
+
+void Menu::drawSettings() {
+    Rectangle r = { 40, 40, 460, 280 };
+    ui::panel(r);
+    ui::label("설정 — 음량", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    Audio& au = engine_.audio();
+    const char* names[3] = { "마스터", "배경음(BGM)", "효과음" };
+    float vols[3] = { au.masterVolume(), au.musicVolume(), au.sfxVolume() };
+    for (int i = 0; i < 3; ++i) {
+        int y = (int)r.y + 60 + i * 50;
+        Color c = i == selection_ ? ui::kAccentHi : ui::kText;
+        DrawTextU(TextFormat("%s %s", i == selection_ ? ">" : " ", names[i]), (int)r.x + 16, y, 20, c);
+        // bar
+        Rectangle bar = { r.x + 200, (float)y + 2, 200, 18 };
+        DrawRectangleRec(bar, Color{30,34,44,255});
+        DrawRectangle((int)bar.x, (int)bar.y, (int)(bar.width * vols[i]), 18, ui::kAccent);
+        DrawRectangleLinesEx(bar, 1, Fade(BLACK, 0.5f));
+        DrawTextU(TextFormat("%d%%", (int)(vols[i] * 100)), (int)bar.x + bar.width + 12, y, 18, ui::kTextDim);
+    }
+    DrawTextU("위/아래: 선택   좌/우: 조절   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
+}
+
+void Menu::drawSave() {
+    Rectangle r = { 40, 40, 460, 280 };
+    ui::panel(r);
+    ui::label("저장 — 슬롯 선택", (int)r.x + 16, (int)r.y + 12, 22, ui::kAccent);
+    for (int i = 0; i < 3; ++i) {
+        int y = (int)r.y + 60 + i * 50;
+        Color c = i == selection_ ? ui::kAccentHi : ui::kText;
+        fs::path f = fs::path(engine_.project().dir) / "save" / ("slot" + std::to_string(i + 1) + ".json");
+        std::error_code ec; bool used = fs::exists(f, ec);
+        DrawTextU(TextFormat("%s 슬롯 %d  %s", i == selection_ ? ">" : " ", i + 1,
+                  used ? "(저장됨)" : "(비어 있음)"), (int)r.x + 16, y, 20, c);
+    }
+    DrawTextU("위/아래: 선택   Enter: 저장   ESC: 뒤로", (int)r.x + 16, (int)(r.y + r.height - 28), 14, ui::kTextDim);
 }
 
 void Menu::drawItems() {
@@ -221,10 +277,12 @@ void Menu::drawStatus() {
 
 void Menu::draw() {
     switch (page_) {
-        case Page::Root:   drawRoot();   break;
-        case Page::Items:  drawItems();  break;
-        case Page::Equip:  drawEquip();  break;
-        case Page::Status: drawStatus(); break;
+        case Page::Root:     drawRoot();     break;
+        case Page::Items:    drawItems();    break;
+        case Page::Equip:    drawEquip();    break;
+        case Page::Status:   drawStatus();   break;
+        case Page::Settings: drawSettings(); break;
+        case Page::Save:     drawSave();     break;
     }
     if (toastTimer_ > 0) {
         int w = MeasureTextU(toast_.c_str(), 20);

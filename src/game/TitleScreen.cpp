@@ -12,8 +12,22 @@ namespace tsukuru {
 
 TitleScreen::TitleScreen(Engine& engine) : engine_(engine) {}
 
+// Newest existing save among slot1..3 (empty if none) — "이어하기" loads this.
+static fs::path latestSave(const std::string& projectDir) {
+    fs::path dir = fs::path(projectDir) / "save";
+    fs::path best; fs::file_time_type bestT{};
+    for (int i = 1; i <= 3; ++i) {
+        fs::path f = dir / ("slot" + std::to_string(i) + ".json");
+        std::error_code ec;
+        if (!fs::exists(f, ec)) continue;
+        auto t = fs::last_write_time(f, ec);
+        if (best.empty() || t > bestT) { best = f; bestT = t; }
+    }
+    return best;
+}
+
 bool TitleScreen::hasSave() const {
-    return fs::exists(fs::path(engine_.project().dir) / "save" / "slot1.json");
+    return !latestSave(engine_.project().dir).empty();
 }
 
 void TitleScreen::startSingle() {
@@ -50,8 +64,9 @@ void TitleScreen::update(float dt) {
     if (!confirm) return;
 
     if (selection_ == 0) startSingle();                       // 새 게임 (싱글)
-    else if (selection_ == 1 && hasSave()) {                  // 이어하기
-        std::ifstream f((fs::path(engine_.project().dir) / "save" / "slot1.json").string());
+    else if (selection_ == 1 && hasSave()) {                  // 이어하기 (가장 최근 슬롯)
+        fs::path sv = latestSave(engine_.project().dir);
+        std::ifstream f(sv.string());
         if (f) { json j; f >> j; engine_.state().fromJson(j); engine_.setMode(Mode::Play); }
     } else if (selection_ == 2) {                             // MMO 호스트 (최대 42명)
         engine_.net().startHost(7777, 42);

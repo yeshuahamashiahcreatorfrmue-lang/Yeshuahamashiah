@@ -109,6 +109,9 @@ public:
     int  getVar(int id) const {
         auto it = variables_.find(id); return it == variables_.end() ? 0 : it->second;
     }
+    // read-only views for the in-game debug inspector (event testing)
+    const std::map<int,bool>& switches() const { return switches_; }
+    const std::map<int,int>&  variables() const { return variables_; }
 
     // Start a brand-new game from the database/start settings.
     void newGame(const Database& db, int startActorId, int playerCharId, int startMap, int sx, int sy);

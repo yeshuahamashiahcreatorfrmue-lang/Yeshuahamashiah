@@ -437,6 +437,19 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     y += 8;
     DrawTextU("트리거 '자동실행' = 맵 진입 시 1회 재생.", (int)panel.x + 12, (int)y, 12, ui::kTextDim);
     y += 22;
+    // duplicate: copy this event to the next free tile (fast authoring of many events)
+    if (ui::button({ panel.x + 12, y, 296, 26 }, "이벤트 복제 (옆 칸)", false)) {
+        Event copy = *ev;                       // value copy BEFORE the vector may realloc
+        copy.id = m.nextEventId();
+        copy.x = std::min(m.tilemap.width() - 1, ev->x + 1);
+        copy.y = ev->y;
+        while (m.eventAt(copy.x, copy.y) && copy.x + 1 < m.tilemap.width()) copy.x++; // find a free tile
+        m.events.push_back(copy);
+        editingEventId_ = copy.id;              // ev is now dangling — do not use it below
+        EndScissorMode();
+        return;
+    }
+    y += 30;
     if (ui::button({ panel.x + 12, y, 296, 28 }, "이벤트(오브젝트) 삭제", false)) {
         auto& evs = m.events;
         evs.erase(std::remove_if(evs.begin(), evs.end(),

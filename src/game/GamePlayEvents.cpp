@@ -46,6 +46,34 @@ void GamePlay::interact() {
 }
 
 // ----------------------------- message box -----------------------------
+static int utf8Len(unsigned char c) {
+    if (c < 0x80) return 1; if ((c >> 5) == 0x6) return 2;
+    if ((c >> 4) == 0xE) return 3; if ((c >> 3) == 0x1E) return 4; return 1;
+}
+// Wrap a string to maxW pixels, breaking at spaces when possible and at glyph
+// boundaries otherwise (so Korean, which can run without spaces, still wraps).
+static std::vector<std::string> wrapToWidth(const std::string& s, int maxW, int fontSize) {
+    std::vector<std::string> out;
+    std::string line; int lastSpace = -1;
+    for (size_t i = 0; i < s.size(); ) {
+        int n = utf8Len((unsigned char)s[i]);
+        std::string ch = s.substr(i, n); i += n;
+        if (ch == "\n") { out.push_back(line); line.clear(); lastSpace = -1; continue; }
+        std::string trial = line + ch;
+        if (!line.empty() && MeasureTextU(trial.c_str(), fontSize) > maxW) {
+            if (ch == " ") { out.push_back(line); line.clear(); lastSpace = -1; continue; }
+            if (lastSpace >= 0) { out.push_back(line.substr(0, lastSpace)); line = line.substr(lastSpace + 1); lastSpace = -1; }
+            else { out.push_back(line); line.clear(); }
+            line += ch;
+        } else {
+            if (ch == " ") lastSpace = (int)line.size();
+            line += ch;
+        }
+    }
+    if (!line.empty()) out.push_back(line);
+    return out;
+}
+
 void GamePlay::showMessage(const std::string& text) {
     showMessageEx(text, "", -1, "", "", -1);
 }
@@ -56,11 +84,24 @@ void GamePlay::showMessageEx(const std::string& text, const std::string& speaker
     msgChoiceA_ = choiceA; msgChoiceB_ = choiceB;
     // a choice is pending only when both options are provided
     msgChoiceSwitch_ = (!choiceA.empty() && !choiceB.empty()) ? choiceSwitch : -2; // -2 = no choice
+
+    // Build pages: split on explicit '|', then word-wrap each segment to the box
+    // width and group wrapped lines into pages of at most 3 lines.
+    const int maxW = screenW() - 80 - 40;       // box width minus padding
+    const int maxLines = 3;
     msgPages_.clear();
     size_t start = 0;
     while (true) {
         size_t bar = text.find('|', start);
-        msgPages_.push_back(text.substr(start, bar == std::string::npos ? std::string::npos : bar - start));
+        std::string seg = text.substr(start, bar == std::string::npos ? std::string::npos : bar - start);
+        std::vector<std::string> lines = wrapToWidth(seg, maxW, 22);
+        if (lines.empty()) lines.push_back("");
+        for (size_t i = 0; i < lines.size(); i += maxLines) {
+            std::string page;
+            for (size_t j = i; j < lines.size() && j < i + maxLines; ++j)
+                page += (j > i ? "\n" : "") + lines[j];
+            msgPages_.push_back(page);
+        }
         if (bar == std::string::npos) break;
         start = bar + 1;
     }
@@ -353,6 +394,33 @@ void GamePlay::drawQuestLog() {
     DrawTextU(TextFormat("진행 %d · 완료 %d", active, done), (int)box.x + 18, (int)(box.y + box.height - 30), 14, ui::kTextDim);
 }
 
+// F3: a read-only inspector of all switches & variables — invaluable for testing
+// event logic (conditions, quest flags, choice results) without guesswork.
+void GamePlay::drawDebugVars() {
+    GameState& gs = engine_.state();
+    int sw = screenW();
+    Rectangle box = { (float)sw - 320, 70, 300, 360 };
+    ui::panel(box);
+    DrawTextU("스위치 / 변수 (F3 닫기)", (int)box.x + 14, (int)box.y + 10, 18, ui::kAccent);
+    int y = (int)box.y + 40;
+    DrawTextU("─ 스위치 (ON) ─", (int)box.x + 14, y, 13, ui::kAccentHi); y += 18;
+    int shown = 0;
+    for (const auto& kv : gs.switches()) {
+        if (!kv.second) continue;
+        DrawTextU(TextFormat("#%d = ON", kv.first), (int)box.x + 22, y, 14, ui::kGood); y += 18;
+        if (++shown >= 8 || y > box.y + 200) break;
+    }
+    if (shown == 0) { DrawTextU("(켜진 스위치 없음)", (int)box.x + 22, y, 13, ui::kTextDim); y += 18; }
+    y += 6;
+    DrawTextU("─ 변수 ─", (int)box.x + 14, y, 13, ui::kAccentHi); y += 18;
+    int vshown = 0;
+    for (const auto& kv : gs.variables()) {
+        DrawTextU(TextFormat("#%d = %d", kv.first, kv.second), (int)box.x + 22, y, 14, ui::kText); y += 18;
+        if (++vshown >= 8 || y > box.y + box.height - 16) break;
+    }
+    if (vshown == 0) DrawTextU("(변수 없음)", (int)box.x + 22, y, 13, ui::kTextDim);
+}
+
 void GamePlay::drawMessage() {
     int sw = screenW(), sh = screenH();
     Rectangle box = { 40, (float)sh - 160, (float)sw - 80, 120 };
@@ -375,7 +443,17 @@ void GamePlay::drawMessage() {
     }
     DrawRectangleRec(box, Fade(Color{ 20, 24, 36, 255 }, 0.95f));
     DrawRectangleLinesEx(box, 2, ui::kAccent);
-    DrawTextU(message_.c_str(), (int)textX, (int)box.y + 20, 22, ui::kText);
+    // draw the page line-by-line (pages are pre-wrapped, '\n'-joined)
+    {
+        const std::string& pg = message_;
+        int ly = (int)box.y + 16; size_t p = 0;
+        while (p <= pg.size()) {
+            size_t nl = pg.find('\n', p);
+            std::string ln = pg.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
+            DrawTextU(ln.c_str(), (int)textX, ly, 22, ui::kText); ly += 28;
+            if (nl == std::string::npos) break; p = nl + 1;
+        }
+    }
     if (choice) {
         // two-way choice buttons
         Rectangle bA = { box.x + box.width - 360, box.y + box.height - 44, 168, 34 };

@@ -57,6 +57,14 @@ void GamePlay::onEnter() {
         openShop({ atoi(s), 2, 8 }, "무기·도구 상점");
     if (getenv("TSUKURU_MSGCHOICE"))              // debug: show a choice message
         showMessageEx("정말 마을을 떠나시겠어요?", "촌장", -1, "예, 떠납니다", "아니오", 10);
+    if (getenv("TSUKURU_MSGLONG"))                // debug: long message (auto-wrap test)
+        showMessageEx("이 마을은 오랜 옛날부터 윌로우브룩이라 불렸으며, 북쪽 산맥의 동굴 깊은 곳에는 마을을 지키는 신비한 크리스탈이 잠들어 있다고 전해진다. 자네가 그것을 되찾아 준다면 온 마을이 자네를 영웅으로 기릴 것이네.",
+                      "마을 장로", -1, "", "", -1);
+    if (getenv("TSUKURU_DEBUGVARS")) {            // debug: seed some flags + open F3 inspector
+        GameState& g = engine_.state();
+        g.setSwitch(10, true); g.setSwitch(40, true); g.setVar(1, 5); g.setVar(2, 12);
+        debugVarsOpen_ = true;
+    }
     if (getenv("TSUKURU_QUESTLOG") && map_) {     // debug: accept all quests + open log
         GameState& gs = engine_.state();
         for (auto& e : map_->events) {
@@ -95,6 +103,7 @@ void GamePlay::loadMap(int id) {
 // ----------------------------- lifecycle / dispatch -----------------------------
 void GamePlay::update(float dt) {
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
+    if (IsKeyPressed(KEY_F3)) debugVarsOpen_ = !debugVarsOpen_;   // switch/variable inspector
 
     if (toastTimer_ > 0) toastTimer_ -= dt;
 
@@ -161,6 +170,7 @@ void GamePlay::draw() {
     if (invOpen_)   drawInventoryOverlay();
     if (equipOpen_) drawEquipOverlay();
     if (questLogOpen_) drawQuestLog();
+    if (debugVarsOpen_) drawDebugVars();
     if (phase_ == Phase::Message) drawMessage();
     if (phase_ == Phase::Menu && menu_) menu_->draw();
 }

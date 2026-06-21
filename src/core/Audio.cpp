@@ -8,7 +8,19 @@ namespace tsukuru {
 void Audio::init() {
     InitAudioDevice();
     ready_ = IsAudioDeviceReady();
-    if (ready_) SetMasterVolume(0.75f);
+    if (ready_) SetMasterVolume(masterVol_);
+}
+
+void Audio::setMasterVolume(float v) {
+    masterVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
+    if (ready_) SetMasterVolume(masterVol_);
+}
+void Audio::setMusicVolume(float v) {
+    musicVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
+    if (ready_ && bgmLoaded_) SetMusicVolume(bgm_, musicVol_);
+}
+void Audio::setSfxVolume(float v) {
+    sfxVol_ = v < 0 ? 0 : (v > 1 ? 1 : v);
 }
 
 void Audio::shutdown() {
@@ -39,7 +51,7 @@ void Audio::playSfx(const std::string& name, float volume) {
     if (!ready_) return;
     auto it = sfx_.find(name);
     if (it == sfx_.end()) return;
-    SetSoundVolume(it->second, volume);
+    SetSoundVolume(it->second, volume * sfxVol_);
     PlaySound(it->second);
 }
 
@@ -52,7 +64,7 @@ void Audio::playSfxFile(const std::string& path, float volume) {
         Sound s = LoadSound(path.c_str());
         it = sfx_.emplace(path, s).first;
     }
-    SetSoundVolume(it->second, volume);
+    SetSoundVolume(it->second, volume * sfxVol_);
     PlaySound(it->second);
 }
 
@@ -65,7 +77,7 @@ void Audio::playBgm(const std::string& path) {
     bgm_ = LoadMusicStream(path.c_str());
     bgm_.looping = true;
     PlayMusicStream(bgm_);
-    SetMusicVolume(bgm_, 0.6f);
+    SetMusicVolume(bgm_, musicVol_);
     bgmLoaded_ = true;
     bgmPath_ = path;
 }
