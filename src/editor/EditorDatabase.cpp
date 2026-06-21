@@ -18,39 +18,46 @@ void Editor::drawDatabaseTab() {
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
     Database& db = engine_.project().database;
 
-    // category tabs (equipment & skills are now Items(kind=장비) / FieldSkills)
+    DrawTextU("데이터베이스 — 분류를 펼쳐 전체 목록에서 선택", 12, (int)kToolbarH + 12, 16, ui::kAccent);
+
+    // ---- accordion list: all 3 categories visible at once; click a header to
+    //      fold/unfold, click an entry to select & edit it (no view-switching). ----
     const char* cats[] = { "아이템", "액터", "적" };
-    for (int i = 0; i < 3; ++i)
-        if (ui::button({ 12.0f + i*120, kToolbarH + 10, 112, 28 }, cats[i], dbCategory_ == i)) {
-            dbCategory_ = i; dbSelected_ = -1; dbNameFocus_ = -1; dbScroll_ = 0;
+    float listX = 12, listY = kToolbarH + 44, listW = 280;
+    Rectangle listPanel = { listX, listY, listW, area.height - 54 };
+    ui::panel(listPanel, ui::kPanel);
+    uiScissor((int)listX, (int)listY, (int)listW, (int)listPanel.height);
+    if (ui::mouseIn(listPanel)) dbListScroll_ -= GetMouseWheelMove() * 40;
+    if (dbListScroll_ < 0) dbListScroll_ = 0;
+    float ly = listY + 6 - dbListScroll_;
+    auto catCount = [&](int c){ return c==0?(int)db.items.size():c==1?(int)db.actors.size():(int)db.enemies.size(); };
+    auto catName  = [&](int c,int i)->std::string{ return c==0?db.items[i].name:c==1?db.actors[i].name:db.enemies[i].name; };
+    for (int c = 0; c < 3; ++c) {
+        // section header (▼/▶ + name + count)
+        Rectangle hr = { listX + 6, ly, listW - 12, 28 };
+        std::string htxt = std::string(dbExpanded_[c] ? "[-] " : "[+] ") + cats[c] + "  (" + std::to_string(catCount(c)) + ")";
+        if (ui::button(hr, htxt, false)) dbExpanded_[c] = !dbExpanded_[c];
+        ly += 32;
+        if (!dbExpanded_[c]) continue;
+        for (int i = 0; i < catCount(c); ++i) {
+            Rectangle r = { listX + 18, ly, listW - 26, 24 };
+            bool sel = (dbCategory_ == c && dbSelected_ == i);
+            if (ly + 24 > listY && ly < listY + listPanel.height)
+                if (ui::button(r, catName(c, i), sel)) { dbCategory_ = c; dbSelected_ = i; dbNameFocus_ = -1; dbScroll_ = 0; }
+            ly += 26;
         }
-
-    float listX = 12, listY = kToolbarH + 50, listW = 280;
-    ui::panel({ listX, listY, listW, area.height - 60 }, ui::kPanel);
-
-    // "Add" button
-    if (ui::button({ listX + 8, listY + 8, listW - 16, 28 }, "+ 새로 추가")) {
-        switch (dbCategory_) {
-            case 0: { Item it; it.id = (int)db.items.size()+1; db.items.push_back(it); dbSelected_=(int)db.items.size()-1; } break;
-            case 1: { ActorDef a; a.id = (int)db.actors.size()+1; db.actors.push_back(a); dbSelected_=(int)db.actors.size()-1; } break;
-            case 2: { EnemyDef en; en.id = (int)db.enemies.size()+1; db.enemies.push_back(en); dbSelected_=(int)db.enemies.size()-1; } break;
+        Rectangle ar = { listX + 18, ly, listW - 26, 24 };
+        if (ui::button(ar, "+ 새로 추가", false)) {
+            if (c==0){ Item it; it.id=(int)db.items.size()+1; db.items.push_back(it); dbSelected_=(int)db.items.size()-1; }
+            else if (c==1){ ActorDef a; a.id=(int)db.actors.size()+1; db.actors.push_back(a); dbSelected_=(int)db.actors.size()-1; }
+            else { EnemyDef en; en.id=(int)db.enemies.size()+1; db.enemies.push_back(en); dbSelected_=(int)db.enemies.size()-1; }
+            dbCategory_ = c; dbNameFocus_ = -1; dbScroll_ = 0;
         }
+        ly += 32;
     }
+    EndScissorMode();
 
-    // list
-    float ly = listY + 44;
-    auto listEntry = [&](int i, const std::string& name) {
-        Rectangle r = { listX + 8, ly, listW - 16, 26 };
-        if (ui::button(r, name, dbSelected_ == i)) { dbSelected_ = i; dbNameFocus_ = -1; dbScroll_ = 0; }
-        ly += 28;
-    };
-    int count = 0;
-    switch (dbCategory_) {
-        case 0: count=(int)db.items.size();     for (int i=0;i<count;++i) listEntry(i, db.items[i].name); break;
-        case 1: count=(int)db.actors.size();    for (int i=0;i<count;++i) listEntry(i, db.actors[i].name); break;
-        case 2: count=(int)db.enemies.size();   for (int i=0;i<count;++i) listEntry(i, db.enemies[i].name); break;
-    }
-
+    int count = catCount(dbCategory_);
     if (dbSelected_ < 0 || dbSelected_ >= count) return;
 
     // ---- detail editor (scrollable: tall editors like 식품 overflow the panel) ----

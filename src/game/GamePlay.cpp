@@ -171,6 +171,18 @@ void GamePlay::update(float dt) {
     // even if the input language is Korean.
     plat::setImeEnabled(chatOpen_);
     if (chatBubbleT_ > 0) chatBubbleT_ -= dt;
+    // drain MMO chat from other players into the log + remote speech bubbles
+    if (engine_.net().active()) {
+        for (auto& m : engine_.net().takeChats()) {
+            chatLog_.push_back("P" + std::to_string(m.first) + ": " + m.second);
+            if (chatLog_.size() > 50) chatLog_.erase(chatLog_.begin());
+            remoteBubbles_[m.first] = { m.second, 4.0f };
+        }
+    }
+    for (auto it = remoteBubbles_.begin(); it != remoteBubbles_.end(); ) {
+        it->second.second -= dt;
+        if (it->second.second <= 0) it = remoteBubbles_.erase(it); else ++it;
+    }
     if (IsKeyPressed(KEY_F2)) { engine_.setMode(Mode::Editor); return; }
     if (IsKeyPressed(KEY_F3)) debugVarsOpen_ = !debugVarsOpen_;   // switch/variable inspector
     if (IsKeyPressed(KEY_F1)) helpOpen_ = !helpOpen_;             // controls help

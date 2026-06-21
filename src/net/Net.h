@@ -41,6 +41,10 @@ public:
     // Remote players currently in `mapId` (never includes the local player).
     std::vector<NetPlayer> remotesInMap(int mapId) const;
 
+    // --- chat ---
+    void sendChat(const std::string& text);                 // broadcast a chat line
+    std::vector<std::pair<int,std::string>> takeChats();    // drain received (senderId, text)
+
 private:
     struct Conn {
         long long sock = -1;
@@ -65,6 +69,7 @@ private:
     int  nextId_ = 1;                // host: next client id to hand out
     int  maxPlayers_ = 42;
     float tick_ = 0;                 // send throttle
+    std::vector<std::pair<int,std::string>> chatIn_;   // received chat (senderId, text)
     std::string status_ = "오프라인";
 };
 

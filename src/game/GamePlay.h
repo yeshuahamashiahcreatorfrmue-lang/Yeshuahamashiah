@@ -8,6 +8,8 @@
 #include <vector>
 #include <set>
 #include <unordered_set>
+#include <unordered_map>
+#include <utility>
 #include "raylib.h"
 #include "world/Map.h"
 #include "core/Types.h"
@@ -194,6 +196,7 @@ private:
     std::vector<std::string> chatLog_;
     std::string chatBubble_;
     float chatBubbleT_ = 0;
+    std::unordered_map<int, std::pair<std::string,float>> remoteBubbles_; // netId -> (text, timer)
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
 

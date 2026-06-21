@@ -170,46 +170,42 @@ void GamePlay::drawSkillPanel() {
     if (nBound == 0) return;
 
     int sw = screenW(), sh = screenH();
-    float pw = 178, ph = 72, gap = 7;
-    float px = sw - pw - 12;
-    float py = sh - (ph + gap) * nBound - 14;
-
     GameState& gs = engine_.state();
     int mp = gs.party.empty() ? 0 : gs.party[0].mp;
 
-    int row = 0;
+    // Compact HORIZONTAL skill strip along the bottom, right-aligned. This frees
+    // the entire right column for the chat window.
+    float cw = 88, chh = 50, gap = 6;
+    float totalW = nBound * (cw + gap);
+    float px = sw - totalW - 10;
+    float py = sh - chh - 64;     // above the inventory/quest buttons row
+
+    int col = 0;
     for (int slot = 0; slot < kSkillSlots; ++slot) {
         const FieldSkill* s = bound[slot];
         if (!s) continue;
-        Rectangle r = { px, py + row*(ph+gap), pw, ph };
-        skillBtn_[slot] = r; ++row;
+        Rectangle r = { px + col*(cw+gap), py, cw, chh };
+        skillBtn_[slot] = r; ++col;
         bool hover = CheckCollisionPointRec(GetMousePosition(), r);
         bool ready = skillCd_[slot] <= 0 && mp >= s->mpCost;
         Color bg = ready ? (hover ? ui::kPanelHi : ui::kPanel) : Color{40,30,30,235};
         DrawRectangleRec(r, Fade(bg, 0.95f));
         DrawRectangleLinesEx(r, 2, ready ? ui::kAccent : Fade(ui::kDanger,0.7f));
 
-        DrawRectangle((int)r.x+8, (int)r.y+8, 30, 30, Fade(ui::kAccent, ready?0.9f:0.4f));
-        DrawTextU(keys[slot], (int)r.x+17, (int)r.y+13, 22, BLACK);
-        DrawTextU(s->name.c_str(), (int)r.x+46, (int)r.y+8, 18, ui::kText);
+        DrawRectangle((int)r.x+5, (int)r.y+5, 22, 22, Fade(ui::kAccent, ready?0.9f:0.4f));
+        DrawTextU(keys[slot], (int)r.x+10, (int)r.y+7, 16, BLACK);
+        DrawTextU(s->name.c_str(), (int)r.x+31, (int)r.y+6, 14, ui::kText);
         if (s->mpCost > 0)
-            DrawTextU(TextFormat("기력 %d", s->mpCost), (int)r.x+46, (int)r.y+32, 13,
+            DrawTextU(TextFormat("기력%d", s->mpCost), (int)r.x+6, (int)r.y+30, 12,
                       mp >= s->mpCost ? ui::kGood : ui::kDanger);
-        // short auto description (TextFormat's rotating static buffer — no heap alloc)
-        const char* d = s->projectile ? TextFormat("원거리 %d칸", s->range)
-                      : s->blink > 0 && s->powerPct<=0 ? TextFormat("전방 %d칸 이동", s->blink)
-                      : s->blink > 0 ? TextFormat("순간이동+광역 %d", (int)s->patX.size())
-                      : TextFormat("범위 %d칸", (int)s->patX.size());
-        DrawTextU(d, (int)r.x+8, (int)r.y+50, 12, ui::kTextDim);
-
         if (skillCd_[slot] > 0) {
             float frac = s->cooldown > 0 ? skillCd_[slot] / s->cooldown : 0;
             if (frac > 1) frac = 1;
             DrawRectangle((int)r.x, (int)r.y, (int)r.width, (int)(r.height*frac), Fade(BLACK, 0.55f));
-            DrawTextU(TextFormat("%.1f", skillCd_[slot]), (int)(r.x+r.width-40), (int)r.y+8, 16, ui::kTextDim);
+            DrawTextU(TextFormat("%.1f", skillCd_[slot]), (int)(r.x+r.width-30), (int)r.y+6, 14, ui::kTextDim);
         }
     }
-    DrawTextU("스킬: 키 또는 클릭/터치", (int)px, (int)py - 20, 13, Fade(ui::kText,0.7f));
+    DrawTextU("스킬: 키 또는 클릭/터치", (int)px, (int)py - 18, 12, Fade(ui::kText,0.7f));
 }
 
 // touch / mouse click on a skill slot casts that skill

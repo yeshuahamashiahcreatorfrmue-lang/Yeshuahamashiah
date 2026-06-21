@@ -134,6 +134,8 @@ private:
     int  dbNameFocus_ = -1;
     int  dbDescFocus_ = -1;   // item description text-field focus
     float dbScroll_ = 0;      // detail-panel vertical scroll (tall editors overflow)
+    bool  dbExpanded_[3] = { true, true, true };  // accordion: each category section open?
+    float dbListScroll_ = 0;  // accordion list vertical scroll
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

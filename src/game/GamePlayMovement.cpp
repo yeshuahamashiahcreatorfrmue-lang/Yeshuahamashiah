@@ -73,6 +73,7 @@ void GamePlay::updateField(float dt) {
                 chatLog_.push_back("나: " + chatInput_);
                 if (chatLog_.size() > 50) chatLog_.erase(chatLog_.begin());
                 chatBubble_ = chatInput_; chatBubbleT_ = 4.0f;
+                if (engine_.net().active()) engine_.net().sendChat(chatInput_);   // MMO 동기화
             }
             chatInput_.clear(); chatOpen_ = false;
         }

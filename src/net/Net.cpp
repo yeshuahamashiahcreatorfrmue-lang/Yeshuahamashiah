@@ -173,6 +173,11 @@ void Net::hostPoll() {
                 NetPlayer p = c.state; // keep id
                 std::sscanf(line.c_str() + 1, "%d %d %d %d %d", &p.mapId, &p.x, &p.y, &p.dir, &p.charId);
                 p.id = c.state.id; c.state = p; c.got = true;
+            } else if (line.rfind("C ", 0) == 0) {              // chat from this client
+                std::string text = line.substr(2);
+                chatIn_.push_back({ c.state.id, text });        // host displays it
+                std::string relay = "M " + std::to_string(c.state.id) + " " + text + "\n";
+                for (auto& o : conns_) if (o.alive && &o != &c) sendLine(o.sock, relay); // to others
             }
         }
     }
@@ -207,8 +212,33 @@ void Net::clientPoll() {
             if (p.id != myId_) remotes_[p.id] = p;
         } else if (line.size() > 1 && line[0] == 'D') {
             int id = std::atoi(line.c_str() + 1); remotes_.erase(id);
+        } else if (line.rfind("M ", 0) == 0) {                 // chat relayed from host
+            int id = std::atoi(line.c_str() + 2);
+            size_t sp = line.find(' ', 2);
+            std::string text = (sp != std::string::npos) ? line.substr(sp + 1) : "";
+            chatIn_.push_back({ id, text });
         }
     }
+}
+
+// --- chat ---------------------------------------------------------------
+void Net::sendChat(const std::string& raw) {
+    if (mode_ == Mode::Off) return;
+    std::string text = raw;
+    for (char& c : text) if (c == '\n' || c == '\r') c = ' ';   // single line only
+    if (text.size() > 200) text.resize(200);
+    if (mode_ == Mode::Host) {
+        std::string line = "M 0 " + text + "\n";                // host id = 0
+        for (auto& c : conns_) if (c.alive) sendLine(c.sock, line);
+    } else if (mode_ == Mode::Client) {
+        sendLine(client_, "C " + text + "\n");                  // host will relay as M
+    }
+}
+
+std::vector<std::pair<int,std::string>> Net::takeChats() {
+    std::vector<std::pair<int,std::string>> out;
+    out.swap(chatIn_);
+    return out;
 }
 
 std::vector<NetPlayer> Net::remotesInMap(int mapId) const {

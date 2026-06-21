@@ -197,10 +197,10 @@ void GamePlay::drawCharacter(int assetId, int dir, int frame, float px, float py
 // chat: speech bubble over the player, a right-side log window, and the input line
 void GamePlay::drawChat() {
     int sw = screenW(), sh = screenH();
-    // chat log window (left column — the right side holds the minimap + skill bar)
+    // chat log window (right column, under the minimap; skill bar now sits along the bottom)
     if (!chatLog_.empty() || chatOpen_) {
-        float w = 250, h = 168;
-        Rectangle box = { 10, 92, w, h };
+        float w = 250, h = 176;
+        Rectangle box = { (float)sw - w - 10, 150, w, h };
         DrawRectangleRec(box, Fade(Color{ 12, 14, 20, 255 }, 0.72f));
         DrawRectangleLinesEx(box, 1, Fade(ui::kAccent, 0.5f));
         DrawTextU("채팅", (int)box.x + 10, (int)box.y + 6, 15, ui::kAccent);
@@ -328,6 +328,14 @@ void GamePlay::drawField() {
                 if (!fl.empty()) { spr = fl[0]; frames = 1; }
             }
             drawCharacter(spr, rp.dir, 0, (float)rp.x*TS, (float)rp.y*TS, Color{180,255,180,255}, frames);
+            // remote chat bubble (world space)
+            auto rb = remoteBubbles_.find(rp.id);
+            if (rb != remoteBubbles_.end()) {
+                int fs = 13, tw = MeasureTextU(rb->second.first.c_str(), fs);
+                float bx = rp.x*TS + TS/2.0f - tw/2.0f, by = rp.y*TS - 22;
+                DrawRectangleRounded({ bx-6, by-3, (float)tw+12, 20 }, 0.4f, 6, Fade(WHITE,0.95f));
+                DrawTextU(rb->second.first.c_str(), (int)bx, (int)by, fs, BLACK);
+            }
         }
     }
 
