@@ -138,29 +138,35 @@ void Editor::drawNpcTab() {
     DrawTextU(TextFormat("NPC %d개 · 몹 %d개  (클릭=편집)", npcCount, mobCount),
               (int)lx + 12, (int)ly + 38, 13, ui::kTextDim);
 
-    Rectangle listR = { lx + 6, ly + 60, lw - 12, area.height - 24 - 60 - 6 };
+    searchBox({ lx + 6, ly + 56, lw - 12, 24 }, npcSearch_, 9320);
+    Rectangle listR = { lx + 6, ly + 84, lw - 12, area.height - 24 - 84 - 6 };
     const float rowH = 30;
-    int rows = 1;                                       // player + every npc/mob
-    for (auto& m : p.maps) for (auto& e : m->events) if (e.graphicAsset >= 0) ++rows;
+    auto npcLabel = [&](Map* m, Event& e) {
+        const char* fac = e.faction == NpcFaction::Enemy ? "적"
+                        : e.faction == NpcFaction::Ally  ? "아군" : "중립";
+        return std::string("[") + m->name + "] " + assetName(e.graphicAsset) + " (" + fac + ")";
+    };
+    bool showPlayer = nameMatch("플레이어", npcSearch_);
+    int rows = showPlayer ? 1 : 0;                       // player + every npc/mob
+    for (auto& m : p.maps) for (auto& e : m->events)
+        if (e.graphicAsset >= 0 && nameMatch(npcLabel(m.get(), e), npcSearch_)) ++rows;
     float contentH = rows * rowH + 4;
     uiScissor((int)listR.x, (int)listR.y, (int)listR.width, (int)listR.height);
-    if (ui::mouseIn(listR)) npcListScroll_ -= (int)(GetMouseWheelMove() * 42);
-    int maxS = (int)std::max(0.0f, contentH - listR.height);
-    npcListScroll_ = std::max(0, std::min(npcListScroll_, maxS));
     float ry = listR.y - npcListScroll_;
     // player row
-    if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
-        if (ui::button({ listR.x + 4, ry, listR.width - 8, 28 }, "★ 플레이어", npcTabPlayer_)) {
-            npcTabPlayer_ = true; editingEventId_ = -1;
+    if (showPlayer) {
+        if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
+            if (ui::button({ listR.x + 4, ry, listR.width - 8, 28 }, "★ 플레이어", npcTabPlayer_)) {
+                npcTabPlayer_ = true; editingEventId_ = -1;
+            }
         }
+        ry += rowH;
     }
-    ry += rowH;
     for (auto& m : p.maps) for (auto& e : m->events) {
         if (e.graphicAsset < 0) continue;
+        std::string lbl = npcLabel(m.get(), e);
+        if (!nameMatch(lbl, npcSearch_)) continue;
         if (ry + 28 >= listR.y && ry <= listR.y + listR.height) {
-            const char* fac = e.faction == NpcFaction::Enemy ? "적"
-                            : e.faction == NpcFaction::Ally  ? "아군" : "중립";
-            std::string lbl = std::string("[") + m->name + "] " + assetName(e.graphicAsset) + " (" + fac + ")";
             bool sel = (!npcTabPlayer_ && activeMapId_ == m->id && editingEventId_ == e.id);
             Rectangle r = { listR.x + 4, ry, listR.width - 8, 28 };
             if (ui::button(r, lbl, sel)) { npcTabPlayer_ = false; activeMapId_ = m->id; editingEventId_ = e.id; }
@@ -169,6 +175,7 @@ void Editor::drawNpcTab() {
         ry += rowH;
     }
     EndScissorMode();
+    scrollbar(listR, npcListScroll_, contentH);
 
     // right editor
     Rectangle panel = { lx + lw + 16, ly, area.width - (lx + lw + 16) - 12, area.height - 24 };
@@ -622,20 +629,30 @@ void Editor::drawEventsTab() {
                        std::string("필터: ") + (eventListFilter_ < 0 ? "전체" : tShort[eventListFilter_ % 9]),
                        eventListFilter_ >= 0))
             eventListFilter_ = (eventListFilter_ + 2) % 10 - 1;   // -1..8 cycle
-        Rectangle rows = { listP.x, listP.y + 76, listP.width, listP.height - 84 };
+        searchBox({ listP.x + 6, listP.y + 76, listP.width - 12, 22 }, evSearch_, 9330);
+        Rectangle rows = { listP.x, listP.y + 102, listP.width, listP.height - 110 };
+        auto evLabel = [&](Event& e) {
+            int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
+            std::string pre = e.enabled ? "" : "[off] ";
+            return e.label.empty()
+                ? std::string(TextFormat("#%d %s%s @%d,%d", e.id, pre.c_str(), tShort[ti], e.x, e.y))
+                : std::string(TextFormat("#%d %s%s", e.id, pre.c_str(), e.label.c_str()));
+        };
+        float contentH = 4;
+        for (auto& e : m->events) {
+            int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
+            if (eventListFilter_ >= 0 && ti != eventListFilter_) continue;
+            if (nameMatch(evLabel(e), evSearch_)) contentH += 26;
+        }
         uiScissor((int)rows.x, (int)rows.y, (int)rows.width, (int)rows.height);
-        if (ui::mouseIn(rows)) eventListScroll_ -= GetMouseWheelMove() * 40;
-        if (eventListScroll_ < 0) eventListScroll_ = 0;
         float ly = rows.y - eventListScroll_;
         for (auto& e : m->events) {
             int ti = (int)e.type; if (ti < 0 || ti > 8) ti = 9;
             if (eventListFilter_ >= 0 && ti != eventListFilter_) continue;   // filtered out
+            std::string lbl = evLabel(e);
+            if (!nameMatch(lbl, evSearch_)) continue;
             if (ly + 26 >= rows.y && ly <= rows.y + rows.height) {
                 Rectangle r = { listP.x + 6, ly, listP.width - 12, 24 };
-                std::string pre = e.enabled ? "" : "[off] ";
-                std::string lbl = e.label.empty()
-                    ? std::string(TextFormat("#%d %s%s @%d,%d", e.id, pre.c_str(), tShort[ti], e.x, e.y))
-                    : std::string(TextFormat("#%d %s%s", e.id, pre.c_str(), e.label.c_str()));
                 if (ui::button(r, lbl, e.id == editingEventId_)) {
                     editingEventId_ = e.id;
                     cam_.target = { (e.x + 0.5f) * m->tileset.tileWidth, (e.y + 0.5f) * m->tileset.tileHeight };
@@ -644,8 +661,7 @@ void Editor::drawEventsTab() {
             ly += 26;
         }
         EndScissorMode();
-        float maxS = std::max(0.0f, (ly + eventListScroll_) - (rows.y + rows.height));
-        if (eventListScroll_ > maxS) eventListScroll_ = maxS;
+        scrollbar(rows, eventListScroll_, contentH);
     }
 
     Rectangle canvasArea = { listW, kToolbarH, (float)screenW() - listW - 320, (float)screenH() - kToolbarH };

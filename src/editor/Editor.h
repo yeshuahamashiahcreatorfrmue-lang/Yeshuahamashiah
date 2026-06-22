@@ -69,7 +69,11 @@ private:
     void drawCharsTab();
     void pickAndImportImages();        // native OS file picker -> import selected images
     int  makeTransparentBg(int assetId); // remove a solid/white background -> new transparent asset
-    void scrollbar(Rectangle region, int& scroll, float contentH); // wheel + middle-drag + draggable bar
+    void scrollbar(Rectangle region, int& scroll, float contentH); // wheel + middle-autoscroll + draggable bar
+    void scrollbar(Rectangle region, float& scroll, float contentH); // float overload (bar + autoscroll)
+    void autoScroll(Rectangle region, float* scrollF, int* scrollI, float maxS); // web-style middle-click autoscroll
+    std::string searchBox(Rectangle r, std::string& text, int id);  // 검색 입력칸 (returns lowercased query)
+    static bool nameMatch(const std::string& name, const std::string& q); // case-insensitive contains
     void drawCharSkillEditor();        // per-character skill behaviour editor (range/power/effect/sound)
     void drawCharDataEditor();         // bulk editor: all of a character's stats + every skill
     void applyShape(FieldSkill& s, int shape, int size, bool toEfx = false); // fill damage OR effect tiles from a preset
@@ -158,7 +162,7 @@ private:
 
     // 대화로그 / 시나리오 편집 상태
     int   dlgSel_ = -1, dlgLineSel_ = -1, dlgFocus_ = -1;
-    float dlgLineScroll_ = 0, dlgAnsScroll_ = 0;
+    float dlgLineScroll_ = 0, dlgAnsScroll_ = 0, dlgListScroll_ = 0, scnListScroll_ = 0;
     int   scnSel_ = -1, scnFocus_ = -1;
     float scnActScroll_ = 0;
 
@@ -171,6 +175,15 @@ private:
     std::string* pickerStrTarget_ = nullptr;       // string-valued picker (e.g. sfx)
     std::vector<std::string> pickerStrValues_;
     float pickerScroll_ = 0;
+    // web-style middle-click autoscroll (toggle on, move to scroll, speed ∝ distance)
+    void* autoScrollTarget_ = nullptr;
+    Vector2 autoScrollOrigin_{};
+    float autoScrollAccum_ = 0;
+    void* barDragTarget_ = nullptr;   // float scrollbar thumb drag
+    float barDragGrab_ = 0;
+    // per-list search queries + which search box is focused
+    int   searchFocusId_ = -1;
+    std::string dlgSearch_, scnSearch_, charSearch_, npcSearch_, dbSearch_, evSearch_;
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

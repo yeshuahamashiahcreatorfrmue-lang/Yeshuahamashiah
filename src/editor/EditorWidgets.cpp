@@ -8,8 +8,82 @@
 #include "core/Text.h"
 #include "database/Database.h"
 #include <algorithm>
+#include <cctype>
 
 namespace tsukuru {
+
+// case-insensitive "name contains query" (ASCII-folded; Korean compares as-is)
+bool Editor::nameMatch(const std::string& name, const std::string& q) {
+    if (q.empty()) return true;
+    auto low = [](std::string s){ for (char& c : s) c = (char)tolower((unsigned char)c); return s; };
+    return low(name).find(low(q)) != std::string::npos;
+}
+
+// 검색 입력칸: a small text field with a placeholder; returns the current query.
+std::string Editor::searchBox(Rectangle r, std::string& text, int id) {
+    DrawRectangleRec(r, ui::kPanel);
+    DrawRectangleLinesEx(r, 1, searchFocusId_ == id ? ui::kAccent : Fade(BLACK, 0.5f));
+    if (ui::g_inputEnabled && ui::mouseIn(r) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) searchFocusId_ = id;
+    else if (ui::g_inputEnabled && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(r) && searchFocusId_ == id) searchFocusId_ = -1;
+    ui::textField({ r.x + 18, r.y, r.width - 22, r.height }, text, searchFocusId_ == id, 40);
+    DrawTextU("🔍", (int)r.x + 3, (int)r.y + 3, 13, ui::kTextDim);
+    if (text.empty() && searchFocusId_ != id)
+        DrawTextU("검색…", (int)r.x + 20, (int)r.y + 4, 13, ui::kTextDim);
+    return text;
+}
+
+// web-style autoscroll: middle-click toggles a scroll anchor; moving the cursor
+// away from it scrolls that way with speed ∝ distance. Wheel also scrolls.
+void Editor::autoScroll(Rectangle r, float* sf, int* si, float maxS) {
+    Vector2 m = GetMousePosition();
+    void* key = si ? (void*)si : (void*)sf;
+    auto get = [&]{ return si ? (float)*si : *sf; };
+    auto set = [&](float v){ if (si) *si = (int)v; else *sf = v; };
+    bool inR = CheckCollisionPointRec(m, r);
+    if (inR) { float w = GetMouseWheelMove(); if (w != 0) set(get() - w * 48); }
+    if (inR && IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) {
+        if (autoScrollTarget_ == key) autoScrollTarget_ = nullptr;
+        else { autoScrollTarget_ = key; autoScrollOrigin_ = m; autoScrollAccum_ = 0; }
+    }
+    if (autoScrollTarget_ == key) {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) autoScrollTarget_ = nullptr;
+        else {
+            float dy = m.y - autoScrollOrigin_.y;
+            autoScrollAccum_ += dy * 0.10f;
+            int step = (int)autoScrollAccum_; autoScrollAccum_ -= step;
+            set(get() + step);
+            DrawCircleLines((int)autoScrollOrigin_.x, (int)autoScrollOrigin_.y, 13, ui::kAccentHi);
+            DrawCircle((int)autoScrollOrigin_.x, (int)autoScrollOrigin_.y, 3, Fade(ui::kAccentHi, 0.7f));
+        }
+    }
+    float v = get(); if (v < 0) v = 0; if (v > maxS) v = maxS; set(v);
+}
+
+// float scrollbar: wheel + middle-autoscroll + draggable thumb (web-like).
+void Editor::scrollbar(Rectangle r, float& scroll, float contentH) {
+    float maxS = std::max(0.0f, contentH - r.height);
+    autoScroll(r, &scroll, nullptr, maxS);
+    if (maxS <= 0) { scroll = 0; return; }
+    Vector2 m = GetMousePosition();
+    const float trackW = 10;
+    float tx = r.x + r.width - trackW - 2, th = r.height;
+    float thumbH = std::max(28.0f, th * r.height / contentH);
+    if (barDragTarget_ == &scroll) {
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            float denom = std::max(1.0f, th - thumbH);
+            scroll = ((m.y - barDragGrab_) - r.y) / denom * maxS;
+        } else barDragTarget_ = nullptr;
+    }
+    if (scroll < 0) scroll = 0; if (scroll > maxS) scroll = maxS;
+    float thumbY = r.y + (th - thumbH) * (scroll / maxS);
+    Rectangle thumb = { tx, thumbY, trackW, thumbH };
+    DrawRectangleRounded({ tx, r.y, trackW, th }, 0.5f, 4, Fade(BLACK, 0.30f));
+    bool hot = CheckCollisionPointRec(m, thumb) || barDragTarget_ == &scroll;
+    DrawRectangleRounded(thumb, 0.5f, 4, hot ? ui::kAccentHi : ui::kAccent);
+    if (CheckCollisionPointRec(m, thumb) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        barDragTarget_ = &scroll; barDragGrab_ = m.y - thumbY;
+    }
+}
 
 // Open this picker, recording the trigger button rect (called when clicked).
 void Editor::optionButton(Rectangle r, const std::string& label,

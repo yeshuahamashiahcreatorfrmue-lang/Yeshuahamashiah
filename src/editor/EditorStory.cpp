@@ -27,7 +27,7 @@ void Editor::drawDialogueTab() {
     ui::panel({ rx, top, rw, panelH }, ui::kPanel);
     if (dlgSel_ < 0 && !list.empty()) dlgSel_ = 0;
 
-    // ---- LEFT: scenario list ----
+    // ---- LEFT: scenario list (검색 + 스크롤) ----
     {
         float x = lx + 8, w = lw - 16, y = top + 8;
         if (ui::button({ x, y, w, 28 }, "+ 새 대화")) {
@@ -35,11 +35,19 @@ void Editor::drawDialogueTab() {
             d.lines.push_back({ "", "...", {} });
             list.push_back(d); dlgSel_ = (int)list.size() - 1; dlgLineSel_ = 0; p.save();
         }
-        y += 34;
+        y += 32;
+        searchBox({ x, y, w, 24 }, dlgSearch_, 9001); y += 28;
+        Rectangle reg = { lx, y, lw, top + panelH - y - 104 };
+        uiScissor((int)lx, (int)y, (int)lw, (int)reg.height);
+        float ly = y - dlgListScroll_; int shown = 0;
         for (int i = 0; i < (int)list.size(); ++i) {
-            if (ui::button({ x, y, w, 26 }, list[i].name, dlgSel_ == i)) { dlgSel_ = i; dlgLineSel_ = 0; dlgFocus_ = -1; }
-            y += 28;
+            if (!nameMatch(list[i].name, dlgSearch_)) continue;
+            if (ly + 26 > y && ly < y + reg.height)
+                if (ui::button({ x, ly, w - 12, 26 }, list[i].name, dlgSel_ == i)) { dlgSel_ = i; dlgLineSel_ = 0; dlgFocus_ = -1; }
+            ly += 28; ++shown;
         }
+        EndScissorMode();
+        scrollbar(reg, dlgListScroll_, shown * 28.0f + 4);
     }
     if (dlgSel_ < 0 || dlgSel_ >= (int)list.size()) return;
     DialogueScenario& d = list[dlgSel_];
@@ -167,11 +175,19 @@ void Editor::drawScenarioTab() {
             Scene s; s.id = (int)list.size()+1; s.name = "장면" + std::to_string(s.id);
             list.push_back(s); scnSel_ = (int)list.size()-1; p.save();
         }
-        y += 34;
+        y += 32;
+        searchBox({ x, y, w, 24 }, scnSearch_, 9101); y += 28;
+        Rectangle reg = { lx, y, lw, top + panelH - y - 80 };
+        uiScissor((int)lx, (int)y, (int)lw, (int)reg.height);
+        float ly = y - scnListScroll_; int shown = 0;
         for (int i = 0; i < (int)list.size(); ++i) {
-            if (ui::button({ x, y, w, 26 }, list[i].name, scnSel_ == i)) { scnSel_ = i; scnFocus_ = -1; }
-            y += 28;
+            if (!nameMatch(list[i].name, scnSearch_)) continue;
+            if (ly + 26 > y && ly < y + reg.height)
+                if (ui::button({ x, ly, w - 12, 26 }, list[i].name, scnSel_ == i)) { scnSel_ = i; scnFocus_ = -1; }
+            ly += 28; ++shown;
         }
+        EndScissorMode();
+        scrollbar(reg, scnListScroll_, shown * 28.0f + 4);
         float by = top + panelH - 70;
         if (scnSel_ >= 0 && scnSel_ < (int)list.size()) {
             DrawTextU("이름", (int)x, (int)by, 12, ui::kTextDim); by += 16;

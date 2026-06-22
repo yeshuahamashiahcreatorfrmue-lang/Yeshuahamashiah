@@ -24,22 +24,32 @@ void Editor::drawDatabaseTab() {
     //      fold/unfold, click an entry to select & edit it (no view-switching). ----
     const char* cats[] = { "아이템", "액터", "적" };
     float listX = 12, listY = kToolbarH + 44, listW = 280;
-    Rectangle listPanel = { listX, listY, listW, area.height - 54 };
+    // search box above the accordion
+    searchBox({ listX, listY, listW, 26 }, dbSearch_, 9201);
+    listY += 32;
+    Rectangle listPanel = { listX, listY, listW, area.height - 86 };
     ui::panel(listPanel, ui::kPanel);
     uiScissor((int)listX, (int)listY, (int)listW, (int)listPanel.height);
-    if (ui::mouseIn(listPanel)) dbListScroll_ -= GetMouseWheelMove() * 40;
-    if (dbListScroll_ < 0) dbListScroll_ = 0;
-    float ly = listY + 6 - dbListScroll_;
     auto catCount = [&](int c){ return c==0?(int)db.items.size():c==1?(int)db.actors.size():(int)db.enemies.size(); };
     auto catName  = [&](int c,int i)->std::string{ return c==0?db.items[i].name:c==1?db.actors[i].name:db.enemies[i].name; };
+    // measure content height for the scrollbar (only expanded + matching rows)
+    float contentH = 6;
     for (int c = 0; c < 3; ++c) {
-        // section header (▼/▶ + name + count)
+        contentH += 32;
+        if (!dbExpanded_[c]) continue;
+        for (int i = 0; i < catCount(c); ++i) if (nameMatch(catName(c, i), dbSearch_)) contentH += 26;
+        contentH += 32;
+    }
+    float ly = listY + 6 - dbListScroll_;
+    for (int c = 0; c < 3; ++c) {
+        // section header ([-]/[+] + name + count)
         Rectangle hr = { listX + 6, ly, listW - 12, 28 };
         std::string htxt = std::string(dbExpanded_[c] ? "[-] " : "[+] ") + cats[c] + "  (" + std::to_string(catCount(c)) + ")";
         if (ui::button(hr, htxt, false)) dbExpanded_[c] = !dbExpanded_[c];
         ly += 32;
         if (!dbExpanded_[c]) continue;
         for (int i = 0; i < catCount(c); ++i) {
+            if (!nameMatch(catName(c, i), dbSearch_)) continue;
             Rectangle r = { listX + 18, ly, listW - 26, 24 };
             bool sel = (dbCategory_ == c && dbSelected_ == i);
             if (ly + 24 > listY && ly < listY + listPanel.height)
@@ -56,6 +66,7 @@ void Editor::drawDatabaseTab() {
         ly += 32;
     }
     EndScissorMode();
+    scrollbar(listPanel, dbListScroll_, contentH);
 
     int count = catCount(dbCategory_);
     if (dbSelected_ < 0 || dbSelected_ >= count) return;

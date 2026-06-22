@@ -261,12 +261,7 @@ std::vector<int> Editor::sliceSheetRow0(int assetId) {
 void Editor::scrollbar(Rectangle r, int& scroll, float contentH) {
     int maxS = (int)std::max(0.0f, contentH - r.height);
     Vector2 m = GetMousePosition();
-    bool inR = CheckCollisionPointRec(m, r);
-    if (inR) {
-        float w = GetMouseWheelMove();
-        if (w != 0) scroll -= (int)(w * 48);
-        if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) scroll -= (int)GetMouseDelta().y;  // 휠 클릭 드래그
-    }
+    autoScroll(r, nullptr, &scroll, (float)maxS);   // wheel + web-style middle-click autoscroll
     if (maxS <= 0) { scroll = 0; return; }
     const float trackW = 10;
     float tx = r.x + r.width - trackW - 2, th = r.height;
@@ -324,12 +319,17 @@ void Editor::drawCharsTab() {
     {
         float x = leftX + 10, w = leftW - 20;
         ui::label(mobMode_ ? "몹" : "캐릭터", (int)x, (int)panelTop + 8, 15, ui::kAccent);
-        float listTop = panelTop + 32, listH = panelH - 290;
+        std::string& q = charSearch_;
+        searchBox({ x, panelTop + 30, w, 24 }, q, mobMode_ ? 9311 : 9310);
+        float listTop = panelTop + 58, listH = panelH - 316;
         Rectangle listReg = { leftX, listTop, leftW, listH };
         int rows = (int)list.size();
+        int shown = 0;
+        for (int i = 0; i < rows; ++i) if (nameMatch(list[i].name, q)) ++shown;
         uiScissor((int)leftX, (int)listTop, (int)leftW, (int)listH);
         float ly = listTop - charListScroll_;
         for (int i = 0; i < rows; ++i) {
+            if (!nameMatch(list[i].name, q)) continue;
             if (ly + 28 > listTop && ly < listTop + listH)
                 if (ui::button({ x, ly, w - 12, 26 }, list[i].name, sel == i)) {
                     sel = i; charDefNameFocus_ = false; charFrameSel_ = -1;
@@ -337,7 +337,7 @@ void Editor::drawCharsTab() {
             ly += 30;
         }
         EndScissorMode();
-        scrollbar(listReg, charListScroll_, rows * 30.0f + 4);
+        scrollbar(listReg, charListScroll_, shown * 30.0f + 4);
         if (rows == 0) DrawTextU("(없음)", (int)x, (int)listTop + 6, 13, ui::kTextDim);
 
         float by = listTop + listH + 6;
