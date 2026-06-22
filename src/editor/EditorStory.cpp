@@ -558,6 +558,11 @@ void Editor::drawScenarioTab() {
     // token under cursor
     int hovTag = -1000;
     for (auto& kv : scnDraft_) if (CheckCollisionPointCircle(mouse, t2s(kv.second.x, kv.second.y), 11)) hovTag = kv.first;
+    if (IsKeyPressed(KEY_ESCAPE)) {   // Esc: 메뉴 닫기 → 배치 취소 → 선택 해제 순
+        if (scnCtxOpen_) scnCtxOpen_ = false;
+        else if (scnRecPlaceChar_ >= 0) scnRecPlaceChar_ = -1;
+        else scnSelTags_.clear();
+    }
 
     // dropping a browsed character onto the map → new 등장(SA_Spawn) at the click tile
     if (scnRecPlaceChar_ >= 0) {
@@ -621,13 +626,30 @@ void Editor::drawScenarioTab() {
         DrawCircle((int)sp.x,(int)sp.y, rr, Fade(Color{250,180,60,255}, 0.12f));
         DrawCircleV(sp, 4, Color{250,180,60,255});
     }
-    // tokens (selected = bright ring)
+    // resolve a tag's sprite asset (player=playerChar, spawn=its char/mob 썸네일)
+    auto tagThumb = [&](int tag)->int {
+        if (tag == 0) { const CharacterDef* c = db.character(p.playerCharId); return c ? charThumbAsset(*c) : -1; }
+        for (auto& a2 : sc.actions) if (a2.type==SA_Spawn && a2.targetId==tag) {
+            const CharacterDef* c = a2.refId <= -2 ? db.character(-a2.refId-1) : db.mob(a2.refId);
+            return c ? charThumbAsset(*c) : -1;
+        }
+        return -1;
+    };
+    // tokens — draw the real sprite (readable RTS stage); selected = bright ring
     for (auto& kv : scnDraft_) {
         int tag = kv.first; Vector2 sp = t2s(kv.second.x, kv.second.y);
         Color col = (tag == 0) ? Color{120,170,250,255} : Color{120,200,120,255};
-        if (selected(tag)) DrawCircleLines((int)sp.x,(int)sp.y, 13, ui::kAccentHi);
-        DrawCircleV(sp, 10, Fade(BLACK,0.6f)); DrawCircleV(sp, 8, col);
-        DrawTextU((tag==0 ? std::string("플레이어") : spawnTagLabel(tag)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, WHITE);
+        if (selected(tag)) DrawCircleLines((int)sp.x,(int)sp.y, 15, ui::kAccentHi);
+        int aid = tagThumb(tag);
+        if (aid >= 0) {
+            const Texture2D& tex = engine_.assetTexture(aid);
+            if (tex.id) { float fw = tex.width>=tex.height*2 ? tex.width/4.0f : (float)tex.width;
+                float r=12, scl=std::min(r*2/fw, r*2/(float)tex.height);
+                DrawCircleV(sp, r+2, Fade(col,0.5f));
+                DrawTexturePro(tex, {0,0,fw,(float)tex.height}, {sp.x-fw*scl/2, sp.y-tex.height*scl/2, fw*scl, tex.height*scl}, {0,0}, 0, WHITE);
+            } else { DrawCircleV(sp,10,Fade(BLACK,0.6f)); DrawCircleV(sp,8,col); }
+        } else { DrawCircleV(sp,10,Fade(BLACK,0.6f)); DrawCircleV(sp,8,col); }
+        DrawTextU((tag==0 ? std::string("플레이어") : spawnTagLabel(tag)).c_str(), (int)sp.x+13, (int)sp.y-8, 12, WHITE);
     }
     // right-click context menu — applies to ALL selected tokens
     if (scnCtxOpen_) {

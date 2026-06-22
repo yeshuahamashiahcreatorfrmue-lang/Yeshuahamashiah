@@ -7,6 +7,7 @@
 #include "database/Database.h"
 #include <algorithm>
 #include <cstdlib>
+#include <cmath>
 
 namespace tsukuru {
 
@@ -199,68 +200,93 @@ void GamePlay::updateScene(float dt) {
     const Scene* sc = nullptr;
     for (const auto& s : db.scenes) if (s.id == sceneRunId_) sc = &s;
     if (!sc || sceneStep_ >= (int)sc->actions.size()) { sceneRunId_ = -1; sceneStep_ = -1; return; }
-    const SceneAction& a = sc->actions[sceneStep_];
     int TS = map_ ? map_->tileset.tileWidth : 32;
-    bool advance = false;
-    switch (a.type) {
-        case SA_Wait:
-            sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
-        case SA_MoveChar: {                         // tag 0 = player; else a spawned npc tag
-            if (a.targetId == 0) { destX_ = a.x; destY_ = a.y; pxX_ = a.x*(float)TS; pxY_ = a.y*(float)TS; }
-            else { auto it = sceneTags_.find(a.targetId);
-                   if (it != sceneTags_.end()) for (auto& n : npcs_) if (n.eventId == it->second) { n.x=n.destX=a.x; n.y=n.destY=a.y; n.px=a.x*(float)TS; n.py=a.y*(float)TS; } }
-            sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
-        }
-        case SA_Dialogue:
-            if (a.refId >= 0 && db.dialogue(a.refId)) startDialogue(a.refId);
-            advance = true; break;                  // dialogue runs in its own phase; we resume after
-        case SA_Effect:
-            spawnFx(3, a.x*(float)TS, a.y*(float)TS, 0, a.refId, std::max(0.2f, a.time),
-                    TS * 1.2f * std::max(1, a.radius));   // 반경(타일)에 비례한 크기
-            sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
-        case SA_Spawn: {
-            // refId>=0 → db.mobs, refId<=-2 → db.characters(-refId-1) (등록 캐릭터 등장)
-            bool isMob = a.refId >= 0; int cid = isMob ? a.refId : (-a.refId - 1);
-            const CharacterDef* md = isMob ? db.mob(cid) : db.character(cid);
-            if (md) {
-                NpcInst n; n.eventId = -2000 - (int)npcs_.size();
-                n.charId = cid; n.charIsMob = isMob;   // 방향별·동작전환 렌더
-                n.spriteAsset = md->motions[MO_Walk].frames.empty()? -1 : md->motions[MO_Walk].frames.front();
-                n.faction = NpcFaction::Neutral; n.behavior = NpcBehavior::Idle;
-                n.drawPct = md->drawPct; n.drawTilesW = std::max(1,md->drawTilesW); n.drawTilesH = std::max(1,md->drawTilesH);
-                n.x=n.destX=n.homeX=a.x; n.y=n.destY=n.homeY=a.y; n.px=a.x*(float)TS; n.py=a.y*(float)TS;
-                sceneTags_[a.targetId] = n.eventId; npcs_.push_back(n);
-            }
-            advance = true; break;
-        }
-        case SA_Remove: {
-            // 복수 선택한 태그(removeTags) + 단일 targetId 모두 제거
-            std::vector<int> tags = a.removeTags;
-            if (a.targetId >= 0) tags.push_back(a.targetId);
-            for (int tag : tags) {
-                auto it = sceneTags_.find(tag);
-                if (it == sceneTags_.end()) continue;
-                int eid = it->second;
-                npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
-                            [eid](const NpcInst& n){ return n.eventId == eid; }), npcs_.end());
-                sceneTags_.erase(it);
-            }
-            advance = true; break;
-        }
-        case SA_Motion: {   // 대상이 모션(공격/죽음 등)을 time초간 재생
-            int mo = std::max(0, std::min((int)MO_COUNT-1, a.refId));
-            if (a.targetId == 0) {                       // 플레이어
-                playMotion_ = mo; motionFrame_ = 0; motionAnim_ = 0;
-            } else {
-                auto it = sceneTags_.find(a.targetId);
-                if (it != sceneTags_.end()) for (auto& n : npcs_) if (n.eventId == it->second) {
-                    n.sceneMotion = mo; n.sceneMotionT = std::max(0.2f, a.time);
+    auto npcByTag = [&](int tag)->NpcInst* {
+        auto it = sceneTags_.find(tag); if (it == sceneTags_.end()) return nullptr;
+        for (auto& n : npcs_) if (n.eventId == it->second) return &n;
+        return nullptr;
+    };
+    auto isConc = [](int t){ return t == SA_MoveChar || t == SA_Effect || t == SA_Motion; };
+    const SceneAction& first = sc->actions[sceneStep_];
+
+    // ── blocking actions (대화/대기/등장/제거): 한 번에 하나씩 ──
+    if (!isConc(first.type)) {
+        bool advance = false;
+        switch (first.type) {
+            case SA_Wait: sceneTimer_ += dt; if (sceneTimer_ >= first.time) advance = true; break;
+            case SA_Dialogue:
+                if (first.refId >= 0 && db.dialogue(first.refId)) startDialogue(first.refId);
+                advance = true; break;
+            case SA_Spawn: {
+                bool isMob = first.refId >= 0; int cid = isMob ? first.refId : (-first.refId - 1);
+                const CharacterDef* md = isMob ? db.mob(cid) : db.character(cid);
+                if (md) {
+                    NpcInst n; n.eventId = -2000 - (int)npcs_.size();
+                    n.charId = cid; n.charIsMob = isMob;
+                    n.spriteAsset = md->motions[MO_Walk].frames.empty() ? -1 : md->motions[MO_Walk].frames.front();
+                    n.faction = NpcFaction::Neutral; n.behavior = NpcBehavior::Idle;
+                    n.drawPct = md->drawPct; n.drawTilesW = std::max(1,md->drawTilesW); n.drawTilesH = std::max(1,md->drawTilesH);
+                    n.x=n.destX=n.homeX=first.x; n.y=n.destY=n.homeY=first.y; n.px=first.x*(float)TS; n.py=first.y*(float)TS;
+                    sceneTags_[first.targetId] = n.eventId; npcs_.push_back(n);
                 }
+                advance = true; break;
             }
-            sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
+            case SA_Remove: {
+                std::vector<int> tags = first.removeTags;
+                if (first.targetId >= 0) tags.push_back(first.targetId);
+                for (int tag : tags) {
+                    auto it = sceneTags_.find(tag); if (it == sceneTags_.end()) continue;
+                    int eid = it->second;
+                    npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
+                                [eid](const NpcInst& n){ return n.eventId == eid; }), npcs_.end());
+                    sceneTags_.erase(it);
+                }
+                advance = true; break;
+            }
+            default: advance = true; break;
+        }
+        if (advance) { ++sceneStep_; sceneTimer_ = 0; }
+        return;
+    }
+
+    // ── concurrent batch: 연속된 이동/이펙트/동작을 동시에 부드럽게 재생 ──
+    int endi = sceneStep_; float dur = 0;
+    while (endi < (int)sc->actions.size() && isConc(sc->actions[endi].type)) { dur = std::max(dur, sc->actions[endi].time); ++endi; }
+    if (sceneTimer_ == 0.0f) {                       // 배치 시작 1회: 시작좌표 캡처·이펙트·동작 발동
+        sceneMoveFrom_.clear(); sceneMoveTo_.clear(); sceneBatchDur_ = std::max(0.05f, dur);
+        for (int i = sceneStep_; i < endi; ++i) {
+            const SceneAction& a = sc->actions[i];
+            if (a.type == SA_MoveChar) {
+                Vector2 from = { (float)a.x*TS, (float)a.y*TS };
+                if (a.targetId == 0) from = { pxX_, pxY_ };
+                else if (NpcInst* n = npcByTag(a.targetId)) from = { n->px, n->py };
+                sceneMoveFrom_[a.targetId] = from;
+                sceneMoveTo_[a.targetId]   = { (float)a.x*TS, (float)a.y*TS };
+            } else if (a.type == SA_Effect) {
+                spawnFx(3, a.x*(float)TS, a.y*(float)TS, 0, a.refId, std::max(0.2f, a.time), TS*1.2f*std::max(1,a.radius));
+            } else if (a.type == SA_Motion) {
+                int mo = std::max(0, std::min((int)MO_COUNT-1, a.refId));
+                if (a.targetId == 0) { playMotion_ = mo; motionFrame_ = 0; motionAnim_ = 0; }
+                else if (NpcInst* n = npcByTag(a.targetId)) { n->sceneMotion = mo; n->sceneMotionT = std::max(0.2f, a.time); }
+            }
         }
     }
-    if (advance) { ++sceneStep_; sceneTimer_ = 0; }
+    sceneTimer_ += dt;
+    for (int i = sceneStep_; i < endi; ++i) {       // 각 이동을 자기 time에 맞춰 보간
+        const SceneAction& a = sc->actions[i];
+        if (a.type != SA_MoveChar) continue;
+        float ut = a.time > 0 ? std::min(1.0f, sceneTimer_ / a.time) : 1.0f;
+        Vector2 f = sceneMoveFrom_[a.targetId], t = sceneMoveTo_[a.targetId];
+        float px = f.x + (t.x-f.x)*ut, py = f.y + (t.y-f.y)*ut;
+        int dir = std::fabs(t.x-f.x) > std::fabs(t.y-f.y) ? (t.x >= f.x ? 2 : 1) : (t.y >= f.y ? 0 : 3);
+        if (a.targetId == 0) { pxX_ = px; pxY_ = py; dir_ = dir; moving_ = (ut < 1.0f); if (ut >= 1.0f) { destX_=a.x; destY_=a.y; } }
+        else if (NpcInst* n = npcByTag(a.targetId)) {
+            n->px = px; n->py = py; n->dir = dir; n->moving = (ut < 1.0f);
+            n->animTime += dt; if (n->animTime > 0.12f) { n->animTime = 0; n->frame = (n->frame+1)%4; }
+            if (ut >= 1.0f) { n->x=n->destX=a.x; n->y=n->destY=a.y; n->moving = false; }
+        }
+    }
+    if (sceneTimer_ >= dur) { sceneStep_ = endi; sceneTimer_ = 0; for (auto& n : npcs_) n.moving = false; moving_ = false; }
 }
 
 } // namespace tsukuru

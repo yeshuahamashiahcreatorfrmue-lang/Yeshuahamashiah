@@ -216,6 +216,9 @@ private:
     int sceneRunId_ = -1, sceneStep_ = -1;
     float sceneTimer_ = 0;
     std::unordered_map<int,int> sceneTags_;  // scene tag -> spawned NpcInst eventId marker
+    // concurrent batch playback (연속 이동/이펙트/동작을 동시에 부드럽게 재생)
+    float sceneBatchDur_ = 0;
+    std::unordered_map<int, Vector2> sceneMoveFrom_, sceneMoveTo_;  // tag -> 픽셀 시작/목표
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
 
