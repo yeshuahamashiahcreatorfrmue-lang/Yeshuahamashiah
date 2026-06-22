@@ -252,7 +252,7 @@ void Editor::drawScenarioTab() {
             headerHits.push_back({ hr, g });
             if (y + 22 > ly && y < ly + reg.height) {
                 DrawRectangleRec(hr, selG ? ui::kAccent : (bucket ? Color{40,42,50,255} : ui::kPanelHi));
-                DrawTextU((bucket ? "제목없음" : g).c_str(), (int)lx + 4, (int)y + 4, 12, selG ? BLACK : (bucket ? ui::kTextDim : ui::kAccentHi));
+                DrawTextU((bucket ? "미분류" : g).c_str(), (int)lx + 4, (int)y + 4, 12, selG ? BLACK : (bucket ? ui::kTextDim : ui::kAccentHi));
                 if (scnSceneDragIdx_ >= 0 && scnLpDragging_ && ui::mouseIn(hr)) DrawRectangleLinesEx(hr, 2, WHITE);
                 if (!bucket && ui::mouseIn(hr) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     scnGroupSel_ = g; scnGroupTrigDrag_ = g; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
@@ -292,7 +292,7 @@ void Editor::drawScenarioTab() {
                 if (scnLpDragging_ && scnSceneDragIdx_ < (int)list.size())
                     for (auto& hh : headerHits) if (CheckCollisionPointRec(mp, hh.first)) {
                         list[scnSceneDragIdx_].group = hh.second; p.save();
-                        setStatus(hh.second.empty()?"제목없음으로 이동":("제목 이동: "+hh.second)); break;
+                        setStatus(hh.second.empty()?"미분류로 이동":("제목 이동: "+hh.second)); break;
                     }
                 scnSceneDragIdx_ = -1; scnLpDragging_ = false;
             }
@@ -355,7 +355,7 @@ void Editor::drawScenarioTab() {
     cy += 30;
     // ── 제목(그룹): 이 장면이 속한 제목 + 선택 제목 이름변경/삭제 ──
     {
-        DrawTextU(("제목: " + (sc.group.empty()?std::string("제목없음"):sc.group)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi);
+        DrawTextU(("제목: " + (sc.group.empty()?std::string("미분류"):sc.group)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi);
         cy += 16;
         int gi = -1; for (int i=0;i<(int)db.sceneGroups.size();++i) if (db.sceneGroups[i]==scnGroupSel_) gi=i;
         if (gi >= 0) {
