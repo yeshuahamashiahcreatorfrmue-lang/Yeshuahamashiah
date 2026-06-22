@@ -82,6 +82,13 @@ void GamePlay::applyDialogueAnswer(int idx) {
         case DR_NpcHostile:  spawnTimedNpc(a.npcCharId, (int)NpcFaction::Enemy, a.durationSecs, false); break;
         case DR_NpcFriendly: spawnTimedNpc(a.npcCharId, (int)NpcFaction::Ally,  a.durationSecs, false); break;
         case DR_NpcFollow:   spawnTimedNpc(a.npcCharId, (int)NpcFaction::Ally,  a.durationSecs, true);  break;
+        case DR_Scene:
+            if (a.sceneId >= 0) {                 // 대화에서 시나리오(장면) 시작
+                dlgRunId_ = -1; phase_ = Phase::Field;
+                startScene(a.sceneId);
+                return;
+            }
+            break;
         default: break;
     }
     if (a.dismissFollowers) {   // 대화로 추종 NPC 떠나보내기

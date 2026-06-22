@@ -16,8 +16,9 @@ enum DlgRespType {
     DR_NpcHostile = 3,  // NPC 적대 (시간제한)
     DR_NpcFriendly = 4, // NPC 우호 (시간제한)
     DR_NpcFollow = 5,   // NPC 추종 (시간제한, 대화로 떠나보낼 수 있음)
+    DR_Scene = 6,       // 스토리 시나리오(장면) 시작
 };
-inline const char* const kDlgRespNames[6] = { "없음","보상","몹소환","적대NPC","우호NPC","추종NPC" };
+inline const char* const kDlgRespNames[7] = { "없음","보상","몹소환","적대NPC","우호NPC","추종NPC","시나리오" };
 
 // One selectable answer under a dialogue line.
 struct DialogueAnswer {
@@ -27,6 +28,7 @@ struct DialogueAnswer {
     int   mobId = -1;             // DR_SpawnMob: db.mobs id
     int   npcCharId = -1;         // DR_Npc*: db.mobs/characters id used as the NPC graphic
     float durationSecs = 0;       // 적대/우호/추종 시간제한 (0 = 무제한)
+    int   sceneId = -1;           // DR_Scene: 시작할 시나리오(장면) id
     int   gotoLine = -1;          // 이 대답 뒤 이동할 라인(-1 = 다음 라인/종료)
     bool  dismissFollowers = false; // 추종 NPC를 떠나보냄(대화로 떠나게)
 };

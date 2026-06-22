@@ -113,7 +113,7 @@ void Editor::drawDialogueTab() {
             iy += 28;
             // response type picker
             optionButton({ ix, iy, 150, 24 }, "대응",
-                { kDlgRespNames[0],kDlgRespNames[1],kDlgRespNames[2],kDlgRespNames[3],kDlgRespNames[4],kDlgRespNames[5] },
+                { kDlgRespNames[0],kDlgRespNames[1],kDlgRespNames[2],kDlgRespNames[3],kDlgRespNames[4],kDlgRespNames[5],kDlgRespNames[6] },
                 {}, a.respType, 3000 + i);
             // goto line stepper
             ui::intStepper({ ix + 158, iy, iw - 158, 24 }, "→라인", a.gotoLine, 1, -1, 99); iy += 28;
@@ -132,6 +132,8 @@ void Editor::drawDialogueTab() {
                 iy += 28;
                 if (a.respType == DR_NpcFollow)
                     if (ui::button({ ix, iy, iw, 24 }, a.dismissFollowers ? "추종 해제 대답: 켜짐" : "추종 해제 대답: 꺼짐", a.dismissFollowers)) { a.dismissFollowers = !a.dismissFollowers; p.save(); }
+            } else if (a.respType == DR_Scene) {
+                ui::intStepper({ ix, iy, iw, 24 }, "시나리오ID(시나리오 탭)", a.sceneId, 1, -1, 9999); iy += 28;
             }
         }
         ay += cardH;

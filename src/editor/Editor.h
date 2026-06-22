@@ -194,6 +194,8 @@ private:
     int  wpDragKind_ = -1, wpDragRef_ = -1;
     bool wpDragMoved_ = false;
     Vector2 wpDragStart_{};
+    int  wpLastClickRef_ = -1;        // double-click detection on event markers
+    double wpLastClickTime_ = -10;
     std::vector<int> worldPreviewStack_; // back-stack for entering building interiors
     int  scrollDragAxis_ = 0;         // map-canvas scrollbar drag: 1=horizontal, 2=vertical
     std::unordered_map<int, RenderTexture2D> mapThumbs_;  // map id -> cached thumbnail

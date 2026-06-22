@@ -563,8 +563,8 @@ void Editor::drawWorldPreviewOverlay() {
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 248 });
     auto pm = p.map(worldPreviewMapId_);
-    DrawTextU(TextFormat("미리보기: %s   (아이콘 드래그=이동 · 우클릭=삭제 · 겹친 건 부채꼴로 펼쳐짐 · 빈 곳·X·ESC=닫기)", pm ? pm->name.c_str() : "맵"),
-              20, (int)kToolbarH + 10, 16, ui::kAccent);
+    DrawTextU(TextFormat("미리보기: %s   (더블클릭=대화록 · 드래그=이동 · 우클릭=삭제 · 겹침=부채꼴 · 빈곳·X·ESC=닫기)", pm ? pm->name.c_str() : "맵"),
+              20, (int)kToolbarH + 10, 15, ui::kAccent);
 
     // right-side add/delete edit panel
     const float panelW = 320.0f;
@@ -590,6 +590,23 @@ void Editor::drawWorldPreviewOverlay() {
         Vector2 mouse = GetMousePosition();
         auto t2s = [&](float tx, float ty){ return Vector2{ bx + (tx+0.5f)/mw*pw, by + (ty+0.5f)/mh*ph }; };
         auto s2t = [&](Vector2 s, int& tx, int& ty){ tx = (int)((s.x - bx) / pw * mw); ty = (int)((s.y - by) / ph * mh); };
+        // double-click an NPC/event marker → open (or create+link) its 대화록 in the 대화 탭
+        auto openDialogueFor = [&](Event& e) {
+            Database& db = p.database;
+            if (e.type != EventType::Message) e.type = EventType::Message;
+            if (e.dialogueId < 0 || !db.dialogue(e.dialogueId)) {
+                DialogueScenario d; d.id = (int)db.dialogues.size() + 1;
+                while (db.dialogue(d.id)) ++d.id;
+                d.name = e.label.empty() ? ("대화" + std::to_string(d.id)) : e.label;
+                d.lines.push_back({ e.speakerName, e.text.empty() ? "..." : e.text, {} });
+                db.dialogues.push_back(d);
+                e.dialogueId = d.id;
+            }
+            for (int k = 0; k < (int)db.dialogues.size(); ++k) if (db.dialogues[k].id == e.dialogueId) dlgSel_ = k;
+            dlgLineSel_ = 0; dlgFocus_ = -1; tab_ = Tab::Dialogue;
+            worldPreviewFull_ = false; worldPreviewStack_.clear(); pickerId_ = -1;
+            p.save(); setStatus("이 NPC의 대화록을 엽니다");
+        };
         if (mw > 0 && mh > 0) {
             float r = std::max(5.0f, std::min(pw/mw, ph/mh) * 0.5f);
             bool hitMarker = false;
@@ -670,12 +687,13 @@ void Editor::drawWorldPreviewOverlay() {
                         else if (wpDragRef_ < (int)pm->mobSpawns.size()) { pm->mobSpawns[wpDragRef_].x=tx; pm->mobSpawns[wpDragRef_].y=ty; }
                         p.save(); setStatus(TextFormat("아이콘 이동: (%d,%d)", tx, ty));
                     }
-                } else {                                  // click (no move) → select / navigate
-                    if (wpDragKind_==0) {
-                        for (auto& e : pm->events) if (e.id==wpDragRef_) {
-                            if (e.type==EventType::Teleport && e.targetMap>=0) gotoMap = e.targetMap;
-                            else worldPrevSelEvent_ = e.id;
-                        }
+                } else if (wpDragKind_==0) {              // click (no move) → select / 더블클릭=대화록
+                    bool dbl = (wpLastClickRef_ == wpDragRef_) && (GetTime() - wpLastClickTime_ < 0.40);
+                    wpLastClickRef_ = wpDragRef_; wpLastClickTime_ = GetTime();
+                    for (auto& e : pm->events) if (e.id==wpDragRef_) {
+                        if (dbl) { openDialogueFor(e); break; }
+                        else if (e.type==EventType::Teleport && e.targetMap>=0) gotoMap = e.targetMap;
+                        else worldPrevSelEvent_ = e.id;
                     }
                 }
                 wpDragKind_ = -1; wpDragRef_ = -1; wpDragMoved_ = false; hitMarker = true;

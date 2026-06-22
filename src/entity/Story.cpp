@@ -9,7 +9,7 @@ static json answerToJson(const DialogueAnswer& a) {
             {"rewardGold", a.rewardGold}, {"rewardExp", a.rewardExp},
             {"rewardItemId", a.rewardItemId}, {"rewardItemCount", a.rewardItemCount},
             {"mobId", a.mobId}, {"npcCharId", a.npcCharId}, {"durationSecs", a.durationSecs},
-            {"gotoLine", a.gotoLine}, {"dismissFollowers", a.dismissFollowers}};
+            {"sceneId", a.sceneId}, {"gotoLine", a.gotoLine}, {"dismissFollowers", a.dismissFollowers}};
 }
 static DialogueAnswer answerFromJson(const json& j) {
     DialogueAnswer a;
@@ -19,6 +19,7 @@ static DialogueAnswer answerFromJson(const json& j) {
     a.rewardItemId = j.value("rewardItemId", -1); a.rewardItemCount = j.value("rewardItemCount", 1);
     a.mobId = j.value("mobId", -1); a.npcCharId = j.value("npcCharId", -1);
     a.durationSecs = j.value("durationSecs", 0.0f);
+    a.sceneId = j.value("sceneId", -1);
     a.gotoLine = j.value("gotoLine", -1); a.dismissFollowers = j.value("dismissFollowers", false);
     return a;
 }

@@ -204,6 +204,8 @@ static const ObjPreset kObjPresets[] = {
     { "퀘스트",       EventType::Quest,      false, NpcFaction::Neutral, TriggerType::Autorun,      "목표: " },
     { "엔딩",         EventType::Ending,     false, NpcFaction::Neutral, TriggerType::Autorun,      "" },
     { "회복 지점",    EventType::Heal,       false, NpcFaction::Neutral, TriggerType::ActionButton, "충분히 쉬어 기운을 모두 회복했다!" },
+    { "대화 트리거(밟기)",   EventType::Message, false, NpcFaction::Neutral, TriggerType::PlayerTouch, "" },
+    { "시나리오 트리거(밟기)", EventType::Message, false, NpcFaction::Neutral, TriggerType::PlayerTouch, "" },
 };
 static const int kObjCount = (int)(sizeof(kObjPresets)/sizeof(kObjPresets[0]));
 } // namespace
