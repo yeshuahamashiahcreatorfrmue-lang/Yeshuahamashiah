@@ -74,6 +74,10 @@ private:
     // project (ids are never reused), so this stays valid for the whole session and
     // spares the per-frame fs::path build + lookup in the render loop.
     std::unordered_map<int, std::string> assetPathCache_;
+    // asset id -> texture (resolved once). Saves the per-sprite string hashing +
+    // second map lookup in the render loop; dropped together with the path on
+    // invalidateAsset(). Holds copies of textures owned by textures_ (same GL ids).
+    std::unordered_map<int, Texture2D>   texByIdCache_;
     GameState                state_;
     TextureCache             textures_;
     Audio                    audio_;

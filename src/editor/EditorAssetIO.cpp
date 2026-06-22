@@ -618,7 +618,7 @@ void Editor::efxReplaceFrame(int assetId, int frame, const std::string& src) {
               { x0 + (cellW-dw)/2, (cellH-dh)/2, dw, dh }, WHITE);
     ExportImage(strip, p.assetFullPath(assetId).c_str());
     UnloadImage(strip); UnloadImage(nw);
-    engine_.textures().invalidate(p.assetFullPath(assetId));   // force reload
+    engine_.invalidateAsset(assetId);   // 경로+ID 텍스처 캐시 모두 무효화(즉시 재로딩)   // force reload
     p.save();
     setStatus(TextFormat("이펙트 %d번 프레임 교체됨", frame + 1));
 }
@@ -638,7 +638,7 @@ bool Editor::efxAddFrame(int assetId) {
     ExportImage(wider, p.assetFullPath(assetId).c_str());
     UnloadImage(strip); UnloadImage(wider);
     p.assets.setAnim(assetId, frames+1, ae->fps > 0 ? ae->fps : 12);
-    engine_.textures().invalidate(p.assetFullPath(assetId));
+    engine_.invalidateAsset(assetId);   // 경로+ID 텍스처 캐시 모두 무효화(즉시 재로딩)
     p.save();
     setStatus(TextFormat("프레임 추가됨 (총 %d)", frames+1));
     return true;
@@ -665,7 +665,7 @@ bool Editor::efxRemoveFrame(int assetId, int frame) {
     ExportImage(out, p.assetFullPath(assetId).c_str());
     UnloadImage(strip); UnloadImage(out);
     p.assets.setAnim(assetId, frames-1, ae->fps > 0 ? ae->fps : 12);
-    engine_.textures().invalidate(p.assetFullPath(assetId));
+    engine_.invalidateAsset(assetId);   // 경로+ID 텍스처 캐시 모두 무효화(즉시 재로딩)
     p.save();
     setStatus(TextFormat("프레임 삭제됨 (총 %d)", frames-1));
     return true;

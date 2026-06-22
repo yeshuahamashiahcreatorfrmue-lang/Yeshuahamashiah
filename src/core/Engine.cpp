@@ -17,16 +17,22 @@ Engine::Engine() = default;
 Engine::~Engine() = default;
 
 const Texture2D& Engine::assetTexture(int assetId) {
+    // Fast path: id -> texture (one int-hash lookup, no string hashing).
+    auto ti = texByIdCache_.find(assetId);
+    if (ti != texByIdCache_.end()) return ti->second;
+
     auto it = assetPathCache_.find(assetId);
     if (it == assetPathCache_.end()) {
         std::string path = project_->assetFullPath(assetId);
         if (path.empty()) return textures_.get(path);   // don't cache unresolved ids
         it = assetPathCache_.emplace(assetId, std::move(path)).first;
     }
-    return textures_.get(it->second);
+    const Texture2D& tex = textures_.get(it->second);   // owns/loads the GPU texture
+    return texByIdCache_.emplace(assetId, tex).first->second;  // cache the id->texture copy
 }
 
 void Engine::invalidateAsset(int assetId) {
+    texByIdCache_.erase(assetId);           // drop the id->texture fast-path entry
     auto it = assetPathCache_.find(assetId);
     if (it != assetPathCache_.end()) {
         textures_.invalidate(it->second);   // free the GPU texture
