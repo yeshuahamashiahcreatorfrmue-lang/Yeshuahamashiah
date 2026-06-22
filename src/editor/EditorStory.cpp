@@ -70,16 +70,12 @@ void Editor::drawDialogueTab() {
         bool overPopup = editing && mouse.x > mapX + mapW;
         float r = std::max(11.0f, std::min(pw / mwT, ph / mhT) * 0.7f);
         for (auto& e : m->events) {
-            if (e.graphicAsset < 0) continue;
+            if (e.graphicAsset < 0 && e.charId < 0) continue;   // NPC = 등록 캐릭터 또는 그래픽
             Vector2 sp = { bx + (e.x + 0.5f) / mwT * pw, by + (e.y + 0.5f) / mhT * ph };
             bool sel = (dlgNpcEventId_ == e.id);
-            const Texture2D& tex = engine_.assetTexture(e.graphicAsset);
-            if (tex.id) {
-                float fw = tex.width >= tex.height * 2 ? tex.width / 4.0f : (float)tex.width;
-                float sc = std::min(r * 2 / fw, r * 2 / (float)tex.height);
-                DrawTexturePro(tex, { 0, 0, fw, (float)tex.height },
-                               { sp.x - fw * sc / 2, sp.y - tex.height * sc / 2, fw * sc, tex.height * sc }, { 0, 0 }, 0, WHITE);
-            } else DrawCircleV(sp, r, ui::factionColor((int)e.faction));
+            int spr = eventSpriteAsset(e);
+            if (spr >= 0) drawSpriteCentered(spr, sp, r * 2);    // 실게임처럼 캐릭터 이미지
+            else DrawCircleV(sp, r, ui::factionColor((int)e.faction));
             if (sel) DrawCircleLines((int)sp.x, (int)sp.y, r + 3, ui::kAccentHi);
             bool hot = !overPopup && CheckCollisionPointCircle(mouse, sp, r + 2);
             if (hot) {
@@ -225,7 +221,8 @@ void Editor::drawScenarioTab() {
     // ---- LEFT panel: 맵별로 분할된 장면 목록 (장면 클릭=선택, ▶=재생, 맵 제목=전체재생) ----
     {
         float lx = leftX + 8, lw = leftW - 16, ly = top + 8;
-        DrawTextU("장면 목록 (맵별)", (int)lx, (int)ly, 13, ui::kAccent); ly += 22;
+        DrawTextU("장면 목록 (맵별)", (int)lx, (int)ly, 13, ui::kAccent); ly += 16;
+        DrawTextU("제목을 맵으로 끌면 실행지점 등록", (int)lx, (int)ly, 10, ui::kTextDim); ly += 16;
         Rectangle reg = { leftX, ly, leftW, top + panelH - ly - 8 };
         uiScissor((int)leftX, (int)ly, (int)leftW, (int)reg.height);
         if (ui::mouseIn(reg)) scnListScroll_ -= GetMouseWheelMove() * 28;
@@ -256,7 +253,12 @@ void Editor::drawScenarioTab() {
             y += 26;
             for (int idx : ids) {
                 if (y + 22 > ly && y < ly + reg.height) {
-                    if (ui::button({ lx + 10, y, lw - 50, 22 }, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; }
+                    Rectangle nameR = { lx + 10, y, lw - 50, 22 };
+                    if (ui::button(nameR, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; }
+                    // 제목을 끌어 맵에 실행지점(트리거) 등록: 이 행에서 누르면 드래그 후보로 잡음
+                    if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        scnTitleDrag_ = idx; scnTitleDragStart_ = GetMousePosition(); scnTitleDragging_ = false;
+                    }
                     if (ui::button({ lx + lw - 36, y, 36, 22 }, "▶")) { engine_.startPlaytestScene(list[idx].id); return; }
                 }
                 y += 24;
@@ -556,13 +558,64 @@ void Editor::drawScenarioTab() {
             if (lclick) { for (auto& e2 : m->events) if (e2.sceneId==sc.id && e2.graphicAsset>=0) e2.sceneId=-1; e.sceneId=sc.id; scnTrigMode_=0; p.save(); setStatus("이 NPC와 대화 시 시나리오 발동"); }
         }
     }
-    // trigger point marker (star-ish), draggable
-    if (trigPoint) {
-        Vector2 sp = (scnDragIdx_==-2) ? mouse : t2s((float)trigPoint->x, (float)trigPoint->y);
-        DrawPoly(sp, 5, 9, 0, ui::kGood); DrawPolyLines(sp, 5, 9, 0, WHITE);
-        DrawTextU("발동지점", (int)sp.x+10, (int)sp.y-8, 11, ui::kGood);
-        if (CheckCollisionPointCircle(mouse, t2s((float)trigPoint->x,(float)trigPoint->y), 11) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && scnTrigMode_==0)
-            scnDragIdx_ = -2;
+    // ── 모든 장면의 실행지점(트리거)을 별 아이콘으로 표시 — 클릭/호버하면 제목이 옆에 ──
+    auto sceneName = [&](int sid)->std::string {
+        for (auto& sc2 : db.scenes) if (sc2.id == sid) return sc2.name;
+        return "장면#" + std::to_string(sid);
+    };
+    for (auto& e : m->events) {
+        if (e.sceneId < 0 || e.graphicAsset >= 0 || e.charId >= 0) continue;   // 지점 트리거만(NPC 트리거 제외)
+        bool drag = (scnTrigDragId_ == e.id);
+        Vector2 sp = drag ? mouse : t2s((float)e.x, (float)e.y);
+        bool isCur = (e.sceneId == sc.id);
+        Color col = isCur ? ui::kGood : ui::kAccentHi;
+        DrawPoly(sp, 5, 9, 0, col); DrawPolyLines(sp, 5, 9, 0, WHITE);
+        bool hov = CheckCollisionPointCircle(mouse, t2s((float)e.x,(float)e.y), 11);
+        if (scnTrigSel_ == e.id || hov)
+            DrawTextU(("▶ " + sceneName(e.sceneId)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, col);
+        if (hov && scnTrigMode_==0 && scnDragIdx_<0 && scnTrigDragId_<0) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { scnTrigSel_ = e.id; scnTrigDragId_ = e.id; }
+            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+                int id = e.id;
+                m->events.erase(std::remove_if(m->events.begin(), m->events.end(),
+                                [id](const Event& x){ return x.id==id; }), m->events.end());
+                if (scnTrigSel_==id) scnTrigSel_=-1;
+                p.save(); setStatus("실행지점 삭제됨"); break;
+            }
+        }
+    }
+    // 실행지점 드래그 이동/놓기
+    if (scnTrigDragId_ >= 0) {
+        Event* te = nullptr; for (auto& e : m->events) if (e.id==scnTrigDragId_) te=&e;
+        if (te) { int tx, ty; s2t(tx, ty);
+            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { te->x=tx; te->y=ty; }
+            else { p.save(); scnTrigDragId_=-1; }
+        } else scnTrigDragId_=-1;
+    }
+
+    // ── 좌측 목록에서 끌어온 장면 제목을 맵에 놓아 실행지점(트리거) 등록 ──
+    if (scnTitleDrag_ >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        if (!scnTitleDragging_ &&
+            (std::abs(mouse.x-scnTitleDragStart_.x)+std::abs(mouse.y-scnTitleDragStart_.y) > 6))
+            scnTitleDragging_ = true;
+        if (scnTitleDragging_ && scnTitleDrag_ < (int)list.size()) {
+            if (inMap) { int tx,ty; s2t(tx,ty); Vector2 g=t2s((float)tx,(float)ty);
+                DrawPoly(g,5,9,0,Fade(ui::kGood,0.8f)); DrawCircleLines((int)g.x,(int)g.y,12,WHITE); }
+            std::string nm = "▶ " + list[scnTitleDrag_].name;
+            int twd = MeasureTextU(nm.c_str(),12)+12;
+            DrawRectangle((int)mouse.x+8,(int)mouse.y-10,twd,18,Fade(BLACK,0.85f));
+            DrawTextU(nm.c_str(),(int)mouse.x+12,(int)mouse.y-8,12,ui::kAccentHi);
+        }
+    } else if (scnTitleDrag_ >= 0) {   // 버튼을 뗌 → 드롭 처리
+        if (scnTitleDragging_ && inMap && scnTitleDrag_ < (int)list.size()) {
+            int tx,ty; s2t(tx,ty);
+            Event ne; ne.id = m->nextEventId(); ne.type = EventType::Message; ne.trigger = TriggerType::PlayerTouch;
+            ne.graphicAsset = -1; ne.sceneId = list[scnTitleDrag_].id;
+            ne.label = "[시나리오] " + list[scnTitleDrag_].name; ne.x = tx; ne.y = ty;
+            m->events.push_back(ne); p.save();
+            setStatus("실행지점 등록: " + list[scnTitleDrag_].name);
+        }
+        scnTitleDrag_ = -1; scnTitleDragging_ = false;
     }
 
   if (!scnRecordMode_) {
@@ -585,10 +638,6 @@ void Editor::drawScenarioTab() {
     if (scnDragIdx_ >= 0 && scnDragIdx_ < (int)sc.actions.size()) {
         int tx, ty; s2t(tx, ty);
         if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { sc.actions[scnDragIdx_].x = tx; sc.actions[scnDragIdx_].y = ty; }
-        else { p.save(); scnDragIdx_ = -1; }
-    } else if (scnDragIdx_ == -2 && trigPoint) {
-        int tx, ty; s2t(tx, ty);
-        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { trigPoint->x = tx; trigPoint->y = ty; }
         else { p.save(); scnDragIdx_ = -1; }
     }
 

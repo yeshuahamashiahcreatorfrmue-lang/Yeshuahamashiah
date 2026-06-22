@@ -609,24 +609,25 @@ void Editor::drawWorldPreviewOverlay() {
             bool hitMarker = false;
 
             // 1) collect every marker (event + mob spawn) with its tile
-            struct Mk { int kind; int ref; int x, y; Color col; std::string label; bool entrance; int gotoMap; };
+            struct Mk { int kind; int ref; int x, y; Color col; std::string label; bool entrance; int gotoMap; int spr; };
             std::vector<Mk> mks;
             for (auto& e : pm->events) {
                 bool entrance = (e.type == EventType::Teleport && e.targetMap >= 0);
+                bool isNpc = (e.graphicAsset >= 0 || e.charId >= 0);
                 Color col = entrance ? ui::kGood
                           : e.type == EventType::StartBattle ? ui::kDanger
-                          : e.graphicAsset >= 0 ? ui::factionColor((int)e.faction)
-                                                : Color{240,210,80,255};
+                          : isNpc ? ui::factionColor((int)e.faction)
+                                  : Color{240,210,80,255};
                 const char* tn[] = { "메시지","이동","아이템","스위치","전투","상점","퀘스트","엔딩","회복" };
-                std::string lbl = e.graphicAsset >= 0
-                    ? (e.faction==NpcFaction::Enemy?"몹":e.faction==NpcFaction::Ally?"NPC아군":"NPC")
+                std::string lbl = isNpc
+                    ? (!e.speakerName.empty() ? e.speakerName : e.faction==NpcFaction::Enemy?"몹":e.faction==NpcFaction::Ally?"NPC아군":"NPC")
                     : ((int)e.type>=0 && (int)e.type<9 ? tn[(int)e.type] : "?");
-                mks.push_back({ 0, e.id, e.x, e.y, col, lbl, entrance, entrance ? e.targetMap : -1 });
+                mks.push_back({ 0, e.id, e.x, e.y, col, lbl, entrance, entrance ? e.targetMap : -1, isNpc ? eventSpriteAsset(e) : -1 });
             }
             for (int si = 0; si < (int)pm->mobSpawns.size(); ++si) {
                 auto& s = pm->mobSpawns[si];
                 const CharacterDef* md = p.database.mob(s.mobId);
-                mks.push_back({ 1, si, s.x, s.y, Color{180,90,220,255}, md?md->name:"몹", false, -1 });
+                mks.push_back({ 1, si, s.x, s.y, Color{180,90,220,255}, md?md->name:"몹", false, -1, md?charThumbAsset(*md):-1 });
             }
 
             // 2) per-tile slot/count for fan-out
@@ -644,9 +645,13 @@ void Editor::drawWorldPreviewOverlay() {
             for (int i = 0; i < (int)mks.size(); ++i) {
                 bool isDragged = (wpDragKind_==mks[i].kind && wpDragRef_==mks[i].ref && wpDragMoved_);
                 Vector2 sp = isDragged ? mouse : fannedPos(i);
-                DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
-                DrawCircleV(sp, r, mks[i].col);
-                if (mks[i].kind==1) DrawTextU("M", (int)sp.x-4, (int)sp.y-7, 14, WHITE);
+                if (mks[i].spr >= 0) {            // 실게임처럼 캐릭터/몹 이미지
+                    drawSpriteCentered(mks[i].spr, sp, (r + 2) * 2);
+                } else {
+                    DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
+                    DrawCircleV(sp, r, mks[i].col);
+                    if (mks[i].kind==1) DrawTextU("M", (int)sp.x-4, (int)sp.y-7, 14, WHITE);
+                }
                 if (mks[i].entrance) DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE);
                 if (mks[i].kind==0 && worldPrevSelEvent_==mks[i].ref) DrawCircleLines((int)sp.x,(int)sp.y, r+5, WHITE);
                 if (!isDragged && CheckCollisionPointCircle(mouse, sp, r + 5)) { hitMarker = true; hoverIdx = i;

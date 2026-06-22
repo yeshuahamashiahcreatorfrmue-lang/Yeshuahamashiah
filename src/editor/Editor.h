@@ -84,6 +84,8 @@ public:
     void deleteCharacterDef(int idx);             // remove a registered character + scrub refs
     void applyCharToNpc(int mapId, int eventId, int charId); // NPC에 등록 캐릭터(상하좌우) 적용
     void drawMapElementMarkers(Map& m, float bx, float by, float pw, float ph, bool includeNpc = true); // 미리보기처럼 모든 요소 표시
+    int  eventSpriteAsset(const Event& e);        // 실게임용 대표 스프라이트(등록 캐릭터 정면, 없으면 graphicAsset)
+    void drawSpriteCentered(int assetId, Vector2 c, float sz, Color tint = WHITE); // 4방향 시트→정면 칸, 중앙 정렬
 
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
@@ -214,6 +216,12 @@ private:
     bool  dlgPopupOpen_ = false;     // 대화 탭: NPC 클릭 시 뜨는 편집 팝업 표시
     int   scnTrigMode_ = 0;          // 시나리오 발동지정 모드: 0=없음 1=맵지점 2=NPC대화
     int   scnDragIdx_ = -1;          // 시나리오: 드래그 중인 마커(액션 인덱스, -2=발동지점)
+    // 좌측 장면 목록에서 제목을 끌어 맵에 실행지점(트리거)을 여러 개 등록
+    int   scnTitleDrag_ = -1;        // 끌고 있는 장면 인덱스(-1=없음)
+    Vector2 scnTitleDragStart_{};    // 드래그 시작 좌표(임계값 판정용)
+    bool  scnTitleDragging_ = false; // 임계값을 넘어 실제 드래그 중
+    int   scnTrigSel_ = -1;          // 클릭해 제목을 표시 중인 트리거 event id(-1=없음)
+    int   scnTrigDragId_ = -1;       // 드래그 중인 트리거 event id(-1=없음)
     // ── 장면녹화(RTS식 무대) 상태 ──
     bool  scnRecordMode_ = false;    // 녹화 모드: 무대 토큰을 끌어 배치 → '장면 녹화'로 기록
     int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)
