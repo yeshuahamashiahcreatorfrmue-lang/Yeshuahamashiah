@@ -37,10 +37,14 @@ public:
 
     void onEnter();      // called when switching into play mode
     void update(float dt);
+    void updatePreview(float dt);   // 미리보기 전용: 컷신/대사/연출만 진행
     void draw();
     void beginScene(int id);     // editor 테스트: 플레이 진입 후 이 시나리오 즉시 시작
     void beginDialogue(int id);  // editor 테스트: 플레이 진입 후 이 대화 즉시 시작
     void beginSceneChain(std::vector<int> ids);  // 여러 장면을 차례로 재생(맵 전체재생)
+    // 에디터 장면 미리보기: 플레이 모드로 전환하지 않고 컷신만 재생(입력·전투·HUD 없음).
+    void setPreviewMode(bool v) { previewMode_ = v; }
+    bool sceneFinished() const { return sceneRunId_ < 0 && sceneQueue_.empty(); }
 
 private:
     enum class Phase { Field, Message, Menu, Shop, GameOver, GameClear, Dialogue };
@@ -223,6 +227,7 @@ private:
     std::unordered_map<int, Vector2> sceneMoveFrom_, sceneMoveTo_;  // tag -> 픽셀 시작/목표
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
+    bool  previewMode_ = false;  // 에디터 미리보기 재생 중(입력·전투·HUD 생략)
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

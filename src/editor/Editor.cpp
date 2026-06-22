@@ -198,7 +198,10 @@ void Editor::draw() {
     // input so a click can't fall through to a button behind the dialog.
     // tab content is locked while a dropdown picker (or confirm dialog) is open,
     // so clicks only reach the open overlay.
-    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0 && !charBrowserOpen_;
+    // 장면 미리보기가 떠 있고 마우스가 그 위(또는 확대 모드)면 뒤 탭 입력을 막는다.
+    bool prevModal = engine_.scenePreviewActive() &&
+                     (scnPrevBig_ || CheckCollisionPointRec(GetMousePosition(), scnPrevBox_));
+    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0 && !charBrowserOpen_ && !prevModal;
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
@@ -222,6 +225,7 @@ void Editor::draw() {
     }
 
     ui::g_inputEnabled = true;   // overlays accept input
+    if (engine_.scenePreviewActive()) drawScenePreviewOverlay();
     drawPickerOverlay();
     if (charBrowserOpen_) drawCharBrowser();
     if (confirmOpen_) drawConfirmOverlay();

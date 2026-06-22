@@ -247,7 +247,7 @@ void Editor::drawScenarioTab() {
                 DrawTextU(g.second.c_str(), (int)lx + 4, (int)y + 4, 12, ui::kAccentHi);
                 if (ui::button({ lx + lw - 44, y, 44, 22 }, "▶전체")) {
                     std::vector<int> sids; for (int idx : ids) sids.push_back(list[idx].id);
-                    engine_.startPlaytestScenes(sids); return;
+                    scnPrevBig_ = false; engine_.startScenePreview(sids); EndScissorMode(); return;
                 }
             }
             y += 26;
@@ -259,7 +259,7 @@ void Editor::drawScenarioTab() {
                     if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         scnTitleDrag_ = idx; scnTitleDragStart_ = GetMousePosition(); scnTitleDragging_ = false;
                     }
-                    if (ui::button({ lx + lw - 36, y, 36, 22 }, "▶")) { engine_.startPlaytestScene(list[idx].id); return; }
+                    if (ui::button({ lx + lw - 36, y, 36, 22 }, "▶")) { scnPrevBig_ = false; engine_.startScenePreview({ list[idx].id }); EndScissorMode(); return; }
                 }
                 y += 24;
             }
@@ -813,6 +813,48 @@ void Editor::drawScenarioTab() {
                      : scnTrigMode_==1 ? "발동지점: 맵 빈곳을 클릭" : scnTrigMode_==2 ? "발동 NPC: 맵의 NPC를 클릭"
                      : "마커 드래그=이동 · 빈곳 클릭=배치 · 휠=이펙트 반경";
     DrawTextU(hint, (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kAccentHi);
+}
+
+// ── 장면 미리보기 PiP: 좌측 하단에 작게 재생, 클릭하면 중앙 확대, X로 닫기 ──
+void Editor::drawScenePreviewOverlay() {
+    const Texture2D& tex = engine_.scenePreviewTexture();
+    if (tex.id == 0) return;
+    float W = (float)screenW(), H = (float)screenH();
+    float tw = (float)tex.width, th = (float)tex.height;     // 640×360
+    Rectangle box;
+    if (scnPrevBig_) {                                       // 중앙 큰 화면
+        float bw = W * 0.66f, bh = bw * th / tw;
+        if (bh > H * 0.78f) { bh = H * 0.78f; bw = bh * tw / th; }
+        box = { (W - bw) / 2, (H - bh) / 2 + 6, bw, bh };
+    } else {                                                 // 좌측 하단 작게(크기에 맞게)
+        float bw = std::min(360.0f, W * 0.42f), bh = bw * th / tw;
+        box = { 10, H - bh - 44, bw, bh };
+    }
+    // 제목줄(영역 위) + 외곽 프레임. scnPrevBox_ 는 입력 가림 판정에 쓰이므로 제목줄 포함.
+    Rectangle frame = { box.x - 3, box.y - 26, box.width + 6, box.height + 29 };
+    scnPrevBox_ = frame;
+    if (scnPrevBig_) DrawRectangle(0, 0, (int)W, (int)H, Fade(BLACK, 0.55f));   // 확대 시 뒤 어둡게
+    DrawRectangleRec(frame, Fade(Color{ 10, 12, 18, 255 }, 0.96f));
+    DrawRectangleLinesEx(frame, 2, ui::kAccent);
+    std::string title = "장면 미리보기";
+    if (!engine_.scenePreviewName().empty()) title += " — " + engine_.scenePreviewName();
+    DrawTextU(title.c_str(), (int)box.x + 4, (int)box.y - 22, 14, ui::kAccentHi);
+    // X 닫기
+    if (ui::button({ box.x + box.width - 24, box.y - 25, 22, 22 }, "x")) {
+        engine_.stopScenePreview(); scnPrevBig_ = false; return;
+    }
+    // 장면 화면(상하 반전)
+    DrawTexturePro(tex, { 0, 0, tw, -th }, box, { 0, 0 }, 0, WHITE);
+    DrawRectangleLinesEx(box, 1, Fade(BLACK, 0.6f));
+    // 화면 클릭 → 작게/크게 토글
+    Vector2 m = GetMousePosition();
+    if (CheckCollisionPointRec(m, box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        scnPrevBig_ = !scnPrevBig_;
+    // 안내
+    const char* hint = scnPrevBig_ ? "클릭=작게 · X=닫기" : "클릭=크게 · X=닫기";
+    int hw = MeasureTextU(hint, 11);
+    DrawRectangle((int)box.x + 4, (int)(box.y + box.height - 16), hw + 6, 14, Fade(BLACK, 0.55f));
+    DrawTextU(hint, (int)box.x + 6, (int)(box.y + box.height - 15), 11, Fade(ui::kText, 0.9f));
 }
 
 } // namespace tsukuru

@@ -370,6 +370,22 @@ void GamePlay::drawField() {
     // weather particles
     drawWeather(GetFrameTime());
 
+    // 에디터 미리보기 재생 중에는 미니맵/HUD/버튼/스킬패널을 숨겨 장면만 보이게 한다.
+    if (previewMode_) {
+        if (sceneRunId_ >= 0) {
+            const char* msg = "장면 재생중";
+            int tw = MeasureTextU(msg, 14);
+            DrawRectangle(screenW() - tw - 20, 8, tw + 12, 22, Fade(BLACK, 0.6f));
+            DrawTextU(msg, screenW() - tw - 14, 11, 14, ui::kAccentHi);
+        } else {
+            const char* msg = "재생 완료";
+            int tw = MeasureTextU(msg, 14);
+            DrawRectangle(screenW() - tw - 20, 8, tw + 12, 22, Fade(BLACK, 0.6f));
+            DrawTextU(msg, screenW() - tw - 14, 11, 14, ui::kGood);
+        }
+        return;
+    }
+
     // minimap
     drawMinimap();
 

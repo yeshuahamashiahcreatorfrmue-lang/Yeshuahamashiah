@@ -84,6 +84,7 @@ public:
     void deleteCharacterDef(int idx);             // remove a registered character + scrub refs
     void applyCharToNpc(int mapId, int eventId, int charId); // NPC에 등록 캐릭터(상하좌우) 적용
     void drawMapElementMarkers(Map& m, float bx, float by, float pw, float ph, bool includeNpc = true); // 미리보기처럼 모든 요소 표시
+    void drawScenePreviewOverlay();               // 장면 미리보기 PiP(작은 화면/큰 화면·X 닫기)
     int  eventSpriteAsset(const Event& e);        // 실게임용 대표 스프라이트(등록 캐릭터 정면, 없으면 graphicAsset)
     void drawSpriteCentered(int assetId, Vector2 c, float sz, Color tint = WHITE); // 4방향 시트→정면 칸, 중앙 정렬
 
@@ -222,6 +223,9 @@ private:
     bool  scnTitleDragging_ = false; // 임계값을 넘어 실제 드래그 중
     int   scnTrigSel_ = -1;          // 클릭해 제목을 표시 중인 트리거 event id(-1=없음)
     int   scnTrigDragId_ = -1;       // 드래그 중인 트리거 event id(-1=없음)
+    // 장면 미리보기 PiP(좌측 하단 작은 화면 ↔ 중앙 큰 화면)
+    bool      scnPrevBig_ = false;   // true=중앙 확대, false=좌측 하단 작게
+    Rectangle scnPrevBox_{};         // 현재 미리보기 프레임 영역(입력 가림 판정용)
     // ── 장면녹화(RTS식 무대) 상태 ──
     bool  scnRecordMode_ = false;    // 녹화 모드: 무대 토큰을 끌어 배치 → '장면 녹화'로 기록
     int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)

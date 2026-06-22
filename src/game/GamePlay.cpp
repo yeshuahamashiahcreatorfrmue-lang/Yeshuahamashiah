@@ -189,7 +189,23 @@ void GamePlay::quickLoad() {
     toast_ = "퀵로드 완료 (F12)"; toastTimer_ = 1.6f;
 }
 
+// 에디터 장면 미리보기: 플레이 진입 없이 컷신 스크립트만 진행한다. 필드 입력/전투/
+// 인카운터/저장은 돌리지 않고, 연출(이동·이펙트·동작·대사)과 비주얼만 틱시킨다.
+void GamePlay::updatePreview(float dt) {
+    plat::setImeEnabled(false);
+    if (toastTimer_ > 0) toastTimer_ -= dt;
+    if (areaBannerT_ > 0) areaBannerT_ -= dt;
+    for (auto& n : npcs_) if (n.lifeTimer > 0) n.lifeTimer -= dt;
+    updateScene(dt);                 // 컷신(및 체인) 진행
+    updateMotion(dt);
+    updateProjectiles(dt);
+    updateFx(dt);
+    updateNpcs(dt);
+    if (phase_ == Phase::Dialogue) updateDialogue();   // 장면 내 대사 진행
+}
+
 void GamePlay::update(float dt) {
+    if (previewMode_) { updatePreview(dt); return; }
     // IME on only while typing chat, off otherwise so WASD/keys always register
     // even if the input language is Korean.
     plat::setImeEnabled(chatOpen_);

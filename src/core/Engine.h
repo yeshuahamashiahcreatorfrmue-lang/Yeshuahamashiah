@@ -44,6 +44,14 @@ public:
     void startPlaytestScenes(const std::vector<int>& sceneIds);  // 맵 전체재생(여러 장면 연속)
     void startPlaytestDialogue(int dialogueId, int mapId, int x, int y); // "▶ 대화 테스트"
 
+    // 에디터 장면 미리보기: 플레이 모드로 전환하지 않고 컷신을 오프스크린 텍스처에 렌더.
+    // 에디터가 작은(좌측 하단)/큰(중앙) 화면으로 그 텍스처를 띄운다.
+    void startScenePreview(const std::vector<int>& sceneIds);
+    void stopScenePreview();
+    bool scenePreviewActive() const { return scenePreview_; }
+    const Texture2D& scenePreviewTexture() const { return scenePreviewRT_.texture; }
+    const std::string& scenePreviewName() const { return scenePreviewName_; }
+
     Project&      project()  { return *project_; }
     GameState&    state()    { return state_; }
     TextureCache& textures() { return textures_; }
@@ -85,6 +93,12 @@ private:
     RenderTexture2D frameRT_{};
     int  rtW_ = 0, rtH_ = 0;
     void drawUiScaleBar();   // bottom-centre zoom control (drawn in logical space)
+
+    // 장면 미리보기(에디터): 컷신을 별도 RT에 렌더해 에디터가 PiP로 보여준다.
+    bool            scenePreview_ = false;
+    RenderTexture2D scenePreviewRT_{};
+    std::string     scenePreviewName_;
+    void renderScenePreview();   // play_->draw()를 scenePreviewRT_에 렌더(메인 프레임 전에 호출)
 };
 
 } // namespace tsukuru

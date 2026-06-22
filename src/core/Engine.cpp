@@ -82,6 +82,52 @@ void Engine::startPlaytestScenes(const std::vector<int>& sceneIds) {
     if (play_) play_->beginSceneChain(sceneIds);
 }
 
+// 에디터 장면 미리보기 시작: 플레이 모드로 전환하지 않고 컷신만 재생하도록 play_를
+// 준비한다(setPreviewMode→onEnter→beginScene/Chain). 렌더는 renderScenePreview()가 담당.
+void Engine::startScenePreview(const std::vector<int>& sceneIds) {
+    if (sceneIds.empty() || !play_) return;
+    int mapId = project_->startMap;
+    scenePreviewName_.clear();
+    for (const auto& s : project_->database.scenes) {
+        if (s.id == sceneIds[0]) { if (s.editMapId >= 0) mapId = s.editMapId; scenePreviewName_ = s.name; }
+    }
+    if (sceneIds.size() > 1) scenePreviewName_ += TextFormat(" 외 %d개", (int)sceneIds.size()-1);
+    state_.newGame(project_->database, project_->startActor, project_->playerCharId,
+                   project_->startMap, project_->startX, project_->startY,
+                   project_->startGold, project_->startItems);
+    state_.currentMap = mapId; state_.playerX = project_->startX; state_.playerY = project_->startY;
+    play_->setPreviewMode(true);
+    play_->onEnter();                 // 맵 로드(미리보기 모드)
+    if (sceneIds.size() == 1) play_->beginScene(sceneIds[0]);
+    else play_->beginSceneChain(sceneIds);
+    scenePreview_ = true;
+}
+
+void Engine::stopScenePreview() {
+    scenePreview_ = false;
+    if (play_) play_->setPreviewMode(false);
+}
+
+// Render the running scene into scenePreviewRT_ at a fixed 640×360. Called from
+// update() (before the main frame RT is bound) so the BeginTextureMode isn't nested.
+void Engine::renderScenePreview() {
+    if (!scenePreview_ || !play_) return;
+    if (scenePreviewRT_.id == 0) {
+        scenePreviewRT_ = LoadRenderTexture(640, 360);
+        SetTextureFilter(scenePreviewRT_.texture, TEXTURE_FILTER_BILINEAR);
+    }
+    int savedW = screenW(), savedH = screenH();
+    float scl = uiScale();
+    setLogicalScreen(std::max(320, (int)(640 / scl)), std::max(180, (int)(360 / scl)));
+    BeginTextureMode(scenePreviewRT_);
+    ClearBackground(Color{ 12, 14, 20, 255 });
+    uiBeginScaled();
+    play_->draw();
+    uiEndScaled();
+    EndTextureMode();
+    setLogicalScreen(savedW, savedH);
+}
+
 // Editor 테스트: jump into play near the NPC and run the dialogue now.
 void Engine::startPlaytestDialogue(int dialogueId, int mapId, int x, int y) {
     state_.newGame(project_->database, project_->startActor, project_->playerCharId,
@@ -126,6 +172,9 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
         setMode(startMode_);
     }
     if (const char* ts = getenv("TSUKURU_TESTSCENE")) startPlaytestScene(atoi(ts));   // debug: run a scene
+    if (const char* sp = getenv("TSUKURU_PREVIEW")) {                                  // debug: 에디터 장면 미리보기
+        setMode(Mode::Editor); startScenePreview({ atoi(sp) });
+    }
 
     int frame = 0;
     while (!WindowShouldClose() && !quit_) {
@@ -180,6 +229,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
         if (maxFrames > 0 && frame >= maxFrames) break;
     }
     if (frameRT_.id) UnloadRenderTexture(frameRT_);
+    if (scenePreviewRT_.id) UnloadRenderTexture(scenePreviewRT_);
 
     audio_.shutdown();
     textures_.clear();
@@ -228,6 +278,11 @@ void Engine::update(float dt) {
         case Mode::Editor: editor_->update(dt); break;
         case Mode::Title:  title_->update(dt);  break;
         case Mode::Play:   play_->update(dt);   break;
+    }
+    // 에디터 장면 미리보기: 컷신을 진행시키고 오프스크린 RT에 렌더(메인 프레임 RT 바인딩 전).
+    if (mode_ == Mode::Editor && scenePreview_ && play_) {
+        play_->update(dt);
+        renderScenePreview();
     }
 }
 
