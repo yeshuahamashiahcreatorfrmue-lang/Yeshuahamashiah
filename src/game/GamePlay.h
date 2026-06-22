@@ -231,6 +231,7 @@ private:
     bool  helpOpen_ = false;     // F1: controls help overlay
     bool  previewMode_ = false;  // 에디터 미리보기 재생 중(입력·전투·HUD 생략)
     bool  previewInteractive_ = false; // 확대 미리보기: 전체 업데이트(키 조작·HUD 허용)
+    float previewDlgT_ = 0;      // 자동 미리보기: 대사 자동진행 타이머(입력 없이 영상처럼 재생)
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

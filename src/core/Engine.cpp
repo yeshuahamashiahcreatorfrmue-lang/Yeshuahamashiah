@@ -101,7 +101,13 @@ void Engine::startScenePreview(const std::vector<int>& sceneIds) {
     state_.newGame(project_->database, project_->startActor, project_->playerCharId,
                    project_->startMap, project_->startX, project_->startY,
                    project_->startGold, project_->startItems);
-    state_.currentMap = mapId; state_.playerX = project_->startX; state_.playerY = project_->startY;
+    state_.currentMap = mapId;
+    // 에디터 시나리오 편집과 동일하게 플레이어(태그0)를 그 맵 중앙에서 시작시킨다
+    // (에디터의 stage[0]=맵 중앙과 일치 → 장면이 편집한 그대로 재생됨).
+    if (auto m = project_->map(mapId)) {
+        state_.playerX = m->tilemap.width() / 2;
+        state_.playerY = m->tilemap.height() / 2;
+    } else { state_.playerX = project_->startX; state_.playerY = project_->startY; }
     play_->setPreviewMode(true);
     play_->setPreviewInteractive(false);   // 시작은 작은(자동) 미리보기
     play_->onEnter();                 // 맵 로드(미리보기 모드)

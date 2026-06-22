@@ -49,6 +49,7 @@ void GamePlay::onEnter() {
     moving_ = false;
     phase_ = Phase::Field;
     chatOpen_ = false; chatInput_.clear();   // 진입 시 채팅 입력 상태 초기화(미리보기 닫기 막힘 방지)
+    previewDlgT_ = 0;                         // 미리보기 대사 자동진행 타이머 초기화
     attackTimer_ = playerHurt_ = 0;
     for (float& c : skillCd_) c = 0;
     playMotion_ = MO_Walk; motionFrame_ = 0; motionAnim_ = motionTimer_ = dyingTimer_ = 0;
@@ -197,12 +198,23 @@ void GamePlay::updatePreview(float dt) {
     if (toastTimer_ > 0) toastTimer_ -= dt;
     if (areaBannerT_ > 0) areaBannerT_ -= dt;
     for (auto& n : npcs_) if (n.lifeTimer > 0) n.lifeTimer -= dt;
-    updateScene(dt);                 // 컷신(및 체인) 진행
+    // 대사창이 뜨면 입력이 없어 멈추므로, 자동 미리보기에서는 대사를 타이머로 진행한다
+    // (영상처럼 흐름이 이어짐). 선택지는 첫 번째를 자동 선택. updateScene 전에 처리해
+    // 대사가 끝나면 같은 프레임에 장면이 이어서 재생된다.
+    if (phase_ == Phase::Dialogue) {
+        previewDlgT_ += dt;
+        if (previewDlgT_ >= 1.5f) {
+            previewDlgT_ = 0;
+            // 미리보기는 대사를 '순서대로' 끝까지 보여주고 종료한다. 선택지의 보상/장면분기
+            // 같은 부작용은 일으키지 않아(자동 미리보기에서 무한 분기/루프 방지) 영상처럼 흐름.
+            ++dlgRunLine_; showDialogueLine();
+        }
+    } else previewDlgT_ = 0;
+    updateScene(dt);                 // 컷신(및 체인) 진행 (대사 중이면 내부에서 대기)
     updateMotion(dt);
     updateProjectiles(dt);
     updateFx(dt);
     updateNpcs(dt);
-    if (phase_ == Phase::Dialogue) updateDialogue();   // 장면 내 대사 진행
 }
 
 void GamePlay::update(float dt) {
