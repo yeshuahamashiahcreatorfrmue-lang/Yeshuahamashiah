@@ -190,6 +190,10 @@ private:
     int  worldPreviewMapId_ = -1;     // map currently shown in the overlay (navigable)
     int  worldPrevSelEvent_ = -1;     // event whose info box is shown in the overlay
     int  prevMobToPlace_ = -1;        // mob id armed for click-to-place on the preview map
+    // preview marker drag (move icons like desktop files): kind 0=event,1=mobspawn
+    int  wpDragKind_ = -1, wpDragRef_ = -1;
+    bool wpDragMoved_ = false;
+    Vector2 wpDragStart_{};
     std::vector<int> worldPreviewStack_; // back-stack for entering building interiors
     int  scrollDragAxis_ = 0;         // map-canvas scrollbar drag: 1=horizontal, 2=vertical
     std::unordered_map<int, RenderTexture2D> mapThumbs_;  // map id -> cached thumbnail

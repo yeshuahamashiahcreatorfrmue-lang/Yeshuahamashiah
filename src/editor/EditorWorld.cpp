@@ -563,8 +563,8 @@ void Editor::drawWorldPreviewOverlay() {
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Color{ 10, 11, 16, 248 });
     auto pm = p.map(worldPreviewMapId_);
-    DrawTextU(TextFormat("미리보기: %s   (빈 곳·X·ESC = 닫기)", pm ? pm->name.c_str() : "맵"),
-              20, (int)kToolbarH + 10, 18, ui::kAccent);
+    DrawTextU(TextFormat("미리보기: %s   (아이콘 드래그=이동 · 우클릭=삭제 · 겹친 건 부채꼴로 펼쳐짐 · 빈 곳·X·ESC=닫기)", pm ? pm->name.c_str() : "맵"),
+              20, (int)kToolbarH + 10, 16, ui::kAccent);
 
     // right-side add/delete edit panel
     const float panelW = 320.0f;
@@ -583,50 +583,108 @@ void Editor::drawWorldPreviewOverlay() {
         DrawTexturePro(worldBigThumb_.texture, { 0,0,tw,-th }, imgR, {0,0}, 0, WHITE);
         DrawRectangleLinesEx({ bx-3,by-3,pw+6,ph+6 }, 1, Fade(BLACK, 0.6f));
 
-        // ---- markers: events (NPC/입구/몹/이벤트) + zone gates (동서남북) ----
+        // ---- markers: events + mob spawns, with OVERLAP FAN-OUT so icons sharing
+        //      a tile spread into a ring; drag to move (like desktop files),
+        //      right-click to delete. ----
         int mw = pm->tilemap.width(), mh = pm->tilemap.height();
         Vector2 mouse = GetMousePosition();
         auto t2s = [&](float tx, float ty){ return Vector2{ bx + (tx+0.5f)/mw*pw, by + (ty+0.5f)/mh*ph }; };
+        auto s2t = [&](Vector2 s, int& tx, int& ty){ tx = (int)((s.x - bx) / pw * mw); ty = (int)((s.y - by) / ph * mh); };
         if (mw > 0 && mh > 0) {
             float r = std::max(5.0f, std::min(pw/mw, ph/mh) * 0.5f);
             bool hitMarker = false;
+
+            // 1) collect every marker (event + mob spawn) with its tile
+            struct Mk { int kind; int ref; int x, y; Color col; std::string label; bool entrance; int gotoMap; };
+            std::vector<Mk> mks;
             for (auto& e : pm->events) {
-                Vector2 sp = t2s((float)e.x, (float)e.y);
                 bool entrance = (e.type == EventType::Teleport && e.targetMap >= 0);
                 Color col = entrance ? ui::kGood
                           : e.type == EventType::StartBattle ? ui::kDanger
                           : e.graphicAsset >= 0 ? ui::factionColor((int)e.faction)
                                                 : Color{240,210,80,255};
-                DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
-                DrawCircleV(sp, r, col);
-                if (entrance) DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE); // 입구
-                if (worldPrevSelEvent_ == e.id) DrawCircleLines((int)sp.x, (int)sp.y, r + 5, WHITE);
-                if (CheckCollisionPointCircle(mouse, sp, r + 5)) {
-                    hitMarker = true;
-                    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        if (entrance) gotoMap = e.targetMap;                 // 건물 입구 → 내부로 이동
-                        else worldPrevSelEvent_ = e.id;                      // 그 외 → 정보 표시
-                    }
-                }
+                const char* tn[] = { "메시지","이동","아이템","스위치","전투","상점","퀘스트","엔딩","회복" };
+                std::string lbl = e.graphicAsset >= 0
+                    ? (e.faction==NpcFaction::Enemy?"몹":e.faction==NpcFaction::Ally?"NPC아군":"NPC")
+                    : ((int)e.type>=0 && (int)e.type<9 ? tn[(int)e.type] : "?");
+                mks.push_back({ 0, e.id, e.x, e.y, col, lbl, entrance, entrance ? e.targetMap : -1 });
             }
-            // ---- mob spawn markers (몹 등장 위치): purple 'M', click=삭제 ----
             for (int si = 0; si < (int)pm->mobSpawns.size(); ++si) {
                 auto& s = pm->mobSpawns[si];
-                Vector2 sp = t2s((float)s.x, (float)s.y);
+                const CharacterDef* md = p.database.mob(s.mobId);
+                mks.push_back({ 1, si, s.x, s.y, Color{180,90,220,255}, md?md->name:"몹", false, -1 });
+            }
+
+            // 2) per-tile slot/count for fan-out
+            auto fannedPos = [&](int i)->Vector2 {
+                int cnt = 0, slot = 0;
+                for (int j = 0; j < (int)mks.size(); ++j) if (mks[j].x==mks[i].x && mks[j].y==mks[i].y) { if (j<i) ++slot; ++cnt; }
+                Vector2 c = t2s((float)mks[i].x, (float)mks[i].y);
+                if (cnt <= 1) return c;
+                float ang = (2.0f*PI*slot)/cnt, rad = r*1.35f;
+                return { c.x + cosf(ang)*rad, c.y + sinf(ang)*rad };
+            };
+
+            // 3) draw + hit-test each marker
+            int hoverIdx = -1;
+            for (int i = 0; i < (int)mks.size(); ++i) {
+                bool isDragged = (wpDragKind_==mks[i].kind && wpDragRef_==mks[i].ref && wpDragMoved_);
+                Vector2 sp = isDragged ? mouse : fannedPos(i);
                 DrawCircleV(sp, r + 2, Fade(BLACK, 0.7f));
-                DrawCircleV(sp, r, Color{ 180, 90, 220, 255 });
-                DrawTextU("M", (int)sp.x - 4, (int)sp.y - 7, 14, WHITE);
-                if (CheckCollisionPointCircle(mouse, sp, r + 5)) {
-                    hitMarker = true;
-                    const CharacterDef* md = p.database.mob(s.mobId);
-                    DrawTextU(md ? md->name.c_str() : "몹", (int)sp.x + 10, (int)sp.y - 8, 14, WHITE);
-                    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) { pm->mobSpawns.erase(pm->mobSpawns.begin()+si); p.save(); setStatus("몹 등장지점 삭제"); break; }
+                DrawCircleV(sp, r, mks[i].col);
+                if (mks[i].kind==1) DrawTextU("M", (int)sp.x-4, (int)sp.y-7, 14, WHITE);
+                if (mks[i].entrance) DrawRectangleLinesEx({ sp.x-r-3, sp.y-r-3, (r+3)*2, (r+3)*2 }, 2, WHITE);
+                if (mks[i].kind==0 && worldPrevSelEvent_==mks[i].ref) DrawCircleLines((int)sp.x,(int)sp.y, r+5, WHITE);
+                if (!isDragged && CheckCollisionPointCircle(mouse, sp, r + 5)) { hitMarker = true; hoverIdx = i;
+                    DrawTextU(mks[i].label.c_str(), (int)sp.x+10, (int)sp.y-8, 14, WHITE);
                 }
             }
+
+            // 4) interactions: left-press = arm drag/select; right-press = delete
+            if (hoverIdx >= 0 && wpDragKind_ < 0) {
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    wpDragKind_ = mks[hoverIdx].kind; wpDragRef_ = mks[hoverIdx].ref;
+                    wpDragStart_ = mouse; wpDragMoved_ = false;
+                }
+                if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+                    if (mks[hoverIdx].kind==0) {
+                        int id = mks[hoverIdx].ref;
+                        pm->events.erase(std::remove_if(pm->events.begin(), pm->events.end(),
+                                         [id](const Event& e){ return e.id==id; }), pm->events.end());
+                        if (worldPrevSelEvent_==id) worldPrevSelEvent_=-1;
+                    } else {
+                        pm->mobSpawns.erase(pm->mobSpawns.begin()+mks[hoverIdx].ref);
+                    }
+                    p.save(); setStatus("아이콘 삭제됨"); hitMarker = true;
+                }
+            }
+            // 5) drag move + release
+            if (wpDragKind_ >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                if (std::abs(mouse.x-wpDragStart_.x)+std::abs(mouse.y-wpDragStart_.y) > 5) wpDragMoved_ = true;
+            }
+            if (wpDragKind_ >= 0 && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                if (wpDragMoved_) {                       // dropped → snap to the tile under the cursor
+                    int tx, ty; s2t(mouse, tx, ty);
+                    if (tx>=0 && ty>=0 && tx<mw && ty<mh) {
+                        if (wpDragKind_==0) { for (auto& e : pm->events) if (e.id==wpDragRef_) { e.x=tx; e.y=ty; } }
+                        else if (wpDragRef_ < (int)pm->mobSpawns.size()) { pm->mobSpawns[wpDragRef_].x=tx; pm->mobSpawns[wpDragRef_].y=ty; }
+                        p.save(); setStatus(TextFormat("아이콘 이동: (%d,%d)", tx, ty));
+                    }
+                } else {                                  // click (no move) → select / navigate
+                    if (wpDragKind_==0) {
+                        for (auto& e : pm->events) if (e.id==wpDragRef_) {
+                            if (e.type==EventType::Teleport && e.targetMap>=0) gotoMap = e.targetMap;
+                            else worldPrevSelEvent_ = e.id;
+                        }
+                    }
+                }
+                wpDragKind_ = -1; wpDragRef_ = -1; wpDragMoved_ = false; hitMarker = true;
+            }
+
             // ---- click empty cell to PLACE the selected mob spawn ----
-            if (prevMobToPlace_ >= 0 && CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                int tx = (int)((mouse.x - bx) / pw * mw);
-                int ty = (int)((mouse.y - by) / ph * mh);
+            if (prevMobToPlace_ >= 0 && !hitMarker && wpDragKind_ < 0 &&
+                CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                int tx, ty; s2t(mouse, tx, ty);
                 if (tx >= 0 && ty >= 0 && tx < mw && ty < mh) {
                     pm->mobSpawns.push_back({ prevMobToPlace_, tx, ty });
                     p.save(); setStatus(TextFormat("몹 등장지점 배치: (%d,%d)", tx, ty));
@@ -656,7 +714,7 @@ void Editor::drawWorldPreviewOverlay() {
                     }
                 }
             }
-            if (!hitMarker && CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            if (!hitMarker && wpDragKind_ < 0 && CheckCollisionPointRec(mouse, imgR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
                 worldPrevSelEvent_ = -1;                                     // empty click clears info
         }
         // ---- info box for the selected (non-navigating) marker ----
@@ -681,7 +739,8 @@ void Editor::drawWorldPreviewOverlay() {
         auto chip = [&](Color c, const char* t){ DrawCircle((int)lx+6,(int)ly+8,6,c); DrawTextU(t,(int)lx+16,(int)ly+1,13,ui::kText); lx += 18 + MeasureTextU(t,13) + 16; };
         chip(ui::kGood, "건물입구(클릭=내부)"); chip(Color{90,210,230,255}, "존통로(클릭=이동)");
         chip(ui::factionColor(0), "NPC"); chip(ui::factionColor(2), "적/몹"); chip(Color{240,210,80,255}, "이벤트");
-        chip(Color{180,90,220,255}, "몹 등장지점(우클릭=삭제)");
+        chip(Color{180,90,220,255}, "몹 등장지점");
+        DrawTextU("아이콘: 드래그=이동 · 우클릭=삭제", (int)bx, (int)(ly+18), 12, ui::kTextDim);
     } else {
         DrawTextU("미리보기 생성 중…", (int)((sw - panelW)/2 - 70), sh/2, 18, ui::kTextDim);
     }

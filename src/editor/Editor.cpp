@@ -59,6 +59,10 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         worldPreviewMapId_ = pp.maps.empty() ? -1 : pp.maps.front()->id;
         for (int i = 0; i < (int)pp.maps.size(); ++i)   // prefer a placed map (shows zone gates)
             if (pp.maps[i]->placed) { worldSelected_ = i; worldPreviewMapId_ = pp.maps[i]->id; break; }
+        if (getenv("TSUKURU_OVERLAP")) {                 // debug: pile markers on one tile
+            if (auto m = pp.map(worldPreviewMapId_))
+                for (int k = 0; k < 5; ++k) m->mobSpawns.push_back({ 1, 12, 9 });
+        }
     }
 }
 
