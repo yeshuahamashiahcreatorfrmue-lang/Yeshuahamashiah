@@ -277,7 +277,7 @@ void Editor::drawScenarioTab() {
         Scene s; s.id = (int)list.size()+1; s.name = "장면" + std::to_string(s.id);
         for (auto& mm : p.maps) if (mm->placed) { s.editMapId = mm->id; break; }
         if (s.editMapId < 0 && !p.maps.empty()) s.editMapId = p.maps.front()->id;
-        list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; p.save();
+        list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; scnObjSel_ = -1; scnAwaitDest_ = false; p.save();
     };
     if (!list.empty()) {
         if (scnSel_ < 0 || scnSel_ >= (int)list.size()) scnSel_ = 0;
@@ -317,7 +317,7 @@ void Editor::drawScenarioTab() {
         Rectangle nf = { cx, cy, cw - 56, 24 };
         if (ui::mouseIn(nf) && lclick) scnFocus_ = 0; else if (lclick && !ui::mouseIn(nf) && scnFocus_ == 0) scnFocus_ = -1;
         ui::textField(nf, sc.name, scnFocus_ == 0, 40);
-        if (ui::button({ cx + cw - 50, cy, 50, 24 }, "삭제")) { list.erase(list.begin()+scnSel_); scnSel_=-1; scnActSel_=-1; p.save(); return; }
+        if (ui::button({ cx + cw - 50, cy, 50, 24 }, "삭제")) { list.erase(list.begin()+scnSel_); scnSel_=-1; scnActSel_=-1; scnObjSel_=-1; scnAwaitDest_=false; p.save(); return; }
     }
     cy += 30;
     // resolve a spawn's entity name (refId>=0 → 몹, refId<=-2 → 등록 캐릭터)
@@ -404,16 +404,64 @@ void Editor::drawScenarioTab() {
         DrawLine((int)cx, (int)cy, (int)(cx+cw), (int)cy, ui::kPanelHi); cy += 6;
     } else { scnDraft_.clear(); scnPendingFx_.clear(); }
 
-    // add-action toolbar (7 types) — appends + selects
-    DrawTextU("동작 추가:", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
-    for (int t = 0; t < 7; ++t) {
-        Rectangle b = { cx + (t%3)*(cw/3), cy + (t/3)*28, cw/3 - 4, 26 };
-        if (ui::button(b, std::string("+") + kSceneActNames[t])) {
-            SceneAction na; na.type = t; na.time = 1.0f;
-            sc.actions.push_back(na); scnActSel_ = (int)sc.actions.size()-1; p.save();
-        }
+    // ── 선택 캐릭터(객체) 표시 + 그 캐릭터에 적용되는 명령 7버튼 ──
+    if (scnObjSel_ >= 0 && !stage.count(scnObjSel_)) { scnObjSel_ = -1; scnAwaitDest_ = false; } // 사라진 대상 해제
+    {
+        std::string who = scnObjSel_ < 0 ? "(없음 — 지도에서 캐릭터 클릭)"
+                        : scnObjSel_ == 0 ? "플레이어(0)" : spawnTagLabel(scnObjSel_);
+        DrawTextU(("선택 캐릭터: " + who).c_str(), (int)cx, (int)cy, 12, scnObjSel_<0?ui::kTextDim:ui::kAccentHi);
+        cy += 18;
     }
-    cy += 88;
+    auto addAct = [&](SceneAction na){ sc.actions.push_back(na); scnActSel_ = (int)sc.actions.size()-1; p.save(); };
+    int tgt = scnObjSel_ < 0 ? 0 : scnObjSel_;   // 미선택 시 플레이어(0) 기본
+    DrawTextU("명령 추가 (선택 캐릭터에 적용):", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
+    // 1행: 이동 / 동작 / 제거
+    if (ui::button({ cx, cy, cw/3-4, 26 }, "+이동", scnAwaitDest_)) {
+        SceneAction na; na.type=SA_MoveChar; na.targetId=tgt; na.time=1.0f;
+        if (stage.count(tgt)) { na.x=(int)stage[tgt].x; na.y=(int)stage[tgt].y; }
+        addAct(na); scnAwaitDest_=true;
+        setStatus(scnObjSel_<0?"대상 미선택 → 플레이어 이동: 목적지 클릭":"이동: 지도에서 목적지 클릭");
+    }
+    if (ui::button({ cx+cw/3, cy, cw/3-4, 26 }, "+동작")) {
+        SceneAction na; na.type=SA_Motion; na.targetId=tgt; na.refId=MO_Attack; na.time=0.8f;
+        addAct(na); setStatus("동작 추가 — 오른쪽에서 동작(공격/죽음 등) 선택");
+    }
+    if (ui::button({ cx+2*cw/3, cy, cw/3-4, 26 }, "+제거")) {
+        if (tgt<=0) setStatus("플레이어는 제거 불가 · 등장 캐릭터를 먼저 선택");
+        else { SceneAction na; na.type=SA_Remove; na.targetId=tgt; na.removeTags={tgt}; addAct(na); scnObjSel_=-1; setStatus("제거 추가됨"); }
+    }
+    cy += 30;
+    // 2행: 이펙트 / 대화 / 대기
+    if (ui::button({ cx, cy, cw/3-4, 26 }, "+이펙트", scnAwaitDest_)) {
+        SceneAction na; na.type=SA_Effect; na.refId=scnRecEffect_; na.radius=1; na.time=0.8f;
+        if (scnObjSel_>=0 && stage.count(scnObjSel_)) { na.x=(int)stage[scnObjSel_].x; na.y=(int)stage[scnObjSel_].y; }
+        addAct(na); scnAwaitDest_=true; setStatus("이펙트 추가 — 지도 클릭=위치, 휠=반경");
+    }
+    if (ui::button({ cx+cw/3, cy, cw/3-4, 26 }, "+대화")) {
+        SceneAction na; na.type=SA_Dialogue; na.time=0.0f; addAct(na);
+        setStatus("대화 추가 — 오른쪽 '대화 편집'으로 대사 작성");
+    }
+    if (ui::button({ cx+2*cw/3, cy, cw/3-4, 26 }, "+대기")) {
+        SceneAction na; na.type=SA_Wait; na.time=0.5f; addAct(na); setStatus("대기 추가");
+    }
+    cy += 30;
+    // 3행: 캐릭터 등장 (등록 캐릭터/몹 브라우저에서 고른 뒤 자동 선택)
+    if (ui::button({ cx, cy, cw, 26 }, "+ 캐릭터 등장 (등록 캐릭터에서)")) {
+        openCharBrowser([this](int cid){
+            if (cid < 0) return;
+            Project& pr = engine_.project(); Database& d2 = pr.database;
+            if (scnSel_ < 0 || scnSel_ >= (int)d2.scenes.size()) return;
+            Scene& s2 = d2.scenes[scnSel_];
+            int tag = 1; for (auto& a : s2.actions) if (a.type==SA_Spawn && a.targetId>=tag) tag = a.targetId+1;
+            auto mp = pr.map(s2.editMapId);
+            int mx = mp ? mp->tilemap.width()/2 : 0, my = mp ? mp->tilemap.height()/2 : 0;
+            SceneAction na; na.type=SA_Spawn; na.targetId=tag; na.refId=-cid-1; na.x=mx; na.y=my;
+            s2.actions.push_back(na); pr.save();
+            scnObjSel_=tag; scnActSel_=(int)s2.actions.size()-1; scnAwaitDest_=true;
+            setStatus("캐릭터 등장 추가 — 지도에서 위치 클릭");
+        });
+    }
+    cy += 34;
     // action sequence chips (numbered) — click to select, reorder, delete
     DrawTextU(TextFormat("동작 순서 (%d) — 선택 후 맵에서 편집", (int)sc.actions.size()), (int)cx, (int)cy, 12, ui::kAccentHi); cy += 18;
     Rectangle chreg = { cx, cy, cw, 96 };
@@ -425,7 +473,11 @@ void Editor::drawScenarioTab() {
         if (chy + 24 > cy && chy < cy + chreg.height) {
             SceneAction& a = sc.actions[i];
             std::string lbl = std::to_string(i+1) + ". " + kSceneActNames[std::max(0,std::min(6,a.type))];
-            if (ui::button({ cx, chy, cw - 78, 22 }, lbl, scnActSel_ == i)) scnActSel_ = (scnActSel_==i)?-1:i;
+            if (ui::button({ cx, chy, cw - 78, 22 }, lbl, scnActSel_ == i)) {
+                scnActSel_ = (scnActSel_==i)?-1:i; scnAwaitDest_ = false;
+                // 동작이 가리키는 캐릭터를 선택 상태로 동기화(있으면)
+                if (scnActSel_>=0 && (a.type==SA_MoveChar||a.type==SA_Motion||a.type==SA_Spawn)) scnObjSel_ = a.targetId;
+            }
             if (ui::button({ cx + cw - 76, chy, 22, 22 }, "위")) { if (i>0) { std::swap(sc.actions[i],sc.actions[i-1]); p.save(); } }
             if (ui::button({ cx + cw - 52, chy, 26, 22 }, "아래")) { if (i+1<(int)sc.actions.size()) { std::swap(sc.actions[i],sc.actions[i+1]); p.save(); } }
             if (ui::button({ cx + cw - 24, chy, 24, 22 }, "x")) { sc.actions.erase(sc.actions.begin()+i); if (scnActSel_>=(int)sc.actions.size()) scnActSel_=-1; p.save(); EndScissorMode(); return; }
@@ -451,8 +503,10 @@ void Editor::drawScenarioTab() {
         if (a.type == SA_MoveChar) {
             std::vector<std::string> o = { "플레이어(0)" }; std::vector<int> v = { 0 };
             for (auto& s2 : sc.actions) if (s2.type==SA_Spawn) { o.push_back(spawnTagLabel(s2.targetId)); v.push_back(s2.targetId); }
-            optionButton({ cx, cy, cw, 24 }, "이동 NPC", o, v, a.targetId, 4150); cy += 28;
-            DrawTextU(TextFormat("목적지: %d,%d (맵 클릭/드래그)", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim); cy += 18;
+            optionButton({ cx, cy, cw, 24 }, "이동 대상", o, v, a.targetId, 4150); cy += 28;
+            DrawTextU(TextFormat("목적지: %d,%d", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim);
+            if (ui::button({ cx+cw-110, cy-2, 110, 20 }, "지도에서 지정", scnAwaitDest_)) scnAwaitDest_ = !scnAwaitDest_;
+            cy += 22;
             durControl(a.time);
         } else if (a.type == SA_Dialogue) {
             entityButton({ cx, cy, cw, 24 }, "대화", a.refId, ENT_Dialogue, 4100); cy += 28;
@@ -468,12 +522,16 @@ void Editor::drawScenarioTab() {
             cy += 28;
         } else if (a.type == SA_Effect) {
             assetButton({ cx, cy, cw, 24 }, "이펙트", a.refId, 4200); cy += 28;
-            DrawTextU(TextFormat("위치: %d,%d · 반경 %d칸 (맵 클릭/휠)", a.x, a.y, a.radius), (int)cx, (int)cy, 11, ui::kTextDim); cy += 18;
+            DrawTextU(TextFormat("위치: %d,%d · 반경 %d칸", a.x, a.y, a.radius), (int)cx, (int)cy, 11, ui::kTextDim);
+            if (ui::button({ cx+cw-110, cy-2, 110, 20 }, "지도에서 지정", scnAwaitDest_)) scnAwaitDest_ = !scnAwaitDest_;
+            cy += 22;
             durControl(a.time);
         } else if (a.type == SA_Spawn) {
             ui::intStepper({ cx, cy, cw/2-4, 24 }, "태그", a.targetId, 1, 1, 99);
             entityButton({ cx+cw/2+2, cy, cw/2-4, 24 }, "몹", a.refId, ENT_Mob, 4300); cy += 28;
-            DrawTextU(TextFormat("등장: %d,%d (맵 클릭/드래그)", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim); cy += 18;
+            DrawTextU(TextFormat("등장: %d,%d", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim);
+            if (ui::button({ cx+cw-110, cy-2, 110, 20 }, "지도에서 지정", scnAwaitDest_)) scnAwaitDest_ = !scnAwaitDest_;
+            cy += 22;
         } else if (a.type == SA_Remove) {
             std::string s2 = "제거: ";
             if (a.removeTags.empty()) s2 += "(맵에서 대상 클릭)";
@@ -481,9 +539,7 @@ void Editor::drawScenarioTab() {
             DrawTextU(s2.c_str(), (int)cx, (int)cy, 11, a.removeTags.empty()?ui::kTextDim:ui::kAccentHi); cy += 18;
             if (ui::button({ cx, cy, cw, 22 }, "선택 비우기")) { a.removeTags.clear(); p.save(); } cy += 26;
         } else if (a.type == SA_Wait) {
-            std::vector<std::string> o = { "전체" }; std::vector<int> v = { -1 };
-            for (auto& s2 : sc.actions) if (s2.type==SA_Spawn) { o.push_back(spawnTagLabel(s2.targetId)); v.push_back(s2.targetId); }
-            optionButton({ cx, cy, cw, 24 }, "대기대상", o, v, a.targetId, 4160); cy += 28;
+            DrawTextU("지정 시간만큼 장면을 멈춥니다(연출 간격).", (int)cx, (int)cy, 11, ui::kTextDim); cy += 18;
             durControl(a.time);
         } else if (a.type == SA_Motion) {   // 동작 전환(죽음/공격 등)
             std::vector<std::string> o = { "플레이어(0)" }; std::vector<int> v = { 0 };
@@ -621,30 +677,79 @@ void Editor::drawScenarioTab() {
     }
 
   if (!scnRecordMode_) {
-    // action markers (effect/spawn/move) — draggable (RTS)
-    auto markerColor = [&](int t){ return t==SA_Effect?Color{250,180,60,255}:t==SA_Spawn?Color{120,200,120,255}:t==SA_MoveChar?Color{120,170,250,255}:ui::kTextDim; };
-    for (int i = 0; i < (int)sc.actions.size(); ++i) {
-        SceneAction& a = sc.actions[i];
-        if (a.type!=SA_Effect && a.type!=SA_Spawn && a.type!=SA_MoveChar) continue;
-        bool sel = (scnActSel_==i), drag = (scnDragIdx_==i);
-        Vector2 sp = drag ? mouse : t2s((float)a.x, (float)a.y);
-        if (a.type==SA_Effect) { float rr=std::max(1,a.radius)*tileSp; DrawCircleLines((int)sp.x,(int)sp.y,rr,Fade(markerColor(a.type),sel?0.9f:0.4f)); DrawCircle((int)sp.x,(int)sp.y,rr,Fade(markerColor(a.type),0.10f)); }
-        DrawCircleV(sp, sel?7:5, Fade(BLACK,0.6f));
-        DrawCircleV(sp, sel?6:4, markerColor(a.type));
-        DrawTextU(std::to_string(i+1).c_str(), (int)sp.x-3, (int)sp.y-7, 13, WHITE);
-        if (!drag && scnDragIdx_==-1 && scnTrigMode_==0 && CheckCollisionPointCircle(mouse, sp, 8) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            scnActSel_ = i; scnDragIdx_ = i;
+    // 태그→대표 스프라이트(플레이어=등록 플레이어 캐릭터, 등장=그 spawn의 캐릭터/몹)
+    auto tagThumb = [&](int tag)->int {
+        if (tag==0) { const CharacterDef* c=db.character(p.playerCharId); return c?charThumbAsset(*c):-1; }
+        for (auto& a2 : sc.actions) if (a2.type==SA_Spawn && a2.targetId==tag) {
+            if (a2.refId<=-2) { const CharacterDef* c=db.character(-a2.refId-1); return c?charThumbAsset(*c):-1; }
+            const CharacterDef* md=db.mob(a2.refId); return md?charThumbAsset(*md):-1;
         }
-    }
-    // dragging update / release
-    if (scnDragIdx_ >= 0 && scnDragIdx_ < (int)sc.actions.size()) {
-        int tx, ty; s2t(tx, ty);
-        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { sc.actions[scnDragIdx_].x = tx; sc.actions[scnDragIdx_].y = ty; }
-        else { p.save(); scnDragIdx_ = -1; }
+        return -1;
+    };
+    bool clickUsed = false;
+    bool removeMode = (scnActSel_>=0 && scnActSel_<(int)sc.actions.size() && sc.actions[scnActSel_].type==SA_Remove);
+
+    // (1) 위치 지정(armed): +이동/+이펙트/+등장 직후 또는 '지도에서 지정' 토글 시 — 지도 클릭으로 좌표 확정
+    if (scnAwaitDest_ && scnActSel_>=0 && scnActSel_<(int)sc.actions.size()) {
+        SceneAction& a = sc.actions[scnActSel_];
+        if (a.type==SA_MoveChar||a.type==SA_Effect||a.type==SA_Spawn) {
+            if (inMap) {
+                int tx,ty; s2t(tx,ty); Vector2 g=t2s((float)tx,(float)ty);
+                DrawCircleLines((int)g.x,(int)g.y,7,WHITE);
+                if (a.type==SA_Effect) {
+                    float wh=GetMouseWheelMove(); if(wh!=0){a.radius=std::max(1,std::min(30,a.radius+(int)wh));p.save();}
+                    float rr=std::max(1,a.radius)*tileSp; DrawCircleLines((int)g.x,(int)g.y,(int)rr,Fade(Color{250,180,60,255},0.7f));
+                }
+                if (lclick) { a.x=tx; a.y=ty; scnAwaitDest_=false; clickUsed=true; p.save(); setStatus("위치 지정 완료"); }
+            }
+            if (IsKeyPressed(KEY_ESCAPE)||IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) scnAwaitDest_=false;
+        } else scnAwaitDest_=false;
     }
 
-    // placing the trigger point (발동지점 mode): click empty map
-    if (scnTrigMode_==1 && inMap && lclick && scnDragIdx_<0) {
+    // (2) 캐릭터 토큰: 플레이어 + 등장 유닛을 실제 스프라이트로 그리고, 클릭=선택(제거모드면 대상 토글)
+    for (auto& kv : stage) {
+        int tag=kv.first; Vector2 sp=t2s(kv.second.x,kv.second.y);
+        float sz=std::max(24.0f, tileSp*1.4f);
+        int thumb=tagThumb(tag);
+        if (thumb>=0) drawSpriteCentered(thumb, sp, sz);
+        else DrawCircleV(sp, 8, tag==0?Color{120,170,250,255}:Color{120,200,120,255});
+        bool seld=(scnObjSel_==tag);
+        bool hov=CheckCollisionPointCircle(mouse, sp, sz/2+2);
+        if (removeMode && tag!=0) {   // 제거 대상 선택 표시
+            bool chosen=std::find(sc.actions[scnActSel_].removeTags.begin(),sc.actions[scnActSel_].removeTags.end(),tag)!=sc.actions[scnActSel_].removeTags.end();
+            DrawCircleLines((int)sp.x,(int)sp.y,(int)(sz/2+4),chosen?ui::kDanger:Fade(WHITE,0.6f));
+        } else if (seld) { DrawCircleLines((int)sp.x,(int)sp.y,(int)(sz/2+4),ui::kAccentHi); DrawCircleLines((int)sp.x,(int)sp.y,(int)(sz/2+6),ui::kAccentHi); }
+        else if (hov) DrawCircleLines((int)sp.x,(int)sp.y,(int)(sz/2+3),WHITE);
+        std::string nm = tag==0?"플레이어":spawnTagLabel(tag);
+        if (seld||hov) DrawTextU(nm.c_str(), (int)sp.x+(int)(sz/2)+2, (int)sp.y-8, 12, seld?ui::kAccentHi:WHITE);
+        if (!clickUsed && !scnAwaitDest_ && scnTrigMode_==0 && scnDragIdx_<0 && hov && lclick) {
+            if (removeMode && tag!=0) {
+                auto& rt=sc.actions[scnActSel_].removeTags;
+                auto it=std::find(rt.begin(),rt.end(),tag);
+                if (it!=rt.end()) rt.erase(it); else rt.push_back(tag);
+                p.save();
+            } else { scnObjSel_=tag; setStatus("선택: "+nm); }
+            clickUsed=true;
+        }
+    }
+
+    // (3) 선택 동작이 이동/이펙트/등장이면 위치 마커를 드래그로 미세조정
+    if (!scnAwaitDest_ && scnActSel_>=0 && scnActSel_<(int)sc.actions.size()) {
+        SceneAction& a=sc.actions[scnActSel_];
+        if (a.type==SA_MoveChar||a.type==SA_Effect||a.type==SA_Spawn) {
+            Vector2 sp = (scnDragIdx_==scnActSel_)?mouse:t2s((float)a.x,(float)a.y);
+            DrawCircleLines((int)sp.x,(int)sp.y,6,Fade(WHITE,0.9f));
+            if (!clickUsed && scnDragIdx_<0 && scnTrigMode_==0 && CheckCollisionPointCircle(mouse,sp,8) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { scnDragIdx_=scnActSel_; clickUsed=true; }
+        }
+    }
+    if (scnDragIdx_>=0 && scnDragIdx_<(int)sc.actions.size()) {
+        int tx,ty; s2t(tx,ty);
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { sc.actions[scnDragIdx_].x=tx; sc.actions[scnDragIdx_].y=ty; }
+        else { p.save(); scnDragIdx_=-1; }
+    }
+
+    // (4) 발동지점 모드(맵 빈곳 클릭) — 기존 유지
+    if (scnTrigMode_==1 && inMap && lclick && scnDragIdx_<0 && !clickUsed) {
         int tx, ty; s2t(tx, ty);
         if (!trigPoint) {
             Event ne; ne.id = m->nextEventId(); ne.type = EventType::Message; ne.trigger = TriggerType::PlayerTouch;
@@ -652,32 +757,6 @@ void Editor::drawScenarioTab() {
             m->events.push_back(ne);
         } else { trigPoint->x = tx; trigPoint->y = ty; }
         scnTrigMode_ = 0; p.save(); setStatus("발동 지점 설정됨(밟으면 시작)");
-    }
-
-    // selected action: click empty map to place, wheel = effect radius, remove = pick spawns
-    if (scnActSel_ >= 0 && scnActSel_ < (int)sc.actions.size() && scnDragIdx_ < 0 && scnTrigMode_==0) {
-        SceneAction& a = sc.actions[scnActSel_];
-        if (a.type==SA_Effect || a.type==SA_Spawn || a.type==SA_MoveChar) {
-            if (inMap) {
-                int tx, ty; s2t(tx, ty);
-                DrawCircleLines((int)t2s((float)tx,(float)ty).x, (int)t2s((float)tx,(float)ty).y, 5, Fade(WHITE,0.7f));
-                if (lclick) { a.x = tx; a.y = ty; p.save(); }
-                if (a.type==SA_Effect) { float wh=GetMouseWheelMove(); if(wh!=0){ a.radius=std::max(1,std::min(30,a.radius+(int)wh)); p.save(); } }
-            }
-        } else if (a.type==SA_Remove) {
-            for (int j = 0; j < (int)sc.actions.size(); ++j) {
-                if (sc.actions[j].type != SA_Spawn) continue;
-                SceneAction& sp2 = sc.actions[j];
-                Vector2 mp = t2s((float)sp2.x, (float)sp2.y);
-                bool chosen = std::find(a.removeTags.begin(), a.removeTags.end(), sp2.targetId) != a.removeTags.end();
-                DrawCircleLines((int)mp.x, (int)mp.y, 10, chosen?ui::kDanger:Fade(WHITE,0.5f));
-                if (CheckCollisionPointCircle(mouse, mp, 10) && lclick) {
-                    if (chosen) a.removeTags.erase(std::find(a.removeTags.begin(), a.removeTags.end(), sp2.targetId));
-                    else a.removeTags.push_back(sp2.targetId);
-                    p.save();
-                }
-            }
-        }
     }
   } else {
     // ── 녹화 모드 (RTS식): 마퀴 다중선택 · 그룹 드래그 이동 · 우클릭 전체 동작/삭제 ──
@@ -811,7 +890,8 @@ void Editor::drawScenarioTab() {
     // hint line
     const char* hint = scnRecordMode_ ? "녹화: 빈곳 드래그=다중선택 · 선택 드래그=그룹이동 · 우클릭=전체 동작/삭제 → '장면 녹화'"
                      : scnTrigMode_==1 ? "발동지점: 맵 빈곳을 클릭" : scnTrigMode_==2 ? "발동 NPC: 맵의 NPC를 클릭"
-                     : "마커 드래그=이동 · 빈곳 클릭=배치 · 휠=이펙트 반경";
+                     : scnAwaitDest_ ? "위치를 지도에서 클릭 (Esc/우클릭 취소 · 이펙트는 휠로 반경)"
+                     : "캐릭터 클릭=선택 → 오른쪽 명령 버튼으로 이동/동작/제거 · 위치 마커 드래그=미세조정";
     DrawTextU(hint, (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kAccentHi);
 }
 

@@ -217,6 +217,9 @@ private:
     bool  dlgPopupOpen_ = false;     // 대화 탭: NPC 클릭 시 뜨는 편집 팝업 표시
     int   scnTrigMode_ = 0;          // 시나리오 발동지정 모드: 0=없음 1=맵지점 2=NPC대화
     int   scnDragIdx_ = -1;          // 시나리오: 드래그 중인 마커(액션 인덱스, -2=발동지점)
+    // 캐릭터 선택 우선(RTS식) 명령 편집: 지도에서 캐릭터(태그)를 고른 뒤 7명령을 적용
+    int   scnObjSel_ = -1;           // 선택된 캐릭터(태그): -1=없음, 0=플레이어, 1+=등장유닛
+    bool  scnAwaitDest_ = false;     // +이동/+이펙트/+등장 직후 "지도 클릭으로 위치 지정" 대기
     // 좌측 장면 목록에서 제목을 끌어 맵에 실행지점(트리거)을 여러 개 등록
     int   scnTitleDrag_ = -1;        // 끌고 있는 장면 인덱스(-1=없음)
     Vector2 scnTitleDragStart_{};    // 드래그 시작 좌표(임계값 판정용)
