@@ -41,6 +41,8 @@ void Engine::invalidateAsset(int assetId) {
 }
 
 void Engine::setMode(Mode m) {
+    // 플레이/테스트에서 에디터로 나오면 배경음을 끈다(에디터와 겹치지 않게).
+    if (m == Mode::Editor && mode_ != Mode::Editor) audio_.stopBgm();   // 에디터로 나오면 음악 정지
     mode_ = m;
     if (m == Mode::Play && play_) play_->onEnter();
 }
@@ -120,6 +122,7 @@ void Engine::startScenePreview(const std::vector<int>& sceneIds) {
 
 void Engine::stopScenePreview() {
     scenePreview_ = false;
+    audio_.stopBgm();   // 미리보기 종료 시 음악 정지(에디터와 겹치지 않게)
     if (play_) { play_->setPreviewMode(false); play_->setPreviewInteractive(false); }
 }
 
