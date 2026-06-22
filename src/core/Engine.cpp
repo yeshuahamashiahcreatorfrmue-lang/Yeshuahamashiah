@@ -63,13 +63,14 @@ void Engine::startPlaytestAt(int mapId, int x, int y) {
 
 // Editor 테스트: jump into play on the scene's editing map and run the scene now.
 void Engine::startPlaytestScene(int sceneId) {
-    int mapId = project_->startMap, x = project_->startX, y = project_->startY;
+    int mapId = project_->startMap;
     for (const auto& s : project_->database.scenes)
         if (s.id == sceneId && s.editMapId >= 0) mapId = s.editMapId;
     state_.newGame(project_->database, project_->startActor, project_->playerCharId,
                    project_->startMap, project_->startX, project_->startY,
                    project_->startGold, project_->startItems);
-    state_.currentMap = mapId; state_.playerX = x; state_.playerY = y;
+    state_.currentMap = mapId;
+    if (auto m = project_->map(mapId)) { state_.playerX = m->tilemap.width()/2; state_.playerY = m->tilemap.height()/2; }
     setMode(Mode::Play);                 // onEnter() loads the map
     if (play_) play_->beginScene(sceneId);
 }
@@ -77,13 +78,14 @@ void Engine::startPlaytestScene(int sceneId) {
 // 맵 전체재생: 같은 맵의 여러 장면을 차례로 재생.
 void Engine::startPlaytestScenes(const std::vector<int>& sceneIds) {
     if (sceneIds.empty()) return;
-    int mapId = project_->startMap, x = project_->startX, y = project_->startY;
+    int mapId = project_->startMap;
     for (const auto& s : project_->database.scenes)
         if (s.id == sceneIds[0] && s.editMapId >= 0) mapId = s.editMapId;
     state_.newGame(project_->database, project_->startActor, project_->playerCharId,
                    project_->startMap, project_->startX, project_->startY,
                    project_->startGold, project_->startItems);
-    state_.currentMap = mapId; state_.playerX = x; state_.playerY = y;
+    state_.currentMap = mapId;
+    if (auto m = project_->map(mapId)) { state_.playerX = m->tilemap.width()/2; state_.playerY = m->tilemap.height()/2; }
     setMode(Mode::Play);
     if (play_) play_->beginSceneChain(sceneIds);
 }

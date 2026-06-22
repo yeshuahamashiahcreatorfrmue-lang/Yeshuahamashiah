@@ -238,13 +238,33 @@ void GamePlay::drawField() {
     int TS = map_->tileset.tileWidth;
     int w = map_->tilemap.width(), h = map_->tilemap.height();
 
-    // follow the player, but clamp so the view never shows past the map edges
+    // 카메라: 기본은 플레이어 추적(2x). 컷신(장면) 재생 중이면 그 장면의 시점 설정을 적용.
     float sw = (float)screenW(), sh = (float)screenH();
-    float halfW = sw / (2.0f * cam_.zoom), halfH = sh / (2.0f * cam_.zoom);
     float mapW = w * (float)TS, mapH = h * (float)TS;
-    float tgx = pxX_ + TS/2.0f, tgy = pxY_ + TS/2.0f;
-    if (mapW > 2*halfW) tgx = std::min(std::max(tgx, halfW), mapW - halfW); else tgx = mapW/2;
-    if (mapH > 2*halfH) tgy = std::min(std::max(tgy, halfH), mapH - halfH); else tgy = mapH/2;
+    float zoom = 2.0f, ftx = pxX_ + TS/2.0f, fty = pxY_ + TS/2.0f;
+    int   camMode = 0;
+    if (sceneRunId_ >= 0) {
+        const Scene* scn = nullptr;
+        for (const auto& s : engine_.project().database.scenes) if (s.id == sceneRunId_) scn = &s;
+        if (scn) {
+            camMode = scn->camMode;
+            zoom = (scn->camZoom > 0.1f ? scn->camZoom : 2.0f);
+            if (camMode == 1) { zoom = std::max(0.05f, std::min(sw/std::max(1.0f,mapW), sh/std::max(1.0f,mapH))); }
+            else if (camMode == 2) { ftx = (scn->camX + 0.5f)*TS; fty = (scn->camY + 0.5f)*TS; }
+            else if (camMode == 3 && scn->camTag != 0) {
+                auto it = sceneTags_.find(scn->camTag);
+                if (it != sceneTags_.end()) for (auto& n : npcs_) if (n.eventId == it->second) { ftx = n.px + TS/2.0f; fty = n.py + TS/2.0f; }
+            }
+        }
+    }
+    cam_.zoom = zoom;
+    float halfW = sw / (2.0f * zoom), halfH = sh / (2.0f * zoom);
+    float tgx = ftx, tgy = fty;
+    if (camMode == 1) { tgx = mapW/2; tgy = mapH/2; }   // 전체맵: 가운데 고정
+    else {
+        if (mapW > 2*halfW) tgx = std::min(std::max(tgx, halfW), mapW - halfW); else tgx = mapW/2;
+        if (mapH > 2*halfH) tgy = std::min(std::max(tgy, halfH), mapH - halfH); else tgy = mapH/2;
+    }
     cam_.target = { tgx, tgy };
     cam_.offset = { sw/2.0f, sh/2.0f };
 

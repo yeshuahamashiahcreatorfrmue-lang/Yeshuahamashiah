@@ -75,6 +75,11 @@ struct Scene {
     std::string name = "장면";
     int editMapId = -1;    // 편집 시 배경으로 보는 맵(런타임 동작과 무관)
     std::string group;     // 소속 제목(그룹) — 좌측 패널에서 이 제목 아래로 묶임(빈칸=미분류)
+    // 시점(카메라): 재생 시 화면이 어디를 어느 배율로 비출지
+    int   camMode = 0;     // 0=플레이어중심 1=전체맵 2=특정위치(camX,camY) 3=특정유닛중심(camTag)
+    float camZoom = 2.0f;  // 확대 배율(전체맵 모드는 자동 맞춤)
+    int   camX = 0, camY = 0; // camMode==2 특정 위치 타일
+    int   camTag = 0;      // camMode==3 중심 유닛 태그(0=플레이어)
     std::vector<SceneAction> actions;
 };
 

@@ -232,6 +232,7 @@ private:
     Vector2 scnLpDragStart_{};       // 좌측 패널 드래그 시작 좌표(임계값)
     bool  scnLpDragging_ = false;    // 좌측 패널 드래그가 임계값을 넘음
     int   scnGroupRenameFocus_ = -1; // 우측 패널 제목 이름 편집 포커스(그룹 idx, -1=없음)
+    bool  scnCamPick_ = false;       // 시점=특정위치: 맵 클릭으로 카메라 위치 지정 대기
     int   scnTrigSel_ = -1;          // 클릭해 제목을 표시 중인 트리거 event id(-1=없음)
     int   scnTrigDragId_ = -1;       // 드래그 중인 트리거 event id(-1=없음)
     // 장면 미리보기 PiP(좌측 하단 작은 화면 ↔ 중앙 큰 화면)

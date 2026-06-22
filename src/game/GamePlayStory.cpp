@@ -44,6 +44,16 @@ void GamePlay::showDialogueLine() {
 void GamePlay::updateDialogue() {
     const DialogueScenario* d = engine_.project().database.dialogue(dlgRunId_);
     if (!d) { phase_ = Phase::Field; return; }
+    // 컷신(장면) 중의 대사는 영상처럼 타이머로 자동 진행(입력 시 즉시). 선택지의 분기/보상
+    // 부작용은 일으키지 않고 다음 줄로 넘어가 시네마틱 재생이 멈추지 않게 한다.
+    if (sceneRunId_ >= 0) {
+        if (IsKeyPressed(KEY_ESCAPE)) { dlgRunId_ = -1; phase_ = Phase::Field; previewDlgT_ = 0; return; }
+        previewDlgT_ += GetFrameTime();
+        if (previewDlgT_ >= 1.6f || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            previewDlgT_ = 0; ++dlgRunLine_; showDialogueLine();
+        }
+        return;
+    }
     static const bool autodismiss = getenv("TSUKURU_AUTOWALK") != nullptr;
     bool hasAns = dlgRunLine_ < (int)d->lines.size() && !d->lines[dlgRunLine_].answers.empty();
     if (hasAns) {

@@ -56,13 +56,17 @@ json sceneToJson(const Scene& s) {
                         {"radius", a.radius}, {"removeTags", rt}});
     }
     return {{"id", s.id}, {"name", s.name}, {"editMapId", s.editMapId},
-            {"group", s.group}, {"actions", acts}};
+            {"group", s.group},
+            {"camMode", s.camMode}, {"camZoom", s.camZoom}, {"camX", s.camX}, {"camY", s.camY}, {"camTag", s.camTag},
+            {"actions", acts}};
 }
 Scene sceneFromJson(const json& j) {
     Scene s;
     s.id = j.value("id", -1); s.name = j.value("name", "장면");
     s.editMapId = j.value("editMapId", -1);
     s.group = j.value("group", std::string());
+    s.camMode = j.value("camMode", 0); s.camZoom = j.value("camZoom", 2.0f);
+    s.camX = j.value("camX", 0); s.camY = j.value("camY", 0); s.camTag = j.value("camTag", 0);
     for (const auto& aj : j.value("actions", json::array())) {
         SceneAction a;
         a.type = aj.value("type", (int)SA_Wait);

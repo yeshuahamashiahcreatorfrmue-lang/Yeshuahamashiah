@@ -263,7 +263,7 @@ void Editor::drawScenarioTab() {
                 }
                 if (!ids.empty() && ui::button({ lx + lw - 42, y, 42, 22 }, "▶전체")) {
                     std::vector<int> sids; for (int idx : ids) sids.push_back(list[idx].id);
-                    scnPrevBig_ = false; engine_.startScenePreview(sids); EndScissorMode(); return;
+                    engine_.startPlaytestScenes(sids); EndScissorMode(); return;   // 전체화면 시네마틱 재생
                 }
             }
             y += 26;
@@ -274,7 +274,11 @@ void Editor::drawScenarioTab() {
                     if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         scnSceneDragIdx_ = idx; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
                     }
-                    if (ui::button({ lx + lw - 38, y, 38, 22 }, "▶")) { scnPrevBig_ = false; engine_.startScenePreview({ list[idx].id }); EndScissorMode(); return; }
+                    // 우클릭 = 그 녹화본을 보면서 수정하는 '스튜디오'(전체화면 재생 후 F2로 편집 복귀)
+                    if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+                        scnSel_ = idx; scnActSel_ = -1; engine_.startPlaytestScene(list[idx].id); EndScissorMode(); return;
+                    }
+                    if (ui::button({ lx + lw - 38, y, 38, 22 }, "▶")) { engine_.startPlaytestScene(list[idx].id); EndScissorMode(); return; }
                 }
                 y += 24;
             }
@@ -411,6 +415,38 @@ void Editor::drawScenarioTab() {
         liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
     }
     cy += 34;
+    // ── 녹화본 사이에 끼울 '대화 장면' 추가 → 대화 탭에서 대사 작성 ──
+    if (ui::button({ cx, cy, cw, 26 }, "+ 대화 장면 (녹화본 사이 대사)")) {
+        DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
+        nd.name="대화"+std::to_string(nd.id); nd.lines.push_back({ "", "...", -1, {} });
+        db.dialogues.push_back(nd);
+        Scene ds; ds.id=1; for(auto&e:list) if(e.id>=ds.id) ds.id=e.id+1;
+        ds.name="대화 "+std::to_string(ds.id); ds.group.clear(); ds.editMapId=sc.editMapId;
+        SceneAction a; a.type=SA_Dialogue; a.refId=nd.id; a.time=0; ds.actions.push_back(a);
+        list.push_back(ds); scnSel_=(int)list.size()-1; scnActSel_=0;
+        for (int k=0;k<(int)db.dialogues.size();++k) if (db.dialogues[k].id==nd.id) dlgSel_=k;
+        dlgLineSel_=0; dlgPopupOpen_=true; tab_=Tab::Dialogue; p.save();
+        setStatus("대화 장면 추가 — 대화 탭에서 대사 작성(미분류)"); return;
+    }
+    cy += 30;
+    // ── 시점(카메라): 재생 시 화면이 어디를 어느 배율로 비출지 ──
+    DrawTextU("시점(카메라):", (int)cx, (int)cy, 12, ui::kAccentHi); cy += 18;
+    { std::vector<std::string> o = { "플레이어중심","전체맵","특정위치","특정유닛중심" };
+      optionButton({ cx, cy, cw, 24 }, "", o, {}, sc.camMode, 4600); cy += 28; }
+    if (sc.camMode != 1) {
+        int z = (int)(sc.camZoom*100+0.5f); if (z<25) z=25; if (z>400) z=400;
+        ui::intStepper({ cx, cy, cw, 24 }, "확대(%)", z, 25, 25, 400); sc.camZoom = z/100.0f; cy += 28;
+    }
+    if (sc.camMode == 2) {
+        DrawTextU(TextFormat("위치: %d,%d", sc.camX, sc.camY), (int)cx, (int)cy, 11, ui::kTextDim);
+        if (ui::button({ cx+cw-110, cy-2, 110, 20 }, "지도에서 지정", scnCamPick_)) scnCamPick_ = !scnCamPick_;
+        cy += 22;
+    }
+    if (sc.camMode == 3) {
+        std::vector<std::string> o = { "플레이어(0)" }; std::vector<int> v = { 0 };
+        for (auto& a : sc.actions) if (a.type==SA_Spawn) { o.push_back(spawnTagLabel(a.targetId)); v.push_back(a.targetId); }
+        optionButton({ cx, cy, cw, 24 }, "중심 유닛", o, v, sc.camTag, 4610); cy += 28;
+    }
     if (scnRecordMode_) {
         DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
         // step duration 0.42~1.42
@@ -778,6 +814,13 @@ void Editor::drawScenarioTab() {
         else { ne.sceneId = sc.id; ne.label = "[시나리오 발동]"; setStatus("이 장면 발동지점 설정"); }
         m->events.push_back(ne);
         scnTrigMode_ = 0; p.save();
+    }
+    // (5) 시점=특정위치: 맵 클릭으로 카메라 위치 지정
+    if (scnCamPick_) {
+        if (inMap) { int tx,ty; s2t(tx,ty); Vector2 g=t2s((float)tx,(float)ty);
+            DrawCircleLines((int)g.x,(int)g.y,8,ui::kAccentHi); DrawTextU("시점 위치", (int)g.x+9,(int)g.y-8,11,ui::kAccentHi);
+            if (lclick) { sc.camX=tx; sc.camY=ty; scnCamPick_=false; p.save(); setStatus("시점 위치 지정됨"); } }
+        if (IsKeyPressed(KEY_ESCAPE)||IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) scnCamPick_=false;
     }
   } else {
     // ── 녹화 모드 (RTS식): 마퀴 다중선택 · 그룹 드래그 이동 · 우클릭 전체 동작/삭제 ──
