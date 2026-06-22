@@ -64,6 +64,8 @@ public:
     void openCharBrowser(std::function<void(int)> apply);
     void drawCharBrowser();
     bool charBrowserOpen() const { return charBrowserOpen_; }
+    int  charThumbAsset(const CharacterDef& c);   // a character's representative sprite asset
+    void deleteCharacterDef(int idx);             // remove a registered character + scrub refs
 
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
@@ -209,7 +211,6 @@ private:
     std::string dlgSearch_, scnSearch_, charSearch_, npcSearch_, dbSearch_, evSearch_;
     // Explorer-like character/image browser overlay
     bool  charBrowserOpen_ = false;
-    bool  charBrowserImport_ = false;             // deferred "외부에서 추가" request
     std::string charBrowserSearch_;
     float charBrowserScroll_ = 0;
     std::function<void(int)> charBrowserApply_;   // chosen asset id (-1=없음) → caller

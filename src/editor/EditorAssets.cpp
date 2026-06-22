@@ -30,17 +30,19 @@ void Editor::cycleAsset(int& cur, AssetType t) {
 void Editor::drawAssetsTab() {
     Rectangle area = { 0, kToolbarH, (float)screenW(), (float)screenH() - kToolbarH };
     DrawRectangleRec(area, Color{ 24, 26, 34, 255 });
-    ui::label(".png / .wav / .ogg 파일을 창에 끌어다 놓으면 등록됩니다.",
+    ui::label(".png / .wav / .ogg 파일을 창에 끌어다 놓으면 등록됩니다.  (우클릭 = 에셋 삭제)",
               20, (int)kToolbarH + 16, 20, ui::kText);
 
     Project& p = engine_.project();
     auto& assets = p.assets.all();
     float x = 20, y = kToolbarH + 56;
     float thumb = 96, pad = 16, cellW = thumb + 80;
+    int rightClickDel = -1;   // asset id to delete (right-clicked this frame)
 
     for (const auto& a : assets) {
         Rectangle cell = { x, y, cellW, thumb + 60 };
         ui::panel(cell, ui::kPanel);
+        if (ui::mouseIn(cell) && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) rightClickDel = a.id;
         if (a.type == AssetType::Image) {
             const Texture2D& tex = engine_.assetTexture(a.id);
             float s = std::min(thumb / std::max(1, tex.width), thumb / std::max(1, tex.height));
@@ -66,6 +68,13 @@ void Editor::drawAssetsTab() {
 
     if (assets.empty())
         ui::label("(아직 에셋이 없습니다)", 20, (int)kToolbarH + 56, 18, ui::kTextDim);
+
+    // right-click an asset → confirm, then delete (refs scrubbed by deleteAssets).
+    if (rightClickDel >= 0) {
+        std::string nm = assetName(rightClickDel);
+        askConfirm("에셋 '" + nm + "' 을(를) 삭제할까요? 사용 중인 곳의 참조도 함께 제거됩니다.",
+                   [this, rightClickDel]{ deleteAssets({ rightClickDel }); setStatus("에셋 삭제됨 (참조 정리 완료)"); });
+    }
 }
 
 

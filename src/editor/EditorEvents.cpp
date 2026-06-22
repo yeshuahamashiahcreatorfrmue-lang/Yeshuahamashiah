@@ -46,7 +46,9 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
     y += 30;
     if (ui::button({ x, y, 300, 26 }, "등록된 캐릭터에서 선택 (목록·검색)", true)) {
         int mid = activeMapId_, eid = ev.id;
-        openCharBrowser([this, mid, eid](int aid){
+        openCharBrowser([this, mid, eid](int cid){   // cid = 등록된 캐릭터 id → 대표 스프라이트를 NPC 그래픽으로
+            const CharacterDef* c = engine_.project().database.character(cid);
+            int aid = c ? charThumbAsset(*c) : -1;
             if (auto m = engine_.project().map(mid)) for (auto& e : m->events) if (e.id == eid) e.graphicAsset = aid;
         });
     }
@@ -90,16 +92,13 @@ void Editor::drawPlayerEditor(Rectangle panel) {
     CharacterDef* cd = nullptr;
     for (auto& c : db.characters) if (c.id == p.playerCharId) cd = &c;
     std::string who = cd ? cd->name : "(없음 — 시트 스프라이트)";
-    if (ui::button({ x, y, 320, 28 }, std::string("플레이어 캐릭터: ") + who, cd != nullptr)) {
-        int idx = -1;
-        for (int i = 0; i < (int)db.characters.size(); ++i) if (db.characters[i].id == p.playerCharId) idx = i;
-        idx++;
-        p.playerCharId = (idx >= (int)db.characters.size()) ? -1 : db.characters[idx].id;
-        p.save();
-        cd = nullptr; for (auto& c : db.characters) if (c.id == p.playerCharId) cd = &c;
+    DrawTextU(("플레이어 캐릭터: " + who).c_str(), (int)x, (int)y, 16, cd ? ui::kAccentHi : ui::kTextDim);
+    y += 24;
+    if (ui::button({ x, y, 320, 28 }, "등록된 캐릭터에서 선택 (목록·검색)", true)) {
+        openCharBrowser([this](int cid){ engine_.project().playerCharId = cid; engine_.project().save(); });
     }
     y += 34;
-    DrawTextU("위 버튼 = 플레이어로 쓸 캐릭터 순환 선택", (int)x, (int)y, 12, ui::kTextDim); y += 24;
+    DrawTextU("등록된 캐릭터(이동·모션·이펙트 포함)를 플레이어로 가져옵니다.", (int)x, (int)y, 12, ui::kTextDim); y += 24;
 
     if (!cd) {
         DrawTextU("캐릭터 탭에서 캐릭터를 만든 뒤 위에서 선택하세요.", (int)x, (int)y, 14, ui::kText); y += 26;

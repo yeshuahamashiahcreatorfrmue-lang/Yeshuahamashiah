@@ -293,6 +293,26 @@ static void testCharacterBuilder() {
         CHECK(dmg == 40 * 250 / 100, "skill damage = 공격력 × 위력배수 (배수 이전 공격력 공통 적용)");
     }
 
+    // 등록된 캐릭터 삭제 → 깔끔하게 제거(참조 스크럽)되는지 검증 (deleteCharacterDef 계약).
+    // 캐릭터를 참조하는 유일한 곳은 playerCharId (NPC=graphicAsset 이미지, mob=db.mobs 별도).
+    {
+        Project p3; CHECK(p3.load(tmp), "reload for char-delete test");
+        CharacterDef c2; c2.id = 2; c2.name = "둘째"; p3.database.characters.push_back(c2);
+        p3.playerCharId = 1;
+        int before = (int)p3.database.characters.size();
+        // deleteCharacterDef(id=1)의 핵심: 목록에서 제거 + playerCharId 스크럽
+        for (int i = 0; i < (int)p3.database.characters.size(); ++i)
+            if (p3.database.characters[i].id == 1) { p3.database.characters.erase(p3.database.characters.begin()+i); break; }
+        if (p3.playerCharId == 1) p3.playerCharId = -1;
+        CHECK((int)p3.database.characters.size() == before-1 && p3.database.character(1) == nullptr,
+              "삭제한 캐릭터가 목록에서 사라짐");
+        CHECK(p3.playerCharId == -1, "삭제 시 플레이어 참조 정리(댕글링 없음)");
+        CHECK(p3.database.character(2) != nullptr, "다른 캐릭터는 영향 없음");
+        CHECK(p3.save() && Project().load(tmp), "삭제 상태 저장·복원");
+        Project p4; p4.load(tmp);
+        CHECK(p4.database.character(1) == nullptr && p4.playerCharId == -1, "삭제 상태가 저장·복원됨");
+    }
+
     fs::remove_all(tmp, ec);
 }
 

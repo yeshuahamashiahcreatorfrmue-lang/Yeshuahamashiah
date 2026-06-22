@@ -363,12 +363,9 @@ void Editor::drawWorldViewTab() {
     for (int i = 0; i < (int)p.maps.size(); ++i) {
         auto& m = p.maps[i];
         if (!m->placed) continue;
-        // Box size reflects the map's REAL tile dimensions: a 1742×1742 map fills
-        // the cell (100%), smaller maps are proportionally smaller (min 18% so a
-        // 30×30 map is still clickable).
-        int dim = std::max(m->tilemap.width(), m->tilemap.height());
-        float frac = std::min(1.0f, std::max(0.18f, dim / 1742.0f));
-        float side = (cell - 12) * frac;
+        // The thumbnail fills its grid cell (한 칸에 꽉 차게) regardless of the map's
+        // tile dimensions, so even a small map is shown at a readable size.
+        float side = cell - 12;
         float bx = m->worldX*cell + (cell - side)/2, by = m->worldY*cell + (cell - side)/2;
         Rectangle box = { bx, by, side, side };
         if (const RenderTexture2D* th = mapThumb(m->id)) {     // real map thumbnail

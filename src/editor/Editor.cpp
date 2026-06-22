@@ -105,15 +105,6 @@ void Editor::update(float dt) {
     if (pendingItemIcon_)     { pendingItemIcon_     = false; pickAndImportItemIcon(); }
     if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
-    if (charBrowserImport_) {   // 브라우저의 "외부에서 추가": import one image, assign, close
-        charBrowserImport_ = false;
-        std::vector<std::string> files = plat::openImageFiles();
-        if (!files.empty()) {
-            int id = stageImportImage(files.front(), "npc_char");
-            if (id >= 0 && charBrowserApply_) { charBrowserApply_(id); setStatus("캐릭터 적용됨: " + assetName(id)); }
-        }
-        charBrowserOpen_ = false; charBrowserApply_ = nullptr;
-    }
     if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
     if (pendingEfxFrameImport_){ pendingEfxFrameImport_= false; pickAndImportEfxFrame(); }
 

@@ -218,15 +218,41 @@ void Editor::openCharBrowser(std::function<void(int)> apply) {
     charBrowserSearch_.clear(); charBrowserScroll_ = 0; pickerId_ = -1;
 }
 
-// Full-screen modal: a searchable thumbnail grid of every registered image asset
-// (the pool NPC/character graphics are picked from), plus 없음 and 외부에서 추가.
+// A registered character's representative sprite asset (걷기 아래 첫 프레임), or any
+// motion frame, else -1. Used for thumbnails and as the NPC graphic.
+int Editor::charThumbAsset(const CharacterDef& c) {
+    if (!c.motions[MO_Walk].frames.empty()) return c.motions[MO_Walk].frames.front();
+    for (const auto& mo : c.motions) {
+        if (!mo.frames.empty()) return mo.frames.front();
+        for (const auto* v : { &mo.left, &mo.right, &mo.up }) if (!v->empty()) return v->front();
+    }
+    return -1;
+}
+
+// Remove a registered character cleanly: scrub the player reference, fix the
+// editor selection. (Characters are separate from raw assets and from db.mobs.)
+void Editor::deleteCharacterDef(int idx) {
+    Database& db = engine_.project().database;
+    if (idx < 0 || idx >= (int)db.characters.size()) return;
+    int id = db.characters[idx].id;
+    if (engine_.project().playerCharId == id) engine_.project().playerCharId = -1;
+    db.characters.erase(db.characters.begin() + idx);
+    if (charDefSel_ >= (int)db.characters.size()) charDefSel_ = (int)db.characters.size() - 1;
+    engine_.project().save();
+    setStatus("캐릭터 삭제됨 (참조 정리 완료)");
+}
+
+// Full-screen modal: a searchable thumbnail grid of every REGISTERED CHARACTER
+// (db.characters — separate from raw image assets; each carries motions/effects).
+// Left-click = 선택, 우클릭 = 삭제, plus 없음 and '캐릭터 탭에서 제작'.
 void Editor::drawCharBrowser() {
+    Database& db = engine_.project().database;
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.72f));
     Rectangle box = { 40, 40, (float)sw - 80, (float)sh - 80 };
     ui::panel(box, ui::kPanel);
     DrawRectangleLinesEx(box, 2, ui::kAccent);
-    DrawTextU("등록된 캐릭터/이미지에서 선택 (검색·클릭)", (int)box.x + 16, (int)box.y + 12, 20, ui::kAccent);
+    DrawTextU("등록된 캐릭터에서 선택 (검색·클릭=선택 · 우클릭=삭제)", (int)box.x + 16, (int)box.y + 12, 20, ui::kAccent);
     if (ui::button({ box.x + box.width - 96, box.y + 10, 84, 30 }, "닫기") || IsKeyPressed(KEY_ESCAPE)) {
         charBrowserOpen_ = false; charBrowserApply_ = nullptr; return;
     }
@@ -236,25 +262,28 @@ void Editor::drawCharBrowser() {
         if (charBrowserApply_) charBrowserApply_(-1);
         charBrowserOpen_ = false; charBrowserApply_ = nullptr; return;
     }
-    if (ui::button({ x + 436, top, 150, 28 }, "외부에서 추가")) { charBrowserImport_ = true; return; }
+    if (ui::button({ x + 436, top, 180, 28 }, "캐릭터 탭에서 제작")) {
+        charBrowserOpen_ = false; charBrowserApply_ = nullptr; tab_ = Tab::Chars; return;
+    }
 
-    // grid of image-asset thumbnails (filtered by name)
-    auto imgs = engine_.project().assets.byType(AssetType::Image);
+    // grid of registered-character thumbnails (filtered by name)
     float gridTop = top + 40;
     Rectangle grid = { box.x + 8, gridTop, box.width - 16, box.y + box.height - gridTop - 12 };
     const float cell = 112, thumb = 92, pad = 10;
     int cols = std::max(1, (int)((grid.width - pad) / (cell + pad)));
-    // count matches for scroll height
-    std::vector<const AssetEntry*> shown;
-    for (const auto* a : imgs) if (nameMatch(a->name, charBrowserSearch_)) shown.push_back(a);
+    std::vector<int> shown;   // indices into db.characters that match the search
+    for (int i = 0; i < (int)db.characters.size(); ++i)
+        if (nameMatch(db.characters[i].name, charBrowserSearch_)) shown.push_back(i);
     int rows = ((int)shown.size() + cols - 1) / cols;
     float contentH = rows * (cell + pad) + pad;
 
     uiScissor((int)grid.x, (int)grid.y, (int)grid.width, (int)grid.height);
     Vector2 m = GetMousePosition();
-    int chosen = -2;   // -2 = none clicked this frame
-    for (int i = 0; i < (int)shown.size(); ++i) {
-        int r = i / cols, c = i % cols;
+    int chosen = -2;          // -2 = none picked this frame
+    int toDelete = -1;        // index to delete after the loop
+    for (int k = 0; k < (int)shown.size(); ++k) {
+        const CharacterDef& cdc = db.characters[shown[k]];
+        int r = k / cols, c = k % cols;
         float cx = grid.x + pad + c * (cell + pad);
         float cy = grid.y + pad + r * (cell + pad) - charBrowserScroll_;
         if (cy + cell < grid.y || cy > grid.y + grid.height) continue;   // cull
@@ -262,27 +291,33 @@ void Editor::drawCharBrowser() {
         bool hot = CheckCollisionPointRec(m, cellR);
         DrawRectangleRec(cellR, hot ? ui::kPanelHi : Color{ 30, 33, 42, 255 });
         DrawRectangleLinesEx(cellR, hot ? 2 : 1, hot ? ui::kAccent : Fade(BLACK, 0.5f));
-        const Texture2D& tex = engine_.assetTexture(shown[i]->id);
-        if (tex.id) {
-            // fit, keeping aspect; if it looks like a 4-dir sheet show the first cell
-            float fw = tex.width >= tex.height * 2 ? tex.width / 4.0f : (float)tex.width;
-            float s = std::min(thumb / fw, thumb / (float)tex.height);
-            float dw = fw * s, dh = tex.height * s;
-            DrawTexturePro(tex, { 0, 0, fw, (float)tex.height },
-                           { cx + (cell - dw) / 2, cy + 6 + (thumb - dh) / 2, dw, dh }, { 0, 0 }, 0, WHITE);
+        int aid = charThumbAsset(cdc);
+        if (aid >= 0) {
+            const Texture2D& tex = engine_.assetTexture(aid);
+            if (tex.id) {
+                float fw = tex.width >= tex.height * 2 ? tex.width / 4.0f : (float)tex.width;  // 4방향 시트→첫 칸
+                float s = std::min(thumb / fw, thumb / (float)tex.height);
+                float dw = fw * s, dh = tex.height * s;
+                DrawTexturePro(tex, { 0, 0, fw, (float)tex.height },
+                               { cx + (cell - dw) / 2, cy + 6 + (thumb - dh) / 2, dw, dh }, { 0, 0 }, 0, WHITE);
+            }
+        } else {
+            DrawTextU("(이미지 없음)", (int)cx + 14, (int)cy + 42, 12, ui::kTextDim);
         }
-        std::string nm = shown[i]->name;
+        std::string nm = cdc.name;
         if ((int)nm.size() > 14) nm = nm.substr(0, 13) + "..";
         int tw = MeasureTextU(nm.c_str(), 12);
         DrawTextU(nm.c_str(), (int)(cx + (cell - tw) / 2), (int)(cy + cell - 16), 12, ui::kText);
-        if (hot && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) chosen = shown[i]->id;
+        if (hot && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))  chosen = cdc.id;
+        if (hot && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) toDelete = shown[k];
     }
     EndScissorMode();
     scrollbar(grid, charBrowserScroll_, contentH);
-    if (shown.empty())
-        DrawTextU("등록된 이미지가 없습니다. '외부에서 추가'로 불러오세요.",
+    if (db.characters.empty())
+        DrawTextU("등록된 캐릭터가 없습니다. '캐릭터 탭에서 제작'으로 만드세요.",
                   (int)grid.x + 12, (int)grid.y + 12, 14, ui::kTextDim);
 
+    if (toDelete >= 0) { deleteCharacterDef(toDelete); return; }   // db changed; bail this frame
     if (chosen != -2) {
         if (charBrowserApply_) charBrowserApply_(chosen);
         charBrowserOpen_ = false; charBrowserApply_ = nullptr;
