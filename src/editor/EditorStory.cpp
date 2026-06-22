@@ -216,9 +216,55 @@ void Editor::drawScenarioTab() {
     auto& list = db.scenes;
     ui::label("시나리오 — 맵에서 NPC/이펙트를 끌어 배치하고, 발동 지점·NPC를 지정 (RTS식)", 14, (int)kToolbarH + 8, 16, ui::kAccent);
     float top = kToolbarH + 34, botY = H - 10, panelH = botY - top;
-    float ctrlW = 272, ctrlX = W - ctrlW - 8;
-    float mapX = 8, mapW = ctrlX - mapX - 8;
+    float leftW = 198, leftX = 8;
+    float ctrlW = 262, ctrlX = W - ctrlW - 8;
+    float mapX = leftX + leftW + 8, mapW = ctrlX - mapX - 8;
+    ui::panel({ leftX, top, leftW, panelH }, ui::kPanel);
     ui::panel({ ctrlX, top, ctrlW, panelH }, ui::kPanel);
+
+    // ---- LEFT panel: 맵별로 분할된 장면 목록 (장면 클릭=선택, ▶=재생, 맵 제목=전체재생) ----
+    {
+        float lx = leftX + 8, lw = leftW - 16, ly = top + 8;
+        DrawTextU("장면 목록 (맵별)", (int)lx, (int)ly, 13, ui::kAccent); ly += 22;
+        Rectangle reg = { leftX, ly, leftW, top + panelH - ly - 8 };
+        uiScissor((int)leftX, (int)ly, (int)leftW, (int)reg.height);
+        if (ui::mouseIn(reg)) scnListScroll_ -= GetMouseWheelMove() * 28;
+        if (scnListScroll_ < 0) scnListScroll_ = 0;
+        float y = ly - scnListScroll_;
+        // group scenes by editMapId, in map order; collect leftover under "기타"
+        std::vector<std::pair<int,std::string>> groups;  // mapId, name
+        for (auto& mm : p.maps) groups.push_back({ mm->id, mm->name });
+        groups.push_back({ -1, "기타(맵 미지정)" });
+        for (auto& g : groups) {
+            std::vector<int> ids;   // scene indices in this group
+            for (int i = 0; i < (int)list.size(); ++i) {
+                bool match = (list[i].editMapId == g.first) ||
+                             (g.first == -1 && !p.map(list[i].editMapId));
+                if (match) ids.push_back(i);
+            }
+            if (ids.empty()) continue;
+            // map header — click "▶전체" plays all its scenes in order
+            if (y + 24 > ly && y < ly + reg.height) {
+                Rectangle hr = { lx, y, lw - 46, 22 };
+                DrawRectangleRec(hr, ui::kPanelHi);
+                DrawTextU(g.second.c_str(), (int)lx + 4, (int)y + 4, 12, ui::kAccentHi);
+                if (ui::button({ lx + lw - 44, y, 44, 22 }, "▶전체")) {
+                    std::vector<int> sids; for (int idx : ids) sids.push_back(list[idx].id);
+                    engine_.startPlaytestScenes(sids); return;
+                }
+            }
+            y += 26;
+            for (int idx : ids) {
+                if (y + 22 > ly && y < ly + reg.height) {
+                    if (ui::button({ lx + 10, y, lw - 50, 22 }, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; }
+                    if (ui::button({ lx + lw - 36, y, 36, 22 }, "▶")) { engine_.startPlaytestScene(list[idx].id); return; }
+                }
+                y += 24;
+            }
+        }
+        EndScissorMode();
+        if (list.empty()) DrawTextU("(장면 없음)", (int)lx, (int)ly + 4, 12, ui::kTextDim);
+    }
 
     // ---- RIGHT control panel ----
     float cx = ctrlX + 10, cw = ctrlW - 20, cy = top + 8;
@@ -294,7 +340,7 @@ void Editor::drawScenarioTab() {
     }
 
     // ── RTS 라이브 녹화 진입 (실시간 조종·길찾기·동영상식 녹화) ──
-    if (ui::button({ cx, cy, cw, 28 }, "● RTS 라이브 녹화 (실시간 조종)")) {
+    if (ui::button({ cx, cy, cw, 28 }, "▶ RTS 라이브 녹화 (실시간 조종)")) {
         scnLive_ = true; scnLiveInit_ = false; scnRecording_ = false; scnRecClock_ = 0;
         liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
     }
@@ -330,7 +376,7 @@ void Editor::drawScenarioTab() {
         ui::intStepper({ cx+cw/2+2, cy, cw/2-4, 24 }, "반경", scnRecRadius_, 1, 1, 30); cy += 28;
         DrawTextU(TextFormat("대기 이펙트 %d개 (맵 클릭=뿌리기)", (int)scnPendingFx_.size()), (int)cx, (int)cy, 11, ui::kTextDim); cy += 16;
         // 녹화 / 취소
-        if (ui::button({ cx, cy, cw, 28 }, "● 장면 녹화 (현재 배치 기록)")) {
+        if (ui::button({ cx, cy, cw, 28 }, "★ 장면 녹화 (현재 배치 기록)")) {
             int rec = 0;
             for (auto& kv : stage) {
                 auto it = scnDraft_.find(kv.first);

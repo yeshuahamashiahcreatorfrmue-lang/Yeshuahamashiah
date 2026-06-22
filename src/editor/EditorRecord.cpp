@@ -117,18 +117,18 @@ void Editor::drawLiveRecorder(Scene& sc) {
     // ---- top control bar (2 rows) ----
     float by = kToolbarH + 6, bx = 8;
     auto tbtn = [&](const char* t, float w, bool on=false)->bool { bool r = ui::button({ bx, by, w, 28 }, t, on); bx += w + 4; return r; };
-    if (tbtn(scnRecording_ ? "■ 녹화 완료" : "● 녹화 시작", 120, scnRecording_)) {
+    if (tbtn(scnRecording_ ? "녹화 완료(저장)" : "녹화 시작", 120, scnRecording_)) {
         if (!scnRecording_) {                       // 시작: 초기화 + 등장 기록(t=0)
             liveInitUnits(sc, *m); recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true; scnPaused_ = false;
             for (auto& u : liveUnits_) if (u.tag != 0)
                 recCmds_.push_back({ 0, 2, u.tag, (int)std::lround(u.tx), (int)std::lround(u.ty), u.charId, 0, u.isMob });
         } else { scnRecording_ = false; scnPaused_ = false; liveBuildScene(sc, *m); setStatus("녹화 완료 → 장면 저장됨"); }
     }
-    if (tbtn(scnPaused_ ? "▶ 재개 (P)" : "⏸ 일시정지 (P)", 130, scnPaused_) || IsKeyPressed(KEY_P)) scnPaused_ = !scnPaused_;
+    if (tbtn(scnPaused_ ? "▶ 재개 (P)" : "일시정지 (P)", 130, scnPaused_) || IsKeyPressed(KEY_P)) scnPaused_ = !scnPaused_;
     if (tbtn("▶ 재생(테스트)", 120)) { engine_.startPlaytestScene(sc.id); scnLive_ = false; return; }
     if (tbtn("닫기", 64)) { scnLive_ = false; scnRecording_ = false; scnPaused_ = false; liveFxMode_ = false; return; }
     if (scnRecording_) { if (!scnPaused_) scnRecClock_ += dt;
-        DrawTextU(TextFormat(scnPaused_ ? "❚❚ 일시정지  %.1f초  (명령 %d)" : "● REC  %.1f초  (명령 %d)", scnRecClock_, (int)recCmds_.size()),
+        DrawTextU(TextFormat(scnPaused_ ? "일시정지  %.1f초  (명령 %d)" : "REC  %.1f초  (명령 %d)", scnRecClock_, (int)recCmds_.size()),
                   (int)bx + 6, (int)by + 6, 15, scnPaused_ ? ui::kAccentHi : ui::kDanger); }
     // row 2
     by += 32; bx = 8;

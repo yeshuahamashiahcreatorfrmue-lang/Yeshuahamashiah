@@ -40,6 +40,7 @@ public:
     void draw();
     void beginScene(int id);     // editor 테스트: 플레이 진입 후 이 시나리오 즉시 시작
     void beginDialogue(int id);  // editor 테스트: 플레이 진입 후 이 대화 즉시 시작
+    void beginSceneChain(std::vector<int> ids);  // 여러 장면을 차례로 재생(맵 전체재생)
 
 private:
     enum class Phase { Field, Message, Menu, Shop, GameOver, GameClear, Dialogue };
@@ -216,6 +217,7 @@ private:
     int sceneRunId_ = -1, sceneStep_ = -1;
     float sceneTimer_ = 0;
     std::unordered_map<int,int> sceneTags_;  // scene tag -> spawned NpcInst eventId marker
+    std::vector<int> sceneQueue_;            // 이어서 재생할 다음 장면들(맵 전체재생)
     // concurrent batch playback (연속 이동/이펙트/동작을 동시에 부드럽게 재생)
     float sceneBatchDur_ = 0;
     std::unordered_map<int, Vector2> sceneMoveFrom_, sceneMoveTo_;  // tag -> 픽셀 시작/목표

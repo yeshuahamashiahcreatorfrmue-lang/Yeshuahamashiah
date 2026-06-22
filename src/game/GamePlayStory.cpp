@@ -12,8 +12,14 @@
 namespace tsukuru {
 
 // editor playtest entry points (public): jump straight into the authored content.
-void GamePlay::beginScene(int id)    { startScene(id); }
+void GamePlay::beginScene(int id)    { sceneQueue_.clear(); startScene(id); }
 void GamePlay::beginDialogue(int id) { startDialogue(id); }
+void GamePlay::beginSceneChain(std::vector<int> ids) {   // 첫 장면 시작, 나머지는 큐에
+    sceneQueue_.clear();
+    if (ids.empty()) return;
+    for (size_t i = 1; i < ids.size(); ++i) sceneQueue_.push_back(ids[i]);
+    startScene(ids[0]);
+}
 
 // ----------------------------- dialogue playback -----------------------------
 void GamePlay::startDialogue(int id) {
@@ -194,12 +200,16 @@ void GamePlay::startScene(int id) {
 void GamePlay::updateScene(float dt) {
     if (sceneRunId_ < 0) return;
     if (phase_ == Phase::Dialogue) return;          // a scene dialogue is playing; wait
-    // ESC skips the rest of a cutscene (never trap the player in a Wait/Move loop).
-    if (IsKeyPressed(KEY_ESCAPE)) { sceneRunId_ = -1; sceneStep_ = -1; toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f; return; }
+    // ESC skips the rest of a cutscene (and the whole chain).
+    if (IsKeyPressed(KEY_ESCAPE)) { sceneRunId_ = -1; sceneStep_ = -1; sceneQueue_.clear(); toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f; return; }
     const Database& db = engine_.project().database;
     const Scene* sc = nullptr;
     for (const auto& s : db.scenes) if (s.id == sceneRunId_) sc = &s;
-    if (!sc || sceneStep_ >= (int)sc->actions.size()) { sceneRunId_ = -1; sceneStep_ = -1; return; }
+    if (!sc || sceneStep_ >= (int)sc->actions.size()) {
+        sceneRunId_ = -1; sceneStep_ = -1;
+        if (!sceneQueue_.empty()) { int nx = sceneQueue_.front(); sceneQueue_.erase(sceneQueue_.begin()); startScene(nx); }  // 다음 장면 이어재생
+        return;
+    }
     int TS = map_ ? map_->tileset.tileWidth : 32;
     auto npcByTag = [&](int tag)->NpcInst* {
         auto it = sceneTags_.find(tag); if (it == sceneTags_.end()) return nullptr;

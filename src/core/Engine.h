@@ -41,6 +41,7 @@ public:
     void startPlaytest();
     void startPlaytestAt(int mapId, int x, int y);  // editor "이 맵에서 플레이" (F6)
     void startPlaytestScene(int sceneId);           // editor "▶ 시나리오 테스트"
+    void startPlaytestScenes(const std::vector<int>& sceneIds);  // 맵 전체재생(여러 장면 연속)
     void startPlaytestDialogue(int dialogueId, int mapId, int x, int y); // "▶ 대화 테스트"
 
     Project&      project()  { return *project_; }
