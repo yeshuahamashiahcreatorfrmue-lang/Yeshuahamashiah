@@ -49,7 +49,7 @@ json Event::toJson() const {
     return {
         {"id", id}, {"x", x}, {"y", y}, {"label", label}, {"sfx", sfx},
         {"type", eventTypeName(type)}, {"trigger", triggerName(trigger)},
-        {"graphicAsset", graphicAsset},
+        {"graphicAsset", graphicAsset}, {"charId", charId},
         {"text", text},
         {"targetMap", targetMap}, {"targetX", targetX}, {"targetY", targetY},
         {"itemId", itemId}, {"amount", amount},
@@ -88,6 +88,7 @@ Event Event::fromJson(const json& j) {
     e.type            = eventTypeFrom(j.value("type", "message"));
     e.trigger         = triggerFrom(j.value("trigger", "action"));
     e.graphicAsset    = j.value("graphicAsset", -1);
+    e.charId          = j.value("charId", -1);
     e.text            = j.value("text", "");
     e.targetMap       = j.value("targetMap", -1);
     e.targetX         = j.value("targetX", 0);

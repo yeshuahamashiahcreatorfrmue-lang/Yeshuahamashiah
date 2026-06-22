@@ -64,6 +64,7 @@ void Editor::drawDialogueTab() {
         Rectangle imgR = { bx, by, pw, ph };
         DrawTexturePro(th->texture, { 0, 0, tw, -tht }, imgR, { 0, 0 }, 0, WHITE);
         DrawRectangleLinesEx(imgR, 1, Fade(BLACK, 0.6f));
+        drawMapElementMarkers(*m, bx, by, pw, ph, false);   // 미리보기처럼 이벤트/몹/오브젝트 표시(NPC는 아래 스프라이트로)
         int mwT = m->tilemap.width(), mhT = m->tilemap.height();
         Vector2 mouse = GetMousePosition();
         bool overPopup = editing && mouse.x > mapX + mapW;
@@ -110,10 +111,7 @@ void Editor::drawDialogueTab() {
     if (npc) {
         if (ui::button({ px, py, pw2 / 2 - 4, 24 }, "등록된 캐릭터")) {
             int mid = dlgMapId_, eid = npc->id;
-            openCharBrowser([this, mid, eid](int cid){
-                const CharacterDef* c = engine_.project().database.character(cid); int aid = c ? charThumbAsset(*c) : -1;
-                if (auto mm = engine_.project().map(mid)) for (auto& e : mm->events) if (e.id == eid) e.graphicAsset = aid;
-            });
+            openCharBrowser([this, mid, eid](int cid){ applyCharToNpc(mid, eid, cid); });
         }
         Rectangle nf = { px + pw2 / 2 + 4, py, pw2 / 2 - 4, 24 };
         if (ui::mouseIn(nf) && lclick) dlgFocus_ = 50; else if (lclick && !ui::mouseIn(nf) && dlgFocus_ == 50) dlgFocus_ = -1;
@@ -391,11 +389,12 @@ void Editor::drawScenarioTab() {
     auto s2t = [&](int& tx, int& ty){ tx = std::max(0,std::min(mwT-1,(int)((mouse.x-bx)/pw*mwT))); ty = std::max(0,std::min(mhT-1,(int)((mouse.y-by)/ph*mhT))); };
     float tileSp = pw/mwT;
 
-    // faint NPC context markers (and click target for 발동 NPC mode)
+    // full context markers (이벤트·NPC·몹·오브젝트·몹스폰) like the world preview
+    drawMapElementMarkers(*m, bx, by, pw, ph, true);
+    // NPC click targets for 발동 NPC mode + current-trigger highlight
     for (auto& e : m->events) {
-        if (e.graphicAsset < 0) continue;
+        if (e.graphicAsset < 0 && e.charId < 0) continue;
         Vector2 sp = t2s((float)e.x, (float)e.y);
-        DrawCircleV(sp, 5, Fade(ui::factionColor((int)e.faction), 0.6f));
         if (e.id == trigNpcId) { DrawCircleLines((int)sp.x,(int)sp.y,9,ui::kGood); DrawTextU("발동", (int)sp.x+8,(int)sp.y-8,11,ui::kGood); }
         if (scnTrigMode_==2 && CheckCollisionPointCircle(mouse, sp, 8)) {
             DrawCircleLines((int)sp.x,(int)sp.y,9,WHITE);

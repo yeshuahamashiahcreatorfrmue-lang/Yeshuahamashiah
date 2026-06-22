@@ -229,6 +229,65 @@ int Editor::charThumbAsset(const CharacterDef& c) {
     return -1;
 }
 
+// Assign a registered character (상하좌우 각각 등록) to an NPC event: store its id
+// (charId, used for directional runtime rendering) plus a thumbnail/footprint in the
+// event so markers/preview keep working. Replaces the old "single sheet asset" NPC.
+void Editor::applyCharToNpc(int mapId, int eventId, int charId) {
+    auto m = engine_.project().map(mapId);
+    if (!m) return;
+    const CharacterDef* c = engine_.project().database.character(charId);
+    for (auto& e : m->events) if (e.id == eventId) {
+        e.charId = charId;
+        e.graphicAsset = c ? charThumbAsset(*c) : -1;
+        if (c) { e.drawTilesW = std::max(1, c->drawTilesW); e.drawTilesH = std::max(1, c->drawTilesH); e.drawPct = c->drawPct; }
+    }
+    engine_.project().save();
+}
+
+// Draw EVERY map element (events by type + mob spawns) as labelled markers — the
+// same comprehensive set the World preview shows — for context on the 대화/시나리오
+// maps. Read-only (selection/editing is handled by the caller). bx/by/pw/ph = the
+// on-screen rect the map thumbnail is drawn into.
+void Editor::drawMapElementMarkers(Map& m, float bx, float by, float pw, float ph, bool includeNpc) {
+    Project& p = engine_.project();
+    int mwT = m.tilemap.width(), mhT = m.tilemap.height();
+    if (mwT <= 0 || mhT <= 0) return;
+    auto t2s = [&](int tx, int ty){ return Vector2{ bx + (tx+0.5f)/mwT*pw, by + (ty+0.5f)/mhT*ph }; };
+    Vector2 mouse = GetMousePosition();
+    const char* tn[] = { "메시지","이동","아이템","스위치","전투","상점","퀘스트","엔딩","회복" };
+    // events: NPC(sprite) vs plain event (teleport/item/shop/…)
+    for (auto& e : m.events) {
+        bool isNpc = (e.graphicAsset >= 0 || e.charId >= 0);
+        if (isNpc && !includeNpc) continue;   // NPCs drawn as sprites by the caller
+        Vector2 sp = t2s(e.x, e.y);
+        bool entrance = (e.type == EventType::Teleport && e.targetMap >= 0);
+        Color col = entrance ? ui::kGood
+                  : e.type == EventType::StartBattle ? ui::kDanger
+                  : isNpc ? ui::factionColor((int)e.faction)
+                          : Color{ 240, 210, 80, 255 };
+        DrawCircleV(sp, 4.5f, Fade(BLACK, 0.6f));
+        DrawCircleV(sp, 3.5f, col);
+        if (entrance) DrawRectangleLinesEx({ sp.x-5, sp.y-5, 10, 10 }, 1, WHITE);
+        if (CheckCollisionPointCircle(mouse, sp, 6)) {
+            std::string lbl = isNpc
+                ? (e.faction==NpcFaction::Enemy?"몹/적":e.faction==NpcFaction::Ally?"NPC아군":"NPC")
+                : ((int)e.type>=0 && (int)e.type<9 ? tn[(int)e.type] : "?");
+            DrawTextU(lbl.c_str(), (int)sp.x+8, (int)sp.y-8, 12, WHITE);
+        }
+    }
+    // mob spawn points
+    for (auto& s : m.mobSpawns) {
+        Vector2 sp = t2s(s.x, s.y);
+        DrawCircleV(sp, 5, Fade(BLACK, 0.6f));
+        DrawCircleV(sp, 4, Color{ 180, 90, 220, 255 });
+        DrawTextU("M", (int)sp.x-3, (int)sp.y-6, 11, WHITE);
+        if (CheckCollisionPointCircle(mouse, sp, 6)) {
+            const CharacterDef* md = p.database.mob(s.mobId);
+            DrawTextU(md?md->name.c_str():"몹", (int)sp.x+8, (int)sp.y-8, 12, WHITE);
+        }
+    }
+}
+
 // Remove a registered character cleanly: scrub the player reference, fix the
 // editor selection. (Characters are separate from raw assets and from db.mobs.)
 void Editor::deleteCharacterDef(int idx) {

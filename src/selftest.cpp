@@ -165,7 +165,7 @@ static void testProjectIO() {
     m->tilemap.setBlocked(2, 2, true);
     Event ev; ev.id = 1; ev.x = 4; ev.y = 4; ev.type = EventType::Message; ev.text = "Hello!";
     m->events.push_back(ev);
-    Event npc; npc.id = 2; npc.x = 6; npc.y = 6; npc.graphicAsset = 0;
+    Event npc; npc.id = 2; npc.x = 6; npc.y = 6; npc.graphicAsset = 0; npc.charId = 3;
     npc.faction = NpcFaction::Enemy; npc.behavior = NpcBehavior::Chase;
     npc.drawPct = 200; npc.npcHp = 80; npc.npcAtk = 14; npc.npcDef = 3;
     m->events.push_back(npc);
@@ -188,6 +188,7 @@ static void testProjectIO() {
               "NPC faction/behavior persisted");
         CHECK(en && en->drawPct == 200 && en->npcHp == 80 && en->npcAtk == 14 && en->npcDef == 3,
               "NPC draw size & combat stats persisted");
+        CHECK(en && en->charId == 3, "NPC 등록 캐릭터(charId·상하좌우) 직렬화");
     }
     fs::remove_all(tmp, ec);
 }

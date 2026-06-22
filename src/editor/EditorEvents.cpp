@@ -42,22 +42,16 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
     float x = panel.x + 12, y = panel.y + 10;
     ui::label("NPC 데이터", (int)x, (int)y, 22, ui::kAccent); y += 38;
 
-    assetButton({ x, y, 300, 26 }, "캐릭터", ev.graphicAsset, 2003);
-    y += 30;
-    if (ui::button({ x, y, 300, 26 }, "등록된 캐릭터에서 선택 (목록·검색)", true)) {
+    // NPC = 등록된 캐릭터(상하좌우 각각 등록). 단일 이미지 통째 사용은 제거.
+    const CharacterDef* cc = engine_.project().database.character(ev.charId);
+    DrawTextU(("캐릭터: " + std::string(cc ? cc->name : "(없음 — 선택 필요)")).c_str(),
+              (int)x, (int)y, 14, cc ? ui::kAccentHi : ui::kDanger); y += 22;
+    if (ui::button({ x, y, 300, 26 }, "등록된 캐릭터에서 선택 (상하좌우 등록)", true)) {
         int mid = activeMapId_, eid = ev.id;
-        openCharBrowser([this, mid, eid](int cid){   // cid = 등록된 캐릭터 id → 대표 스프라이트를 NPC 그래픽으로
-            const CharacterDef* c = engine_.project().database.character(cid);
-            int aid = c ? charThumbAsset(*c) : -1;
-            if (auto m = engine_.project().map(mid)) for (auto& e : m->events) if (e.id == eid) e.graphicAsset = aid;
-        });
+        openCharBrowser([this, mid, eid](int cid){ applyCharToNpc(mid, eid, cid); });
     }
     y += 30;
-    if (ui::button({ x, y, 300, 24 }, "캐릭터 에셋 가져오기 (외부 이미지)", true)) {
-        pendingNpcEventId_ = ev.id; pendingNpcCharImport_ = true;
-    }
-    y += 28;
-    DrawTextU("4방향(세로4×가로4) 캐릭터 시트 권장.", (int)x, (int)y, 11, ui::kTextDim); y += 22;
+    DrawTextU("캐릭터는 '캐릭터' 탭에서 상/하/좌/우 프레임을 각각 등록.", (int)x, (int)y, 11, ui::kTextDim); y += 22;
 
     drawNpcStatRows(ev, x, y, 300); y += 6;
 
@@ -229,15 +223,24 @@ void Editor::newObjectAt(Map& m, int tx, int ty) {
     Event ne; ne.id = m.nextEventId(); ne.x = tx; ne.y = ty;
     ne.type = pr.type; ne.trigger = pr.trig; ne.text = pr.dft;
     if (pr.sprite) {
-        auto imgs = engine_.project().assets.byType(AssetType::Image);
-        ne.graphicAsset = imgs.empty() ? -1 : imgs.front()->id;
+        // NPC는 등록된 캐릭터(상하좌우)를 사용. 캐릭터가 있으면 첫 캐릭터로 시작.
+        const auto& chars = engine_.project().database.characters;
+        if (!chars.empty()) {
+            ne.charId = chars.front().id; ne.graphicAsset = charThumbAsset(chars.front());
+            ne.drawTilesW = std::max(1, chars.front().drawTilesW);
+            ne.drawTilesH = std::max(1, chars.front().drawTilesH);
+            ne.drawPct = chars.front().drawPct;
+        } else {
+            auto imgs = engine_.project().assets.byType(AssetType::Image);
+            ne.graphicAsset = imgs.empty() ? -1 : imgs.front()->id;   // 캐릭터가 없을 때만 임시 이미지
+        }
         ne.faction = pr.fac;
         ne.behavior = (pr.fac == NpcFaction::Neutral) ? NpcBehavior::Wander : NpcBehavior::Chase;
         if (pr.fac == NpcFaction::Enemy) { ne.npcHp = 30; ne.npcAtk = 8; ne.npcDef = 2; }
     }
     m.events.push_back(ne);
     editingEventId_ = ne.id;
-    setStatus(std::string("오브젝트 추가: ") + pr.name);
+    setStatus(std::string("오브젝트 추가: ") + pr.name + (ne.charId>=0?" (등록 캐릭터에서 선택 권장)":""));
 }
 
 // Right-side editor inside the fullscreen map preview: add any object/NPC/event/

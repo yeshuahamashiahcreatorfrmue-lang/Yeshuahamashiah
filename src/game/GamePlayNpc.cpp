@@ -17,12 +17,16 @@ void GamePlay::spawnNpcs() {
     npcs_.clear();
     if (!map_) return;
     int TS = map_->tileset.tileWidth;
+    const Database& db = engine_.project().database;
     for (auto& e : map_->events) {
-        if (e.graphicAsset < 0) continue;           // only events with a sprite are NPCs
+        if (e.graphicAsset < 0 && e.charId < 0) continue;   // NPC = 캐릭터(charId) 또는 구버전 스프라이트
         NpcInst n;
-        n.eventId = e.id; n.spriteAsset = e.graphicAsset;
+        n.eventId = e.id; n.spriteAsset = e.graphicAsset; n.charId = e.charId;
         n.faction = e.faction; n.behavior = e.behavior; n.drawPct = e.drawPct;
         n.drawTilesW = e.drawTilesW; n.drawTilesH = e.drawTilesH;
+        if (const CharacterDef* cd = db.character(e.charId)) {   // footprint from the registered char
+            n.drawPct = cd->drawPct; n.drawTilesW = std::max(1, cd->drawTilesW); n.drawTilesH = std::max(1, cd->drawTilesH);
+        }
         n.x = n.destX = n.homeX = e.x; n.y = n.destY = n.homeY = e.y;
         n.px = e.x * (float)TS; n.py = e.y * (float)TS;
         n.moveCd = 0.6f + (std::rand() % 100) / 80.0f;
@@ -252,14 +256,23 @@ void GamePlay::updateNpcs(float dt) {
 }
 
 void GamePlay::drawNpcs() {
+    const Database& db = engine_.project().database;
     for (auto& n : npcs_) {
         Color tint = WHITE;
         if (n.hurtFlash > 0)                         tint = Color{ 255, 120, 120, 255 };
         else if (n.faction == NpcFaction::Enemy)     tint = Color{ 255, 200, 200, 255 };
         else if (n.faction == NpcFaction::Ally)      tint = Color{ 205, 235, 255, 255 };
-        drawCharacter(n.spriteAsset, n.dir, n.moving ? n.frame : 0, n.px, n.py,
-                      tint, 4, std::max(1, n.drawTilesW) * n.drawPct / 100.0f,
-                      std::max(1, n.drawTilesH) * n.drawPct / 100.0f);
+        float wS = std::max(1, n.drawTilesW) * n.drawPct / 100.0f;
+        float hS = std::max(1, n.drawTilesH) * n.drawPct / 100.0f;
+        const CharacterDef* cd = nullptr;
+        if (n.charId >= 0) { cd = db.character(n.charId); if (!cd) cd = db.mob(n.charId); }
+        if (cd) {   // 등록된 캐릭터: 방향별(상하좌우) 프레임으로 렌더 (몹과 동일 경로)
+            const auto& fr = cd->motions[MO_Walk].dirFrames(n.dir);
+            int asset = fr.empty() ? -1 : fr[(n.moving ? n.frame : 0) % (int)fr.size()];
+            drawCharacter(asset, n.dir, 0, n.px, n.py, tint, 1, wS, hS);
+        } else {    // 구버전: 단일 4방향 시트
+            drawCharacter(n.spriteAsset, n.dir, n.moving ? n.frame : 0, n.px, n.py, tint, 4, wS, hS);
+        }
         // faction tag dot + HP bar for combatants
         if (n.combatant()) {
             int TS = map_ ? map_->tileset.tileWidth : kDefaultTileSize;

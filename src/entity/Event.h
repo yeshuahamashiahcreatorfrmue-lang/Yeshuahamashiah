@@ -49,7 +49,8 @@ struct Event {
     std::string label;       // optional author note shown in the event list
     EventType   type    = EventType::Message;
     TriggerType trigger = TriggerType::ActionButton;
-    int         graphicAsset = -1; // optional sprite shown on the map
+    int         graphicAsset = -1; // 표시용 썸네일/구버전 단일 시트(상하좌우 합본). 마커·미리보기에 사용.
+    int         charId = -1;       // 등록된 캐릭터(상하좌우 각각 등록) id — 런타임에 방향별 스프라이트로 렌더
 
     std::string sfx;         // optional sound effect played when the event runs (stem name)
 

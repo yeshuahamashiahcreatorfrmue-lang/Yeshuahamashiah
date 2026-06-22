@@ -124,6 +124,7 @@ void GamePlay::spawnTimedNpc(int charId, int faction, float dur, bool follower) 
     }
     NpcInst n;
     n.eventId = -1000 - (int)npcs_.size();   // synthetic id (not from a map event)
+    n.charId = cd ? cd->id : -1;             // 방향별(상하좌우) 렌더
     n.spriteAsset = (cd && !cd->motions[MO_Walk].frames.empty()) ? cd->motions[MO_Walk].frames.front() : -1;
     n.faction = (NpcFaction)faction;
     n.behavior = NpcBehavior::Chase;          // allies follow / enemies chase

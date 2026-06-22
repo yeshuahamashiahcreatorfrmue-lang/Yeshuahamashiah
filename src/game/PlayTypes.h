@@ -40,7 +40,8 @@ struct FieldMonster {
 // Ally/Enemy factions, lightweight field combat.
 struct NpcInst {
     int eventId = -1;
-    int spriteAsset = -1;
+    int spriteAsset = -1;       // 구버전 단일 시트(상하좌우 합본) — charId<0 일 때만 사용
+    int charId = -1;            // 등록된 캐릭터: 방향별(상하좌우 각각 등록) 스프라이트로 렌더
     int x = 0, y = 0, destX = 0, destY = 0;
     float px = 0, py = 0;
     bool moving = false;

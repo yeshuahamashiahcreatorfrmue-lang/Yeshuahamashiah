@@ -66,6 +66,8 @@ public:
     bool charBrowserOpen() const { return charBrowserOpen_; }
     int  charThumbAsset(const CharacterDef& c);   // a character's representative sprite asset
     void deleteCharacterDef(int idx);             // remove a registered character + scrub refs
+    void applyCharToNpc(int mapId, int eventId, int charId); // NPC에 등록 캐릭터(상하좌우) 적용
+    void drawMapElementMarkers(Map& m, float bx, float by, float pw, float ph, bool includeNpc = true); // 미리보기처럼 모든 요소 표시
 
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
