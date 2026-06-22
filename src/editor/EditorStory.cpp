@@ -56,7 +56,7 @@ void Editor::drawDialogueTab() {
     Rectangle canvas = { mapX, top + 30, mapW, panelH - 30 };
     DrawRectangleRec(canvas, Color{ 18, 20, 26, 255 });
     auto m = p.map(dlgMapId_);
-    const RenderTexture2D* th = m ? mapThumb(dlgMapId_) : nullptr;
+    const RenderTexture2D* th = m ? bestThumb(dlgMapId_) : nullptr;
     if (th && m && m->tilemap.width() > 0) {
         float tw = (float)th->texture.width, tht = (float)th->texture.height;
         float s = std::min(canvas.width / tw, canvas.height / tht);
@@ -249,7 +249,7 @@ void Editor::drawScenarioTab() {
         DrawRectangleRec(canvas, Color{ 18, 20, 26, 255 });
         std::shared_ptr<Map> bm; for (auto& mm : p.maps) if (mm->placed) { bm = mm; break; }
         if (!bm && !p.maps.empty()) bm = p.maps.front();
-        const RenderTexture2D* bt = bm ? mapThumb(bm->id) : nullptr;
+        const RenderTexture2D* bt = bm ? bestThumb(bm->id) : nullptr;
         if (bt && bm->tilemap.width() > 0) {
             float tw=(float)bt->texture.width, tht=(float)bt->texture.height;
             float s=std::min(canvas.width/tw, canvas.height/tht);
@@ -470,7 +470,7 @@ void Editor::drawScenarioTab() {
     // ---- BIG MAP (left): markers + drag(RTS) + place + radius + remove + triggers ----
     Rectangle canvas = { mapX, top, mapW, panelH };
     DrawRectangleRec(canvas, Color{ 18, 20, 26, 255 });
-    const RenderTexture2D* th = m ? mapThumb(sc.editMapId) : nullptr;
+    const RenderTexture2D* th = m ? bestThumb(sc.editMapId) : nullptr;
     // map chooser overlaid top-left
     std::vector<std::string> mopts; std::vector<int> mvals;
     for (auto& mm : p.maps) { mopts.push_back(mm->name); mvals.push_back(mm->id); }

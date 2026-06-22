@@ -812,46 +812,51 @@ void Editor::ensureThumbsForTab() {
     Project& p = engine_.project();
     if (tab_ != prevTab_) {
         if (tab_ == Tab::World || tab_ == Tab::WorldView) clearMapThumbs();
-        // entering 시나리오 탭: drop the scene map thumb so map edits are reflected
-        if (tab_ == Tab::Scenario && scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size())
-            dropMapThumb(p.database.scenes[scnSel_].editMapId);
-        if (tab_ == Tab::Dialogue && dlgMapId_ >= 0) dropMapThumb(dlgMapId_);
+        // entering 시나리오/대화 탭: force the hi-res map to rebuild so map edits show
+        if (tab_ == Tab::Scenario || tab_ == Tab::Dialogue) {
+            if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
+            worldBigThumb_ = RenderTexture2D{}; worldBigId_ = -1;
+        }
         if (tab_ != Tab::World) { worldPreviewFull_ = false; worldPreviewStack_.clear(); }
         prevTab_ = tab_;
     }
-    if (tab_ == Tab::Scenario) {
-        // build the thumbnail for the currently-edited scene's background map
-        if (scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size()) {
-            int mid = p.database.scenes[scnSel_].editMapId;
-            if (mid >= 0 && p.map(mid) && !mapThumb(mid)) buildMapThumb(*p.map(mid));
-        } else {   // empty-state background: first placed map
-            for (auto& m : p.maps) if (m->placed) { if (!mapThumb(m->id)) buildMapThumb(*m); break; }
-        }
-    } else if (tab_ == Tab::Dialogue) {
-        // background map for the 대화 탭 (NPC 선택용)
-        if (dlgMapId_ >= 0 && p.map(dlgMapId_) && !mapThumb(dlgMapId_)) buildMapThumb(*p.map(dlgMapId_));
-    } else if (tab_ == Tab::WorldView) {
+    if (tab_ == Tab::WorldView) {
         for (auto& m : p.maps) if (m->placed && !mapThumb(m->id)) buildMapThumb(*m);
     } else if (tab_ == Tab::World) {
         if (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) {
             auto& m = p.maps[worldSelected_];
             if (!mapThumb(m->id)) buildMapThumb(*m);
         }
-        // hi-res texture for the fullscreen preview (rebuild when the shown map changes,
-        // including when diving into a building interior)
-        if (worldPreviewFull_ && worldPreviewMapId_ >= 0 && worldBigId_ != worldPreviewMapId_) {
-            if (auto pm = p.map(worldPreviewMapId_)) {
-                if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
-                worldBigThumb_ = makeMapThumb(*pm, 1280, 860);
-                worldBigId_ = worldPreviewMapId_;
-            }
+    }
+    // ── hi-res map texture (worldBigThumb_) shared by 월드 미리보기 / 시나리오 / 대화 ──
+    // so those tabs show a SHARP, detailed map (월드 미리보기처럼) instead of a tiny thumbnail.
+    int bigWant = -1;
+    if (tab_ == Tab::World && worldPreviewFull_) bigWant = worldPreviewMapId_;
+    else if (tab_ == Tab::Scenario) {
+        if (scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size()) bigWant = p.database.scenes[scnSel_].editMapId;
+        else { for (auto& m : p.maps) if (m->placed) { bigWant = m->id; break; } }
+    } else if (tab_ == Tab::Dialogue) {
+        bigWant = dlgMapId_;
+    }
+    if (bigWant >= 0 && worldBigId_ != bigWant) {
+        if (auto pm = p.map(bigWant)) {
+            if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
+            worldBigThumb_ = makeMapThumb(*pm, 1600, 1600);   // hi-res
+            worldBigId_ = bigWant;
         }
     }
-    // release the big preview texture when the overlay is closed / off the tab
-    if ((!worldPreviewFull_ || tab_ != Tab::World) && worldBigId_ >= 0) {
+    // release the hi-res texture only when no tab needs it
+    bool needBig = (tab_ == Tab::World && worldPreviewFull_) || tab_ == Tab::Scenario || tab_ == Tab::Dialogue;
+    if (!needBig && worldBigId_ >= 0) {
         if (worldBigThumb_.id) UnloadRenderTexture(worldBigThumb_);
         worldBigThumb_ = RenderTexture2D{}; worldBigId_ = -1;
     }
+}
+
+// hi-res worldBigThumb_ if it's built for this map, else the small cached thumbnail.
+const RenderTexture2D* Editor::bestThumb(int mapId) {
+    if (worldBigId_ == mapId && worldBigThumb_.id) return &worldBigThumb_;
+    return mapThumb(mapId);
 }
 
 } // namespace tsukuru

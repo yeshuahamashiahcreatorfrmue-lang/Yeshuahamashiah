@@ -85,6 +85,7 @@ private:
     RenderTexture2D makeMapThumb(Map& m, float maxW, float maxH); // render a map into a fit texture
     void buildMapThumb(Map& m);
     const RenderTexture2D* mapThumb(int mapId);
+    const RenderTexture2D* bestThumb(int mapId);  // hi-res(worldBigThumb_) if available, else small
     void dropMapThumb(int mapId);   // unload+erase one cached thumbnail (on map removal)
     void clearMapThumbs();
     void ensureThumbsForTab();   // build any missing thumbnails for the current tab
