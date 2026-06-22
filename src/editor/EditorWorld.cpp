@@ -812,13 +812,22 @@ void Editor::clearMapThumbs() {
 void Editor::ensureThumbsForTab() {
     // refresh thumbnails whenever we (re)enter a tab that shows them, so map
     // edits are reflected; then lazily build the ones actually needed.
+    Project& p = engine_.project();
     if (tab_ != prevTab_) {
         if (tab_ == Tab::World || tab_ == Tab::WorldView) clearMapThumbs();
+        // entering 시나리오 탭: drop the scene map thumb so map edits are reflected
+        if (tab_ == Tab::Scenario && scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size())
+            dropMapThumb(p.database.scenes[scnSel_].editMapId);
         if (tab_ != Tab::World) { worldPreviewFull_ = false; worldPreviewStack_.clear(); }
         prevTab_ = tab_;
     }
-    Project& p = engine_.project();
-    if (tab_ == Tab::WorldView) {
+    if (tab_ == Tab::Scenario) {
+        // build the thumbnail for the currently-edited scene's background map
+        if (scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size()) {
+            int mid = p.database.scenes[scnSel_].editMapId;
+            if (mid >= 0 && p.map(mid) && !mapThumb(mid)) buildMapThumb(*p.map(mid));
+        }
+    } else if (tab_ == Tab::WorldView) {
         for (auto& m : p.maps) if (m->placed && !mapThumb(m->id)) buildMapThumb(*m);
     } else if (tab_ == Tab::World) {
         if (worldSelected_ >= 0 && worldSelected_ < (int)p.maps.size()) {

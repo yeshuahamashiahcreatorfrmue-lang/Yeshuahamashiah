@@ -165,6 +165,7 @@ private:
     float dlgLineScroll_ = 0, dlgAnsScroll_ = 0, dlgListScroll_ = 0, scnListScroll_ = 0;
     int   scnSel_ = -1, scnFocus_ = -1;
     float scnActScroll_ = 0;
+    int   scnActSel_ = -1;            // 맵에서 편집 중인 동작(액션) 인덱스
 
     // dropdown picker state (see optionButton/drawPickerOverlay)
     int   pickerId_ = -1;

@@ -47,19 +47,25 @@ DialogueScenario dialogueFromJson(const json& j) {
 
 json sceneToJson(const Scene& s) {
     json acts = json::array();
-    for (const auto& a : s.actions)
+    for (const auto& a : s.actions) {
+        json rt = json::array(); for (int t : a.removeTags) rt.push_back(t);
         acts.push_back({{"type", a.type}, {"targetId", a.targetId}, {"refId", a.refId},
-                        {"x", a.x}, {"y", a.y}, {"time", a.time}});
-    return {{"id", s.id}, {"name", s.name}, {"actions", acts}};
+                        {"x", a.x}, {"y", a.y}, {"time", a.time},
+                        {"radius", a.radius}, {"removeTags", rt}});
+    }
+    return {{"id", s.id}, {"name", s.name}, {"editMapId", s.editMapId}, {"actions", acts}};
 }
 Scene sceneFromJson(const json& j) {
     Scene s;
     s.id = j.value("id", -1); s.name = j.value("name", "장면");
+    s.editMapId = j.value("editMapId", -1);
     for (const auto& aj : j.value("actions", json::array())) {
         SceneAction a;
         a.type = aj.value("type", (int)SA_Wait);
         a.targetId = aj.value("targetId", -1); a.refId = aj.value("refId", -1);
         a.x = aj.value("x", 0); a.y = aj.value("y", 0); a.time = aj.value("time", 1.0f);
+        a.radius = aj.value("radius", 1);
+        for (const auto& tj : aj.value("removeTags", json::array())) a.removeTags.push_back(tj.get<int>());
         s.actions.push_back(a);
     }
     return s;

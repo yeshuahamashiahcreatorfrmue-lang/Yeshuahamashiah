@@ -190,7 +190,8 @@ void GamePlay::updateScene(float dt) {
             if (a.refId >= 0 && db.dialogue(a.refId)) startDialogue(a.refId);
             advance = true; break;                  // dialogue runs in its own phase; we resume after
         case SA_Effect:
-            spawnFx(3, a.x*(float)TS, a.y*(float)TS, 0, a.refId, std::max(0.2f, a.time), TS*1.2f);
+            spawnFx(3, a.x*(float)TS, a.y*(float)TS, 0, a.refId, std::max(0.2f, a.time),
+                    TS * 1.2f * std::max(1, a.radius));   // 반경(타일)에 비례한 크기
             sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
         case SA_Spawn: {
             if (const CharacterDef* md = db.mob(a.refId)) {
@@ -204,8 +205,12 @@ void GamePlay::updateScene(float dt) {
             advance = true; break;
         }
         case SA_Remove: {
-            auto it = sceneTags_.find(a.targetId);
-            if (it != sceneTags_.end()) {
+            // 복수 선택한 태그(removeTags) + 단일 targetId 모두 제거
+            std::vector<int> tags = a.removeTags;
+            if (a.targetId >= 0) tags.push_back(a.targetId);
+            for (int tag : tags) {
+                auto it = sceneTags_.find(tag);
+                if (it == sceneTags_.end()) continue;
                 int eid = it->second;
                 npcs_.erase(std::remove_if(npcs_.begin(), npcs_.end(),
                             [eid](const NpcInst& n){ return n.eventId == eid; }), npcs_.end());

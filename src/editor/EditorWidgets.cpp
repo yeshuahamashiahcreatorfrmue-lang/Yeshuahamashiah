@@ -25,10 +25,9 @@ std::string Editor::searchBox(Rectangle r, std::string& text, int id) {
     DrawRectangleLinesEx(r, 1, searchFocusId_ == id ? ui::kAccent : Fade(BLACK, 0.5f));
     if (ui::g_inputEnabled && ui::mouseIn(r) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) searchFocusId_ = id;
     else if (ui::g_inputEnabled && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(r) && searchFocusId_ == id) searchFocusId_ = -1;
-    ui::textField({ r.x + 18, r.y, r.width - 22, r.height }, text, searchFocusId_ == id, 40);
-    DrawTextU("🔍", (int)r.x + 3, (int)r.y + 3, 13, ui::kTextDim);
+    ui::textField({ r.x + 6, r.y, r.width - 10, r.height }, text, searchFocusId_ == id, 40);
     if (text.empty() && searchFocusId_ != id)
-        DrawTextU("검색…", (int)r.x + 20, (int)r.y + 4, 13, ui::kTextDim);
+        DrawTextU("검색…", (int)r.x + 8, (int)r.y + 4, 13, ui::kTextDim);
     return text;
 }
 

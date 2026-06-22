@@ -60,15 +60,18 @@ inline const char* const kSceneActNames[6] = { "이동","대화","이펙트","�
 
 struct SceneAction {
     int   type = SA_Wait;
-    int   targetId = -1;   // SA_Spawn/Remove/MoveChar: a tag id (1..) the scene assigns
+    int   targetId = -1;   // SA_Spawn/Remove/MoveChar/Wait: a tag id (1..) the scene assigns
     int   refId = -1;      // mob/char/dialogue/effect-asset id depending on type
-    int   x = 0, y = 0;    // tile position (move/effect/spawn)
+    int   x = 0, y = 0;    // tile position (move/effect/spawn) — set on the map
     float time = 1.0f;     // duration / wait seconds
+    int   radius = 1;      // SA_Effect: 영향 타일 반경 (맵에서 지정)
+    std::vector<int> removeTags;  // SA_Remove: 복수 선택한 제거 대상 태그들
 };
 
 struct Scene {
     int id = -1;
     std::string name = "장면";
+    int editMapId = -1;    // 편집 시 배경으로 보는 맵(런타임 동작과 무관)
     std::vector<SceneAction> actions;
 };
 
