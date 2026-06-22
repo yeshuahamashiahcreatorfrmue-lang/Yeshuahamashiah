@@ -150,11 +150,15 @@ void Editor::audioButton(Rectangle r, const std::string& label, int& assetId, in
         else { pickerId_ = id; pickerScroll_ = 0; }
     }
     if (pickerId_ == id) {
-        std::vector<std::string> opts = { "없음" }; std::vector<int> vals = { -1 };
+        std::vector<std::string> opts = { "없음", "+ 외부에서 불러오기…(확장자 자유)" };
+        std::vector<int> vals = { -1, -1 };
         for (const auto* a : engine_.project().assets.byType(AssetType::Audio)) { opts.push_back(a->name); vals.push_back(a->id); }
-        int cur2 = 0; for (int i = 0; i < (int)vals.size(); ++i) if (vals[i] == assetId) cur2 = i;
+        int cur2 = 0; for (int i = 2; i < (int)vals.size(); ++i) if (vals[i] == assetId) cur2 = i;
         pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerCurIdx_ = cur2;
-        pickerApply_ = [&assetId, vals](int i){ assetId = (i < (int)vals.size()) ? vals[i] : -1; };
+        pickerApply_ = [this, &assetId, vals](int i){
+            if (i == 1) { pendingAudioTarget_ = &assetId; pendingSceneAudioImport_ = true; return; }
+            assetId = (i >= 0 && i < (int)vals.size()) ? vals[i] : -1;
+        };
     }
 }
 

@@ -8,6 +8,8 @@
 #include "core/Text.h"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
@@ -491,6 +493,70 @@ void Editor::pickAndImportBgm() {
     m->bgmAsset = id;
     p.save();
     setStatus("BGM 등록됨: " + assetName(id));
+}
+
+// Import an external audio file regardless of its extension ("확장자 자유").
+// The real format is sniffed from the file header so raylib can decode it even
+// when the file was renamed (e.g. song.dat); the copy stored in the project gets
+// the correct extension. Returns the new Audio asset id, or -1.
+int Editor::importExternalAudio(const std::string& src) {
+    Project& p = engine_.project();
+    std::error_code ec;
+    if (!fs::exists(src, ec)) return -1;
+    fs::path destDir = fs::path(p.dir) / "assets";
+    fs::create_directories(destDir, ec);
+    // 1) copy to an ASCII-named temp (UTF-8 safe) so we can read the header back
+    fs::path tmp = destDir / "_extaudio.tmp";
+    int k = 1;
+    while (fs::exists(tmp, ec)) tmp = destDir / ("_extaudio" + std::to_string(k++) + ".tmp");
+    if (!plat::copyFileUtf8(src, tmp.string())) {
+        fs::copy_file(src, tmp, fs::copy_options::overwrite_existing, ec);
+        if (ec) return -1;
+    }
+    // 2) sniff the format from magic bytes
+    unsigned char h[16] = {0}; size_t n = 0;
+    if (FILE* f = fopen(tmp.string().c_str(), "rb")) { n = fread(h, 1, sizeof(h), f); fclose(f); }
+    auto eq = [&](const char* s, size_t len){ return n >= len && memcmp(h, s, len) == 0; };
+    std::string ext;
+    if      (eq("OggS", 4)) ext = ".ogg";
+    else if (eq("fLaC", 4)) ext = ".flac";
+    else if (eq("RIFF", 4) && n >= 12 && memcmp(h + 8, "WAVE", 4) == 0) ext = ".wav";
+    else if (eq("ID3", 3))  ext = ".mp3";
+    else if (n >= 2 && h[0] == 0xFF && (h[1] & 0xE0) == 0xE0) ext = ".mp3"; // MPEG frame sync
+    else if (eq("qoaf", 4)) ext = ".qoa";
+    if (ext.empty()) {                                   // fall back to original ext
+        std::string oe = fs::path(src).extension().string();
+        for (auto& c : oe) c = (char)tolower((unsigned char)c);
+        ext = isAudioExt(oe) ? oe : ".wav";
+    }
+    // 3) move temp -> final name (original stem + sniffed ext), avoiding clobber
+    std::string stem = fs::path(src).stem().string();
+    if (stem.empty()) stem = "audio";
+    fs::path dest = destDir / (stem + ext);
+    int dup = 1;
+    while (fs::exists(dest, ec)) dest = destDir / (stem + "_" + std::to_string(dup++) + ext);
+    fs::rename(tmp, dest, ec);
+    if (ec) {                                            // cross-device: copy + remove
+        fs::copy_file(tmp, dest, fs::copy_options::overwrite_existing, ec);
+        fs::remove(tmp, ec);
+        if (ec) return -1;
+    }
+    std::string rel = (fs::path("assets") / dest.filename()).generic_string();
+    return p.assets.addExisting(AssetType::Audio, dest.stem().string(), rel);
+}
+
+// Deferred: open the file picker (any extension) and assign the imported audio to
+// whichever music slot requested it (scene music / title music).
+void Editor::pickAndImportSceneAudio() {
+    int* tgt = pendingAudioTarget_; pendingAudioTarget_ = nullptr;
+    if (!tgt) return;
+    std::vector<std::string> files = plat::openAudioFiles();
+    if (files.empty()) { setStatus("음악 불러오기 취소됨."); return; }
+    int id = importExternalAudio(files.front());
+    if (id < 0) { setStatus("음악 불러오기 실패."); return; }
+    *tgt = id;
+    engine_.project().save();
+    setStatus("음악 등록됨: " + assetName(id));
 }
 
 // Import an external image as a DB item's icon (food/drink/equipment picture).

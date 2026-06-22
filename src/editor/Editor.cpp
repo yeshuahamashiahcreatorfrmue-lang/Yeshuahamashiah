@@ -105,6 +105,7 @@ void Editor::update(float dt) {
     if (pendingEffectImport_) { pendingEffectImport_ = false; pickAndImportEffect(); }
     if (pendingSoundImport_)  { pendingSoundImport_  = false; pickAndImportSound(); }
     if (pendingBgmImport_)    { pendingBgmImport_    = false; pickAndImportBgm(); }
+    if (pendingSceneAudioImport_){ pendingSceneAudioImport_= false; pickAndImportSceneAudio(); }
     if (pendingItemIcon_)     { pendingItemIcon_     = false; pickAndImportItemIcon(); }
     if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }

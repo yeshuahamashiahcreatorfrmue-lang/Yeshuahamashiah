@@ -164,6 +164,8 @@ private:
     void pickAndImportEffect();                       // file picker -> assign a skill effect strip (multi = frames)
     void pickAndImportSound();                        // file picker -> assign a skill sound
     void pickAndImportBgm();                          // file picker -> import + assign a map's BGM
+    void pickAndImportSceneAudio();                   // file picker -> import + assign a scene/title music slot
+    int  importExternalAudio(const std::string& src); // any-extension audio import (sniffs real format) -> asset id
     void pickAndImportItemIcon();                     // file picker -> import + assign a DB item's icon
     void pickAndImportTileset();                      // file picker -> assign the active map's tileset (no crop)
     bool aiCutout(Image& img);                        // AI subject cut-out (true if the model handled it)
@@ -357,6 +359,8 @@ private:
     bool pendingSoundImport_  = false;     // request the picker to assign a skill sound
     bool pendingBgmImport_ = false;        // request the picker to import a map BGM
     int  pendingBgmMapId_ = -1;            // map awaiting an imported BGM
+    bool pendingSceneAudioImport_ = false; // request the picker to import scene/title music
+    int* pendingAudioTarget_ = nullptr;    // music-asset slot awaiting an imported file (valid 1 frame)
     bool pendingItemIcon_ = false;         // request the picker to import a DB item icon
     int  pendingItemIconId_ = -1;          // item awaiting an imported icon
     bool pendingTilesetImport_ = false;    // request the picker to assign the map tileset
