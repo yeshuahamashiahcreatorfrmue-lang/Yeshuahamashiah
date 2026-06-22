@@ -11,7 +11,7 @@ inline constexpr int   kUndoLimit = 42;  // Ctrl+Z history depth
 
 // Build tag shown in the editor so a user can confirm they launched the newest
 // build. Bump on every delivered build.
-inline const char* const kBuildTag = "빌드 0629r — 시나리오 제목(그룹) 시스템·제목별 발동·스냅샷 제거";
+inline const char* const kBuildTag = "빌드 0629s — 녹화본은 '제목없음'으로 들어가고 드래그로 제목에 추가";
 
 // Standardized world sizes (14 tiers), square, up to 1742x1742.
 inline constexpr int kSizeTierCount = 14;

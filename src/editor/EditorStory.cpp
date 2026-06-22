@@ -246,13 +246,13 @@ void Editor::drawScenarioTab() {
                 bool member = bucket ? (list[i].group.empty() || !inGroups(list[i].group)) : (list[i].group == g);
                 if (member) ids.push_back(i);
             }
-            if (bucket && ids.empty()) continue;
+            // '제목없음'은 비어 있어도 항상 표시(녹화본이 들어오고, 드래그로 빼낼 대상)
             bool selG = (!bucket && scnGroupSel_ == g);
             Rectangle hr = { lx, y, lw - 44, 22 };
             headerHits.push_back({ hr, g });
             if (y + 22 > ly && y < ly + reg.height) {
-                DrawRectangleRec(hr, selG ? ui::kAccent : ui::kPanelHi);
-                DrawTextU((bucket ? "(미분류)" : g).c_str(), (int)lx + 4, (int)y + 4, 12, selG ? BLACK : ui::kAccentHi);
+                DrawRectangleRec(hr, selG ? ui::kAccent : (bucket ? Color{40,42,50,255} : ui::kPanelHi));
+                DrawTextU((bucket ? "제목없음" : g).c_str(), (int)lx + 4, (int)y + 4, 12, selG ? BLACK : (bucket ? ui::kTextDim : ui::kAccentHi));
                 if (scnSceneDragIdx_ >= 0 && scnLpDragging_ && ui::mouseIn(hr)) DrawRectangleLinesEx(hr, 2, WHITE);
                 if (!bucket && ui::mouseIn(hr) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     scnGroupSel_ = g; scnGroupTrigDrag_ = g; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
@@ -292,7 +292,7 @@ void Editor::drawScenarioTab() {
                 if (scnLpDragging_ && scnSceneDragIdx_ < (int)list.size())
                     for (auto& hh : headerHits) if (CheckCollisionPointRec(mp, hh.first)) {
                         list[scnSceneDragIdx_].group = hh.second; p.save();
-                        setStatus(hh.second.empty()?"미분류로 이동":("제목 이동: "+hh.second)); break;
+                        setStatus(hh.second.empty()?"제목없음으로 이동":("제목 이동: "+hh.second)); break;
                     }
                 scnSceneDragIdx_ = -1; scnLpDragging_ = false;
             }
@@ -307,7 +307,7 @@ void Editor::drawScenarioTab() {
     auto createScene = [&]{
         Scene s; s.id = 1; for (auto& e : list) if (e.id >= s.id) s.id = e.id + 1;   // 고유 id
         s.name = "장면" + std::to_string(s.id);
-        s.group = scnGroupSel_;   // 선택된 제목(그룹) 아래로 등록
+        s.group.clear();   // 새 장면/녹화본은 '제목없음'으로 들어감 → 드래그로 제목에 추가
         for (auto& mm : p.maps) if (mm->placed) { s.editMapId = mm->id; break; }
         if (s.editMapId < 0 && !p.maps.empty()) s.editMapId = p.maps.front()->id;
         list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; scnObjSel_ = -1; scnAwaitDest_ = false; p.save();
@@ -355,7 +355,7 @@ void Editor::drawScenarioTab() {
     cy += 30;
     // ── 제목(그룹): 이 장면이 속한 제목 + 선택 제목 이름변경/삭제 ──
     {
-        DrawTextU(("제목: " + (sc.group.empty()?std::string("(미분류)"):sc.group)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi);
+        DrawTextU(("제목: " + (sc.group.empty()?std::string("제목없음"):sc.group)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi);
         cy += 16;
         int gi = -1; for (int i=0;i<(int)db.sceneGroups.size();++i) if (db.sceneGroups[i]==scnGroupSel_) gi=i;
         if (gi >= 0) {
