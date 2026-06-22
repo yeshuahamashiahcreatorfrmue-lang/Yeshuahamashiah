@@ -271,7 +271,7 @@ void GamePlay::drawNpcs() {
         float wS = std::max(1, n.drawTilesW) * n.drawPct / 100.0f;
         float hS = std::max(1, n.drawTilesH) * n.drawPct / 100.0f;
         const CharacterDef* cd = nullptr;
-        if (n.charId >= 0) { cd = db.character(n.charId); if (!cd) cd = db.mob(n.charId); }
+        if (n.charId >= 0) cd = n.charIsMob ? db.mob(n.charId) : db.character(n.charId);
         if (cd) {   // 등록된 캐릭터: 방향별(상하좌우) 프레임으로 렌더 (몹과 동일 경로)
             int mo = (n.sceneMotionT > 0 && n.sceneMotion >= 0) ? n.sceneMotion : MO_Walk;  // 시나리오 동작 전환
             const auto& fr = cd->motions[mo].dirFrames(n.dir).empty() ? cd->motions[MO_Walk].dirFrames(n.dir)

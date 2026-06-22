@@ -112,8 +112,8 @@ void GamePlay::applyDialogueAnswer(int idx) {
 void GamePlay::spawnTimedNpc(int charId, int faction, float dur, bool follower) {
     if (!map_) return;
     const Database& db = engine_.project().database;
-    const CharacterDef* cd = db.mob(charId);
-    if (!cd) cd = db.character(charId);
+    bool isMob = db.mob(charId) != nullptr;
+    const CharacterDef* cd = isMob ? db.mob(charId) : db.character(charId);
     int TS = map_->tileset.tileWidth;
     int fx = destX_, fy = destY_; bool found = false;
     for (int r=1;r<=5 && !found;++r) for(int dy=-r;dy<=r&&!found;++dy) for(int dx=-r;dx<=r&&!found;++dx){
@@ -124,7 +124,7 @@ void GamePlay::spawnTimedNpc(int charId, int faction, float dur, bool follower) 
     }
     NpcInst n;
     n.eventId = -1000 - (int)npcs_.size();   // synthetic id (not from a map event)
-    n.charId = cd ? cd->id : -1;             // 방향별(상하좌우) 렌더
+    n.charId = cd ? cd->id : -1; n.charIsMob = isMob;   // 방향별(상하좌우) 렌더
     n.spriteAsset = (cd && !cd->motions[MO_Walk].frames.empty()) ? cd->motions[MO_Walk].frames.front() : -1;
     n.faction = (NpcFaction)faction;
     n.behavior = NpcBehavior::Chase;          // allies follow / enemies chase
@@ -219,9 +219,12 @@ void GamePlay::updateScene(float dt) {
                     TS * 1.2f * std::max(1, a.radius));   // 반경(타일)에 비례한 크기
             sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
         case SA_Spawn: {
-            if (const CharacterDef* md = db.mob(a.refId)) {
+            // refId>=0 → db.mobs, refId<=-2 → db.characters(-refId-1) (등록 캐릭터 등장)
+            bool isMob = a.refId >= 0; int cid = isMob ? a.refId : (-a.refId - 1);
+            const CharacterDef* md = isMob ? db.mob(cid) : db.character(cid);
+            if (md) {
                 NpcInst n; n.eventId = -2000 - (int)npcs_.size();
-                n.charId = md->id;   // 방향별·동작전환 렌더
+                n.charId = cid; n.charIsMob = isMob;   // 방향별·동작전환 렌더
                 n.spriteAsset = md->motions[MO_Walk].frames.empty()? -1 : md->motions[MO_Walk].frames.front();
                 n.faction = NpcFaction::Neutral; n.behavior = NpcBehavior::Idle;
                 n.drawPct = md->drawPct; n.drawTilesW = std::max(1,md->drawTilesW); n.drawTilesH = std::max(1,md->drawTilesH);

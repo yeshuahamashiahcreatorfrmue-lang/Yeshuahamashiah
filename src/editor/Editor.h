@@ -201,6 +201,7 @@ private:
     bool  scnRecordMode_ = false;    // 녹화 모드: 무대 토큰을 끌어 배치 → '장면 녹화'로 기록
     int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)
     int   scnRecMob_ = -1;           // 무대에 등장시킬 몹
+    int   scnRecPlaceChar_ = -1;     // 브라우저에서 고른 등록 캐릭터(맵에 드롭 대기, charId)
     // RTS식 다중 선택/이동
     std::vector<int> scnSelTags_;    // 현재 선택된 토큰 태그들(다중 선택)
     bool  scnGroupDrag_ = false;     // 선택 그룹을 드래그 이동 중

@@ -247,11 +247,14 @@ void Editor::drawScenarioTab() {
         if (ui::button({ cx + cw - 50, cy, 50, 24 }, "삭제")) { list.erase(list.begin()+scnSel_); scnSel_=-1; scnActSel_=-1; p.save(); return; }
     }
     cy += 30;
+    // resolve a spawn's entity name (refId>=0 → 몹, refId<=-2 → 등록 캐릭터)
+    auto spawnEntName = [&](int refId)->std::string {
+        if (refId <= -2) { const CharacterDef* c = db.character(-refId-1); return c ? c->name : "캐릭터"; }
+        const CharacterDef* md = db.mob(refId); return md ? md->name : "몹";
+    };
     auto spawnTagLabel = [&](int tag)->std::string {
-        for (auto& a : sc.actions) if (a.type == SA_Spawn && a.targetId == tag) {
-            const CharacterDef* md = db.mob(a.refId);
-            return "#" + std::to_string(tag) + " " + (md ? md->name : "몹");
-        }
+        for (auto& a : sc.actions) if (a.type == SA_Spawn && a.targetId == tag)
+            return "#" + std::to_string(tag) + " " + spawnEntName(a.refId);
         return "#" + std::to_string(tag);
     };
 
@@ -268,7 +271,7 @@ void Editor::drawScenarioTab() {
     // ── 장면녹화 모드 토글 + 컨트롤 ──
     if (ui::button({ cx, cy, cw, 26 }, scnRecordMode_ ? "장면녹화 모드: 켜짐 (끄기)" : "장면녹화 모드 켜기", scnRecordMode_)) {
         scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear();
-        scnSelTags_.clear(); scnGroupDrag_ = false; scnMarquee_ = false; scnCtxOpen_ = false;
+        scnSelTags_.clear(); scnGroupDrag_ = false; scnMarquee_ = false; scnCtxOpen_ = false; scnRecPlaceChar_ = -1;
     }
     cy += 30;
     if (scnRecordMode_) {
@@ -277,12 +280,18 @@ void Editor::drawScenarioTab() {
         { int csd = (int)(scnStepDur_*100+0.5f); if (csd<42) csd=42; if (csd>142) csd=142;
           ui::intStepper({ cx, cy, cw, 24 }, "장면시간(×0.01초)", csd, 10, 42, 142); scnStepDur_ = csd/100.0f; }
         cy += 28;
-        // 무대에 몹 등장 추가
+        // 무대에 몹 등장 추가(중앙)
         entityButton({ cx, cy, cw/2-4, 24 }, "몹", scnRecMob_, ENT_Mob, 4700);
-        if (ui::button({ cx+cw/2+2, cy, cw/2-4, 24 }, "+ 무대 등장")) {
+        if (ui::button({ cx+cw/2+2, cy, cw/2-4, 24 }, "+ 몹 등장")) {
             int tag = 1; for (auto& a : sc.actions) if (a.type==SA_Spawn && a.targetId>=tag) tag = a.targetId+1;
             SceneAction sp; sp.type = SA_Spawn; sp.targetId = tag; sp.refId = scnRecMob_; sp.x = mcx; sp.y = mcy;
             sc.actions.push_back(sp); p.save();
+        }
+        cy += 28;
+        // 등록된 캐릭터에서 골라 맵에 끌어다 등장 (윈도우 탐색기식 브라우저)
+        if (ui::button({ cx, cy, cw, 24 }, scnRecPlaceChar_>=0 ? "맵에 클릭해서 등장 배치…" : "등록 캐릭터에서 등장(목록·검색)", scnRecPlaceChar_>=0)) {
+            if (scnRecPlaceChar_ >= 0) scnRecPlaceChar_ = -1;     // 토글 취소
+            else openCharBrowser([this](int cid){ scnRecPlaceChar_ = cid; });  // 고른 뒤 맵 클릭으로 배치
         }
         cy += 28;
         // 이펙트 뿌리기: 오른쪽 목록에서 선택 후 맵 클릭
@@ -550,7 +559,20 @@ void Editor::drawScenarioTab() {
     int hovTag = -1000;
     for (auto& kv : scnDraft_) if (CheckCollisionPointCircle(mouse, t2s(kv.second.x, kv.second.y), 11)) hovTag = kv.first;
 
-    if (!scnCtxOpen_) {
+    // dropping a browsed character onto the map → new 등장(SA_Spawn) at the click tile
+    if (scnRecPlaceChar_ >= 0) {
+        if (inMap) {
+            int tx, ty; s2t(tx, ty);
+            Vector2 g = t2s((float)tx, (float)ty);
+            DrawCircleLines((int)g.x,(int)g.y, 12, ui::kAccentHi);
+            DrawTextU(("여기 등장: " + spawnEntName(-scnRecPlaceChar_-1)).c_str(), (int)g.x+12, (int)g.y-8, 12, ui::kAccentHi);
+            if (lclick) {
+                int tag = 1; for (auto& a : sc.actions) if (a.type==SA_Spawn && a.targetId>=tag) tag = a.targetId+1;
+                SceneAction sp; sp.type = SA_Spawn; sp.targetId = tag; sp.refId = -scnRecPlaceChar_-1; sp.x = tx; sp.y = ty;
+                sc.actions.push_back(sp); scnRecPlaceChar_ = -1; p.save(); setStatus("등록 캐릭터 등장 추가됨");
+            }
+        }
+    } else if (!scnCtxOpen_) {
         // begin: press a token → (re)select + group drag; press empty → marquee (or effect drop)
         if (lclick && !scnGroupDrag_ && !scnMarquee_) {
             if (hovTag != -1000) {
