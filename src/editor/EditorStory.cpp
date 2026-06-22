@@ -559,17 +559,80 @@ void Editor::drawScenarioTab() {
             cy += 22;
             durControl(a.time);
         } else if (a.type == SA_Dialogue) {
-            entityButton({ cx, cy, cw, 24 }, "대화", a.refId, ENT_Dialogue, 4100); cy += 28;
-            if (ui::button({ cx, cy, cw, 24 }, "대화 편집(대화 탭)")) {
-                if (a.refId < 0 || !db.dialogue(a.refId)) {
-                    DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
-                    nd.name = sc.name + " 대사"; nd.lines.push_back({ "", "...", -1, {} });
-                    db.dialogues.push_back(nd); a.refId = nd.id; p.save();
-                }
-                for (int k=0;k<(int)db.dialogues.size();++k) if (db.dialogues[k].id==a.refId) dlgSel_=k;
-                dlgLineSel_=0; dlgPopupOpen_=true; tab_ = Tab::Dialogue; return;
+            // 대화를 보장(없으면 생성) — 대화 탭으로 가지 않고 여기서 전부 편집
+            if (a.refId < 0 || !db.dialogue(a.refId)) {
+                DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
+                nd.name = sc.name + " 대사"; nd.lines.push_back({ "", "...", -1, {} });
+                db.dialogues.push_back(nd); a.refId = nd.id; p.save();
             }
-            cy += 28;
+            DialogueScenario* d = nullptr; for (auto& dd : db.dialogues) if (dd.id==a.refId) d=&dd;
+            if (d) {
+                if (dlgLineSel_ < 0 || dlgLineSel_ >= (int)d->lines.size()) dlgLineSel_ = 0;
+                DrawTextU(TextFormat("대사 (%d줄)", (int)d->lines.size()), (int)cx, (int)cy, 11, ui::kAccentHi);
+                if (ui::button({ cx+cw-46, cy-2, 46, 18 }, "+줄")) { d->lines.push_back({"","...",-1,{}}); dlgLineSel_=(int)d->lines.size()-1; p.save(); }
+                cy += 18;
+                // 줄 목록(스크롤) — 클릭 선택, x 삭제
+                Rectangle lr = { cx, cy, cw, 58 };
+                uiScissor((int)lr.x,(int)lr.y,(int)lr.width,(int)lr.height);
+                if (ui::mouseIn(lr)) dlgLineScroll_ -= GetMouseWheelMove()*22;
+                if (dlgLineScroll_<0) dlgLineScroll_=0;
+                float ly2 = cy - dlgLineScroll_; int delLine=-1;
+                for (int i=0;i<(int)d->lines.size();++i) {
+                    if (ly2+20>cy && ly2<cy+lr.height) {
+                        std::string lbl = std::to_string(i+1)+". "+(d->lines[i].speaker.empty()?"":("["+d->lines[i].speaker+"] "))+d->lines[i].text;
+                        if ((int)lbl.size()>32) lbl=lbl.substr(0,31)+"..";
+                        if (ui::button({cx, ly2, cw-22, 20}, lbl, dlgLineSel_==i)) { dlgLineSel_=i; dlgFocus_=-1; }
+                        if (ui::button({cx+cw-20, ly2, 20, 20}, "x")) delLine=i;
+                    }
+                    ly2 += 22;
+                }
+                EndScissorMode();
+                if (delLine>=0 && (int)d->lines.size()>1) { d->lines.erase(d->lines.begin()+delLine); if(dlgLineSel_>=(int)d->lines.size())dlgLineSel_=(int)d->lines.size()-1; p.save(); }
+                cy += 62;
+                // 선택 줄 편집: 화자 + 초상캐릭터 + 대사
+                if (dlgLineSel_>=0 && dlgLineSel_<(int)d->lines.size()) {
+                    DialogueLine& ln = d->lines[dlgLineSel_];
+                    Rectangle sf={cx, cy, cw-52, 22};
+                    if (ui::mouseIn(sf)&&lclick) dlgFocus_=100; else if (lclick&&!ui::mouseIn(sf)&&dlgFocus_==100) dlgFocus_=-1;
+                    ui::textField(sf, ln.speaker, dlgFocus_==100, 30);
+                    if (ui::button({cx+cw-48, cy, 48, 22}, "화자")) {
+                        int li=dlgLineSel_, did=a.refId;
+                        openCharBrowser([this,li,did](int cid){
+                            if (cid<0) return;
+                            Database& dbx=engine_.project().database;
+                            DialogueScenario* dx=nullptr; for(auto&dd:dbx.dialogues) if(dd.id==did) dx=&dd;
+                            if (!dx||li<0||li>=(int)dx->lines.size()) return;
+                            const CharacterDef* c=dbx.character(cid);
+                            dx->lines[li].speakerAsset = c?charThumbAsset(*c):-1;
+                            if (dx->lines[li].speaker.empty()&&c) dx->lines[li].speaker=c->name;
+                            engine_.project().save();
+                        });
+                    }
+                    cy += 26;
+                    Rectangle tf={cx, cy, cw, 22};
+                    if (ui::mouseIn(tf)&&lclick) dlgFocus_=101; else if (lclick&&!ui::mouseIn(tf)&&dlgFocus_==101) dlgFocus_=-1;
+                    ui::textField(tf, ln.text, dlgFocus_==101, 200);
+                    cy += 26;
+                    // 선택지(답변) — 텍스트 + 효과유형, +추가/삭제
+                    DrawTextU(TextFormat("선택지 %d", (int)ln.answers.size()), (int)cx, (int)cy, 10, ui::kTextDim);
+                    if (ui::button({cx+cw-46, cy-2, 46, 18}, "+답변")) { ln.answers.push_back({}); p.save(); }
+                    cy += 18;
+                    int delAns=-1;
+                    for (int k=0;k<(int)ln.answers.size();++k) {
+                        DialogueAnswer& an = ln.answers[k];
+                        Rectangle af={cx, cy, cw-22, 20};
+                        int fid = 110+k;
+                        if (ui::mouseIn(af)&&lclick) dlgFocus_=fid; else if (lclick&&!ui::mouseIn(af)&&dlgFocus_==fid) dlgFocus_=-1;
+                        ui::textField(af, an.text, dlgFocus_==fid, 40);
+                        if (ui::button({cx+cw-20, cy, 20, 20}, "x")) delAns=k;
+                        cy += 22;
+                        std::vector<std::string> ro; for (int r=0;r<7;++r) ro.push_back(kDlgRespNames[r]);
+                        optionButton({cx+12, cy, cw-12, 20}, "효과", ro, {}, an.respType, 4200+k); cy += 22;
+                    }
+                    if (delAns>=0) { ln.answers.erase(ln.answers.begin()+delAns); p.save(); }
+                }
+            }
+            cy += 4;
         } else if (a.type == SA_Effect) {
             assetButton({ cx, cy, cw, 24 }, "이펙트", a.refId, 4200); cy += 28;
             DrawTextU(TextFormat("위치: %d,%d · 반경 %d칸", a.x, a.y, a.radius), (int)cx, (int)cy, 11, ui::kTextDim);
