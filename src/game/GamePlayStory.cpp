@@ -205,19 +205,30 @@ void GamePlay::startScene(int id) {
     for (const auto& s : db.scenes) if (s.id == id) sc = &s;
     if (!sc) return;
     sceneRunId_ = id; sceneStep_ = 0; sceneTimer_ = 0; sceneTags_.clear();
+    // 음악 폴백: 장면 음악 → 제목(그룹) 음악 → (없으면 맵 배경음 유지)
+    int bgm = sc->bgmAsset;
+    if (bgm < 0 && !sc->group.empty())
+        for (size_t i = 0; i < db.sceneGroups.size(); ++i)
+            if (db.sceneGroups[i] == sc->group) { if (i < db.sceneGroupBgm.size()) bgm = db.sceneGroupBgm[i]; break; }
+    if (bgm >= 0) engine_.audio().playBgm(engine_.assetPath(bgm));   // playBgm은 같은 곡이면 무시
 }
 
 void GamePlay::updateScene(float dt) {
     if (sceneRunId_ < 0) return;
     if (phase_ == Phase::Dialogue) return;          // a scene dialogue is playing; wait
     // ESC skips the rest of a cutscene (and the whole chain).
-    if (IsKeyPressed(KEY_ESCAPE)) { sceneRunId_ = -1; sceneStep_ = -1; sceneQueue_.clear(); toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f; return; }
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        sceneRunId_ = -1; sceneStep_ = -1; sceneQueue_.clear(); toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f;
+        if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
+        return;
+    }
     const Database& db = engine_.project().database;
     const Scene* sc = nullptr;
     for (const auto& s : db.scenes) if (s.id == sceneRunId_) sc = &s;
     if (!sc || sceneStep_ >= (int)sc->actions.size()) {
         sceneRunId_ = -1; sceneStep_ = -1;
         if (!sceneQueue_.empty()) { int nx = sceneQueue_.front(); sceneQueue_.erase(sceneQueue_.begin()); startScene(nx); }  // 다음 장면 이어재생
+        else if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));  // 체인 종료 → 맵 배경음 복귀
         return;
     }
     int TS = map_ ? map_->tileset.tileWidth : 32;

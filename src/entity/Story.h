@@ -80,6 +80,7 @@ struct Scene {
     float camZoom = 2.0f;  // 확대 배율(전체맵 모드는 자동 맞춤)
     int   camX = 0, camY = 0; // camMode==2 특정 위치 타일
     int   camTag = 0;      // camMode==3 중심 유닛 태그(0=플레이어)
+    int   bgmAsset = -1;   // 장면 음악(오디오 에셋). -1이면 제목 음악→맵 배경음 순으로 폴백
     std::vector<SceneAction> actions;
 };
 

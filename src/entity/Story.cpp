@@ -58,7 +58,7 @@ json sceneToJson(const Scene& s) {
     return {{"id", s.id}, {"name", s.name}, {"editMapId", s.editMapId},
             {"group", s.group},
             {"camMode", s.camMode}, {"camZoom", s.camZoom}, {"camX", s.camX}, {"camY", s.camY}, {"camTag", s.camTag},
-            {"actions", acts}};
+            {"bgmAsset", s.bgmAsset}, {"actions", acts}};
 }
 Scene sceneFromJson(const json& j) {
     Scene s;
@@ -67,6 +67,7 @@ Scene sceneFromJson(const json& j) {
     s.group = j.value("group", std::string());
     s.camMode = j.value("camMode", 0); s.camZoom = j.value("camZoom", 2.0f);
     s.camX = j.value("camX", 0); s.camY = j.value("camY", 0); s.camTag = j.value("camTag", 0);
+    s.bgmAsset = j.value("bgmAsset", -1);
     for (const auto& aj : j.value("actions", json::array())) {
         SceneAction a;
         a.type = aj.value("type", (int)SA_Wait);

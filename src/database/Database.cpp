@@ -172,6 +172,7 @@ json Database::toJson() const {
     j["scenes"] = json::array();
     for (const auto& s : scenes) j["scenes"].push_back(sceneToJson(s));
     j["sceneGroups"] = sceneGroups;
+    j["sceneGroupBgm"] = sceneGroupBgm;
     return j;
 }
 
@@ -219,6 +220,8 @@ void Database::fromJson(const json& j) {
     scenes.clear();
     for (const auto& s : j.value("scenes", json::array())) scenes.push_back(sceneFromJson(s));
     sceneGroups = j.value("sceneGroups", std::vector<std::string>{});
+    sceneGroupBgm = j.value("sceneGroupBgm", std::vector<int>{});
+    sceneGroupBgm.resize(sceneGroups.size(), -1);   // 인덱스 동기 보장
 }
 
 } // namespace tsukuru

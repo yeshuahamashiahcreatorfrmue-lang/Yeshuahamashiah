@@ -145,6 +145,7 @@ public:
     std::vector<DialogueScenario> dialogues; // branching 대화로그 시나리오
     std::vector<Scene> scenes;               // 스토리 시나리오 시퀀스
     std::vector<std::string> sceneGroups;    // 시나리오 제목(그룹) 목록 — 장면을 제목 아래로 묶음
+    std::vector<int> sceneGroupBgm;          // 제목별 음악(오디오 에셋), sceneGroups와 인덱스 동기(-1=없음)
 
     const Item*      item(int id) const;
     const CharacterDef* character(int id) const;

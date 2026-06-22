@@ -221,6 +221,7 @@ void Editor::drawScenarioTab() {
     // ---- LEFT panel: 제목(그룹)별 장면 목록 ----
     //   장면 = 클릭선택·▶재생 · 드래그→다른 제목으로 이동
     //   제목 = 클릭선택 · ▶전체 미리보기 · 드래그→맵에 그 제목의 발동지점 등록
+    if (db.sceneGroupBgm.size() != db.sceneGroups.size()) db.sceneGroupBgm.resize(db.sceneGroups.size(), -1);  // 제목음악 인덱스 동기
     auto inGroups = [&](const std::string& g){ return std::find(db.sceneGroups.begin(), db.sceneGroups.end(), g) != db.sceneGroups.end(); };
     {
         float lx = leftX + 8, lw = leftW - 16, ly = top + 8;
@@ -228,7 +229,7 @@ void Editor::drawScenarioTab() {
         if (ui::button({ lx, ly, lw, 20 }, "+ 새 제목(그룹)")) {
             int n = (int)db.sceneGroups.size() + 1; std::string nm;
             do { nm = "제목 " + std::to_string(n++); } while (inGroups(nm));
-            db.sceneGroups.push_back(nm); scnGroupSel_ = nm; p.save();
+            db.sceneGroups.push_back(nm); db.sceneGroupBgm.push_back(-1); scnGroupSel_ = nm; p.save();
         }
         ly += 24;
         DrawTextU("장면 드래그→제목이동 · 제목 드래그→맵 발동", (int)lx, (int)ly, 9, ui::kTextDim); ly += 14;
@@ -382,9 +383,18 @@ void Editor::drawScenarioTab() {
                 for (auto& s2 : list) if (s2.group == old) s2.group.clear();      // 장면은 미분류로
                 for (auto& mm : p.maps) mm->events.erase(std::remove_if(mm->events.begin(), mm->events.end(),
                     [&](const Event& e){ return e.sceneGroup == old; }), mm->events.end());   // 발동 제거
-                db.sceneGroups.erase(db.sceneGroups.begin()+gi); scnGroupSel_.clear(); p.save();
+                db.sceneGroups.erase(db.sceneGroups.begin()+gi);
+                if (gi < (int)db.sceneGroupBgm.size()) db.sceneGroupBgm.erase(db.sceneGroupBgm.begin()+gi);
+                scnGroupSel_.clear(); p.save();
             }
             cy += 26;
+            // 제목(그룹) 음악: 장면 음악이 없을 때 이 음악이 흐름
+            if (gi >= 0 && gi < (int)db.sceneGroupBgm.size()) {
+                auto auds = p.assets.byType(AssetType::Audio);
+                std::vector<std::string> bo = { "제목음악 없음(맵 배경음)" }; std::vector<int> bv = { -1 };
+                for (auto* a : auds) { bo.push_back(a->name); bv.push_back(a->id); }
+                optionButton({ cx, cy, cw, 24 }, "제목음악", bo, bv, db.sceneGroupBgm[gi], 4630); cy += 28;
+            }
         } else { DrawTextU("(좌측에서 제목을 클릭하면 이름변경)", (int)cx, (int)cy, 10, ui::kTextDim); cy += 16; }
     }
     // resolve a spawn's entity name (refId>=0 → 몹, refId<=-2 → 등록 캐릭터)
@@ -447,6 +457,11 @@ void Editor::drawScenarioTab() {
         for (auto& a : sc.actions) if (a.type==SA_Spawn) { o.push_back(spawnTagLabel(a.targetId)); v.push_back(a.targetId); }
         optionButton({ cx, cy, cw, 24 }, "중심 유닛", o, v, sc.camTag, 4610); cy += 28;
     }
+    // ── 장면 음악: 없으면 제목 음악 → 맵 배경음 순으로 자동 폴백 ──
+    { auto auds = p.assets.byType(AssetType::Audio);
+      std::vector<std::string> bo = { "음악없음(제목/맵 따름)" }; std::vector<int> bv = { -1 };
+      for (auto* a : auds) { bo.push_back(a->name); bv.push_back(a->id); }
+      optionButton({ cx, cy, cw, 24 }, "장면음악", bo, bv, sc.bgmAsset, 4620); cy += 28; }
     if (scnRecordMode_) {
         DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
         // step duration 0.42~1.42
