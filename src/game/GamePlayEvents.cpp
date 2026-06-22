@@ -132,6 +132,13 @@ void GamePlay::runEvent(Event& e) {
     refreshQuestObjective();
     if (!e.sfx.empty()) engine_.audio().playSfx(e.sfx);   // 이벤트별 효과음
 
+    // 제목(그룹) 발동: 그 제목의 모든 장면을 순서대로 연속 재생
+    if (!e.sceneGroup.empty()) {
+        std::vector<int> ids;
+        for (const auto& s : engine_.project().database.scenes)
+            if (s.group == e.sceneGroup) ids.push_back(s.id);
+        if (!ids.empty()) { beginSceneChain(ids); if (e.once) firedOnce_.insert(key); return; }
+    }
     if (e.sceneId >= 0) { startScene(e.sceneId); if (e.once) firedOnce_.insert(key); return; } // 스토리 시나리오 실행
 
     switch (e.type) {

@@ -119,7 +119,7 @@ void Editor::update(float dt) {
     bool anyFieldFocused = eventTextFocus_ || eventFieldFocus_ != 0 || dbNameFocus_ >= 0 ||
         dbDescFocus_ >= 0 || mapNameFocus_ || mapSearchFocus_ || skillNameFocus_ ||
         charDefNameFocus_ || charLibRenameFocus_ || charDataNameFocus_ >= 0 ||
-        dlgFocus_ >= 0 || scnFocus_ >= 0 || searchFocusId_ >= 0;
+        dlgFocus_ >= 0 || scnFocus_ >= 0 || scnGroupRenameFocus_ >= 0 || searchFocusId_ >= 0;
     plat::setImeEnabled(anyFieldFocused);
 
     // Global shortcuts

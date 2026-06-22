@@ -144,6 +144,7 @@ public:
     std::vector<CharacterDef> mobs;         // monsters — same motion/effect/image system as characters
     std::vector<DialogueScenario> dialogues; // branching 대화로그 시나리오
     std::vector<Scene> scenes;               // 스토리 시나리오 시퀀스
+    std::vector<std::string> sceneGroups;    // 시나리오 제목(그룹) 목록 — 장면을 제목 아래로 묶음
 
     const Item*      item(int id) const;
     const CharacterDef* character(int id) const;

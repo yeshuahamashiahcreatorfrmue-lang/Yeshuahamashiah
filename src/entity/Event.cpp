@@ -71,6 +71,7 @@ json Event::toJson() const {
         {"speakerName", speakerName}, {"faceAsset", faceAsset},
         {"choiceA", choiceA}, {"choiceB", choiceB}, {"choiceC", choiceC}, {"choiceD", choiceD},
         {"choiceSwitch", choiceSwitch}, {"choiceVar", choiceVar}, {"dialogueId", dialogueId}, {"sceneId", sceneId},
+        {"sceneGroup", sceneGroup},
         {"giveGold", giveGold},
         {"varId", varId}, {"varOp", varOp}, {"varValue", varValue},
         {"faceDir", faceDir}, {"battleEnemies", battleEnemies},
@@ -139,6 +140,7 @@ Event Event::fromJson(const json& j) {
     e.choiceVar       = j.value("choiceVar", -1);
     e.dialogueId      = j.value("dialogueId", -1);
     e.sceneId         = j.value("sceneId", -1);
+    e.sceneGroup      = j.value("sceneGroup", std::string());
     e.giveGold        = j.value("giveGold", 0);
     e.varId           = j.value("varId", -1);
     e.varOp           = j.value("varOp", 0);

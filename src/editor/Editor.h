@@ -225,10 +225,13 @@ private:
     // 캐릭터 선택 우선(RTS식) 명령 편집: 지도에서 캐릭터(태그)를 고른 뒤 7명령을 적용
     int   scnObjSel_ = -1;           // 선택된 캐릭터(태그): -1=없음, 0=플레이어, 1+=등장유닛
     bool  scnAwaitDest_ = false;     // +이동/+이펙트/+등장 직후 "지도 클릭으로 위치 지정" 대기
-    // 좌측 장면 목록에서 제목을 끌어 맵에 실행지점(트리거)을 여러 개 등록
-    int   scnTitleDrag_ = -1;        // 끌고 있는 장면 인덱스(-1=없음)
-    Vector2 scnTitleDragStart_{};    // 드래그 시작 좌표(임계값 판정용)
-    bool  scnTitleDragging_ = false; // 임계값을 넘어 실제 드래그 중
+    // 시나리오 제목(그룹) 시스템
+    std::string scnGroupSel_;        // 선택/대상 제목(그룹) — 새 장면·발동 NPC 대상
+    int   scnSceneDragIdx_ = -1;     // 좌측에서 장면을 끌어 다른 제목으로 이동(드래그 중인 장면 idx)
+    std::string scnGroupTrigDrag_;   // 제목을 맵으로 끌어 발동지점 등록(드래그 중인 그룹명, 빈칸=없음)
+    Vector2 scnLpDragStart_{};       // 좌측 패널 드래그 시작 좌표(임계값)
+    bool  scnLpDragging_ = false;    // 좌측 패널 드래그가 임계값을 넘음
+    int   scnGroupRenameFocus_ = -1; // 우측 패널 제목 이름 편집 포커스(그룹 idx, -1=없음)
     int   scnTrigSel_ = -1;          // 클릭해 제목을 표시 중인 트리거 event id(-1=없음)
     int   scnTrigDragId_ = -1;       // 드래그 중인 트리거 event id(-1=없음)
     // 장면 미리보기 PiP(좌측 하단 작은 화면 ↔ 중앙 큰 화면)

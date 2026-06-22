@@ -85,6 +85,7 @@ struct Event {
     int  choiceVar = -1;         // stores the chosen option index (0..3) into this variable
     int  dialogueId = -1;        // if >=0, this Message event plays a 대화로그 시나리오 instead
     int  sceneId = -1;           // if >=0, this event triggers a 스토리 시나리오(장면) on action
+    std::string sceneGroup;      // 비어있지 않으면 이 제목(그룹)의 모든 장면을 순서대로 발동
 
     // --- GiveItem extras: also give/remove gold; amount<0 removes items ---
     int  giveGold = 0;

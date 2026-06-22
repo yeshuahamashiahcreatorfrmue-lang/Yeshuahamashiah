@@ -218,34 +218,46 @@ void Editor::drawScenarioTab() {
     ui::panel({ leftX, top, leftW, panelH }, ui::kPanel);
     ui::panel({ ctrlX, top, ctrlW, panelH }, ui::kPanel);
 
-    // ---- LEFT panel: 맵별로 분할된 장면 목록 (장면 클릭=선택, ▶=재생, 맵 제목=전체재생) ----
+    // ---- LEFT panel: 제목(그룹)별 장면 목록 ----
+    //   장면 = 클릭선택·▶재생 · 드래그→다른 제목으로 이동
+    //   제목 = 클릭선택 · ▶전체 미리보기 · 드래그→맵에 그 제목의 발동지점 등록
+    auto inGroups = [&](const std::string& g){ return std::find(db.sceneGroups.begin(), db.sceneGroups.end(), g) != db.sceneGroups.end(); };
     {
         float lx = leftX + 8, lw = leftW - 16, ly = top + 8;
-        DrawTextU("장면 목록 (맵별)", (int)lx, (int)ly, 13, ui::kAccent); ly += 16;
-        DrawTextU("제목을 맵으로 끌면 실행지점 등록", (int)lx, (int)ly, 10, ui::kTextDim); ly += 16;
+        DrawTextU("시나리오 제목 / 장면", (int)lx, (int)ly, 13, ui::kAccent); ly += 18;
+        if (ui::button({ lx, ly, lw, 20 }, "+ 새 제목(그룹)")) {
+            int n = (int)db.sceneGroups.size() + 1; std::string nm;
+            do { nm = "제목 " + std::to_string(n++); } while (inGroups(nm));
+            db.sceneGroups.push_back(nm); scnGroupSel_ = nm; p.save();
+        }
+        ly += 24;
+        DrawTextU("장면 드래그→제목이동 · 제목 드래그→맵 발동", (int)lx, (int)ly, 9, ui::kTextDim); ly += 14;
         Rectangle reg = { leftX, ly, leftW, top + panelH - ly - 8 };
         uiScissor((int)leftX, (int)ly, (int)leftW, (int)reg.height);
         if (ui::mouseIn(reg)) scnListScroll_ -= GetMouseWheelMove() * 28;
         if (scnListScroll_ < 0) scnListScroll_ = 0;
         float y = ly - scnListScroll_;
-        // group scenes by editMapId, in map order; collect leftover under "기타"
-        std::vector<std::pair<int,std::string>> groups;  // mapId, name
-        for (auto& mm : p.maps) groups.push_back({ mm->id, mm->name });
-        groups.push_back({ -1, "기타(맵 미지정)" });
-        for (auto& g : groups) {
-            std::vector<int> ids;   // scene indices in this group
+        std::vector<std::pair<Rectangle,std::string>> headerHits;   // 장면 재분류 드롭 대상
+        std::vector<std::string> headers = db.sceneGroups; headers.push_back(std::string());  // "" = 미분류
+        for (auto& g : headers) {
+            bool bucket = g.empty();
+            std::vector<int> ids;
             for (int i = 0; i < (int)list.size(); ++i) {
-                bool match = (list[i].editMapId == g.first) ||
-                             (g.first == -1 && !p.map(list[i].editMapId));
-                if (match) ids.push_back(i);
+                bool member = bucket ? (list[i].group.empty() || !inGroups(list[i].group)) : (list[i].group == g);
+                if (member) ids.push_back(i);
             }
-            if (ids.empty()) continue;
-            // map header — click "▶전체" plays all its scenes in order
-            if (y + 24 > ly && y < ly + reg.height) {
-                Rectangle hr = { lx, y, lw - 46, 22 };
-                DrawRectangleRec(hr, ui::kPanelHi);
-                DrawTextU(g.second.c_str(), (int)lx + 4, (int)y + 4, 12, ui::kAccentHi);
-                if (ui::button({ lx + lw - 44, y, 44, 22 }, "▶전체")) {
+            if (bucket && ids.empty()) continue;
+            bool selG = (!bucket && scnGroupSel_ == g);
+            Rectangle hr = { lx, y, lw - 44, 22 };
+            headerHits.push_back({ hr, g });
+            if (y + 22 > ly && y < ly + reg.height) {
+                DrawRectangleRec(hr, selG ? ui::kAccent : ui::kPanelHi);
+                DrawTextU((bucket ? "(미분류)" : g).c_str(), (int)lx + 4, (int)y + 4, 12, selG ? BLACK : ui::kAccentHi);
+                if (scnSceneDragIdx_ >= 0 && scnLpDragging_ && ui::mouseIn(hr)) DrawRectangleLinesEx(hr, 2, WHITE);
+                if (!bucket && ui::mouseIn(hr) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    scnGroupSel_ = g; scnGroupTrigDrag_ = g; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
+                }
+                if (!ids.empty() && ui::button({ lx + lw - 42, y, 42, 22 }, "▶전체")) {
                     std::vector<int> sids; for (int idx : ids) sids.push_back(list[idx].id);
                     scnPrevBig_ = false; engine_.startScenePreview(sids); EndScissorMode(); return;
                 }
@@ -253,19 +265,38 @@ void Editor::drawScenarioTab() {
             y += 26;
             for (int idx : ids) {
                 if (y + 22 > ly && y < ly + reg.height) {
-                    Rectangle nameR = { lx + 10, y, lw - 50, 22 };
-                    if (ui::button(nameR, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; }
-                    // 제목을 끌어 맵에 실행지점(트리거) 등록: 이 행에서 누르면 드래그 후보로 잡음
+                    Rectangle nameR = { lx + 12, y, lw - 52, 22 };
+                    if (ui::button(nameR, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; scnObjSel_ = -1; scnGroupSel_ = list[idx].group; }
                     if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        scnTitleDrag_ = idx; scnTitleDragStart_ = GetMousePosition(); scnTitleDragging_ = false;
+                        scnSceneDragIdx_ = idx; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
                     }
-                    if (ui::button({ lx + lw - 36, y, 36, 22 }, "▶")) { scnPrevBig_ = false; engine_.startScenePreview({ list[idx].id }); EndScissorMode(); return; }
+                    if (ui::button({ lx + lw - 38, y, 38, 22 }, "▶")) { scnPrevBig_ = false; engine_.startScenePreview({ list[idx].id }); EndScissorMode(); return; }
                 }
                 y += 24;
             }
         }
         EndScissorMode();
-        if (list.empty()) DrawTextU("(장면 없음)", (int)lx, (int)ly + 4, 12, ui::kTextDim);
+        if (list.empty() && db.sceneGroups.empty()) DrawTextU("'+ 새 제목'으로 시작", (int)lx, (int)ly + 4, 12, ui::kTextDim);
+
+        // 장면을 끌어 제목 헤더에 놓으면 그 제목으로 이동(재분류)
+        if (scnSceneDragIdx_ >= 0) {
+            Vector2 mp = GetMousePosition();
+            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                if (!scnLpDragging_ && std::abs(mp.x-scnLpDragStart_.x)+std::abs(mp.y-scnLpDragStart_.y) > 6) scnLpDragging_ = true;
+                if (scnLpDragging_ && scnSceneDragIdx_ < (int)list.size()) {
+                    std::string nm = list[scnSceneDragIdx_].name; int tw = MeasureTextU(nm.c_str(),12)+12;
+                    DrawRectangle((int)mp.x+8,(int)mp.y-10,tw,18,Fade(BLACK,0.85f));
+                    DrawTextU(nm.c_str(),(int)mp.x+12,(int)mp.y-8,12,ui::kAccentHi);
+                }
+            } else {
+                if (scnLpDragging_ && scnSceneDragIdx_ < (int)list.size())
+                    for (auto& hh : headerHits) if (CheckCollisionPointRec(mp, hh.first)) {
+                        list[scnSceneDragIdx_].group = hh.second; p.save();
+                        setStatus(hh.second.empty()?"미분류로 이동":("제목 이동: "+hh.second)); break;
+                    }
+                scnSceneDragIdx_ = -1; scnLpDragging_ = false;
+            }
+        }
     }
 
     // ---- RIGHT control panel ----
@@ -274,7 +305,9 @@ void Editor::drawScenarioTab() {
     std::vector<std::string> sopt; std::vector<int> sval;
     for (int i = 0; i < (int)list.size(); ++i) { sopt.push_back(list[i].name); sval.push_back(i); }
     auto createScene = [&]{
-        Scene s; s.id = (int)list.size()+1; s.name = "장면" + std::to_string(s.id);
+        Scene s; s.id = 1; for (auto& e : list) if (e.id >= s.id) s.id = e.id + 1;   // 고유 id
+        s.name = "장면" + std::to_string(s.id);
+        s.group = scnGroupSel_;   // 선택된 제목(그룹) 아래로 등록
         for (auto& mm : p.maps) if (mm->placed) { s.editMapId = mm->id; break; }
         if (s.editMapId < 0 && !p.maps.empty()) s.editMapId = p.maps.front()->id;
         list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; scnObjSel_ = -1; scnAwaitDest_ = false; p.save();
@@ -320,6 +353,32 @@ void Editor::drawScenarioTab() {
         if (ui::button({ cx + cw - 50, cy, 50, 24 }, "삭제")) { list.erase(list.begin()+scnSel_); scnSel_=-1; scnActSel_=-1; scnObjSel_=-1; scnAwaitDest_=false; p.save(); return; }
     }
     cy += 30;
+    // ── 제목(그룹): 이 장면이 속한 제목 + 선택 제목 이름변경/삭제 ──
+    {
+        DrawTextU(("제목: " + (sc.group.empty()?std::string("(미분류)"):sc.group)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi);
+        cy += 16;
+        int gi = -1; for (int i=0;i<(int)db.sceneGroups.size();++i) if (db.sceneGroups[i]==scnGroupSel_) gi=i;
+        if (gi >= 0) {
+            Rectangle gf = { cx, cy, cw - 56, 22 };
+            bool foc = (scnGroupRenameFocus_ == gi);
+            if (ui::mouseIn(gf) && lclick) scnGroupRenameFocus_ = gi;
+            else if (lclick && !ui::mouseIn(gf) && foc) scnGroupRenameFocus_ = -1;
+            std::string old = db.sceneGroups[gi], edited = old;
+            ui::textField(gf, edited, foc, 30);
+            if (edited != old && !edited.empty()) {   // 이름 변경을 장면·발동이벤트에 전파
+                for (auto& s2 : list) if (s2.group == old) s2.group = edited;
+                for (auto& mm : p.maps) for (auto& e : mm->events) if (e.sceneGroup == old) e.sceneGroup = edited;
+                db.sceneGroups[gi] = edited; scnGroupSel_ = edited; p.save();
+            }
+            if (ui::button({ cx + cw - 50, cy, 50, 22 }, "제목삭제")) {
+                for (auto& s2 : list) if (s2.group == old) s2.group.clear();      // 장면은 미분류로
+                for (auto& mm : p.maps) mm->events.erase(std::remove_if(mm->events.begin(), mm->events.end(),
+                    [&](const Event& e){ return e.sceneGroup == old; }), mm->events.end());   // 발동 제거
+                db.sceneGroups.erase(db.sceneGroups.begin()+gi); scnGroupSel_.clear(); p.save();
+            }
+            cy += 26;
+        } else { DrawTextU("(좌측에서 제목을 클릭하면 이름변경)", (int)cx, (int)cy, 10, ui::kTextDim); cy += 16; }
+    }
     // resolve a spawn's entity name (refId>=0 → 몹, refId<=-2 → 등록 캐릭터)
     auto spawnEntName = [&](int refId)->std::string {
         if (refId <= -2) { const CharacterDef* c = db.character(-refId-1); return c ? c->name : "캐릭터"; }
@@ -341,18 +400,13 @@ void Editor::drawScenarioTab() {
         else if (a.type == SA_Remove) { for (int t : a.removeTags) stage.erase(t); if (a.targetId >= 0) stage.erase(a.targetId); }
     }
 
-    // ── RTS 라이브 녹화 진입 (실시간 조종·길찾기·동영상식 녹화) ──
-    if (ui::button({ cx, cy, cw, 28 }, "▶ RTS 라이브 녹화 (실시간 조종)")) {
+    // ── 시나리오 배치·녹화 진입: NPC/유닛을 배치하고 실시간으로 조종하며 장면을 녹화 ──
+    scnRecordMode_ = false;   // (구) 스냅샷 배치모드 제거 — 시나리오 배치·녹화로 일원화
+    if (ui::button({ cx, cy, cw, 30 }, "▶ 시나리오 배치·녹화 (NPC 배치→실시간 녹화)")) {
         scnLive_ = true; scnLiveInit_ = false; scnRecording_ = false; scnRecClock_ = 0;
         liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
     }
-    cy += 32;
-    // ── (구) 스냅샷 장면녹화 토글 ──
-    if (ui::button({ cx, cy, cw, 24 }, scnRecordMode_ ? "스냅샷 배치모드: 켜짐 (끄기)" : "스냅샷 배치모드", scnRecordMode_)) {
-        scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear();
-        scnSelTags_.clear(); scnGroupDrag_ = false; scnMarquee_ = false; scnCtxOpen_ = false; scnRecPlaceChar_ = -1;
-    }
-    cy += 28;
+    cy += 34;
     if (scnRecordMode_) {
         DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
         // step duration 0.42~1.42
@@ -568,7 +622,11 @@ void Editor::drawScenarioTab() {
         if (e.id == trigNpcId) { DrawCircleLines((int)sp.x,(int)sp.y,(int)npcHit,ui::kGood); DrawTextU("발동", (int)sp.x+8,(int)sp.y-8,11,ui::kGood); }
         if (scnTrigMode_==2 && CheckCollisionPointCircle(mouse, sp, npcHit)) {
             DrawCircleLines((int)sp.x,(int)sp.y,(int)npcHit,WHITE);
-            if (lclick) { for (auto& e2 : m->events) if (e2.sceneId==sc.id && e2.graphicAsset>=0) e2.sceneId=-1; e.sceneId=sc.id; scnTrigMode_=0; p.save(); setStatus("이 NPC와 대화 시 시나리오 발동"); }
+            if (lclick) {
+                if (!scnGroupSel_.empty()) { e.sceneGroup = scnGroupSel_; e.sceneId = -1; setStatus("이 NPC 대화 시 '"+scnGroupSel_+"' 발동"); }
+                else { for (auto& e2 : m->events) if (e2.sceneId==sc.id && e2.graphicAsset>=0) e2.sceneId=-1; e.sceneId=sc.id; setStatus("이 NPC 대화 시 이 장면 발동"); }
+                scnTrigMode_=0; p.save();
+            }
         }
     }
     // ── 모든 장면의 실행지점(트리거)을 별 아이콘으로 표시 — 클릭/호버하면 제목이 옆에 ──
@@ -577,15 +635,17 @@ void Editor::drawScenarioTab() {
         return "장면#" + std::to_string(sid);
     };
     for (auto& e : m->events) {
-        if (e.sceneId < 0 || e.graphicAsset >= 0 || e.charId >= 0) continue;   // 지점 트리거만(NPC 트리거 제외)
+        bool isGroup = !e.sceneGroup.empty();
+        if (!isGroup && e.sceneId < 0) continue;            // 트리거 아님
+        if (e.graphicAsset >= 0 || e.charId >= 0) continue; // 지점 트리거만(NPC 트리거 제외)
         bool drag = (scnTrigDragId_ == e.id);
         Vector2 sp = drag ? mouse : t2s((float)e.x, (float)e.y);
-        bool isCur = (e.sceneId == sc.id);
+        bool isCur = isGroup ? (!sc.group.empty() && e.sceneGroup == sc.group) : (e.sceneId == sc.id);
         Color col = isCur ? ui::kGood : ui::kAccentHi;
         DrawPoly(sp, 5, 9, 0, col); DrawPolyLines(sp, 5, 9, 0, WHITE);
         bool hov = CheckCollisionPointCircle(mouse, t2s((float)e.x,(float)e.y), 11);
         if (scnTrigSel_ == e.id || hov)
-            DrawTextU(("▶ " + sceneName(e.sceneId)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, col);
+            DrawTextU((isGroup ? ("▶ " + e.sceneGroup + " (제목)") : ("▶ " + sceneName(e.sceneId))).c_str(), (int)sp.x+11, (int)sp.y-8, 12, col);
         // 우클릭 = 즉시 삭제(확인 없이) — 어떤 모드에서든 동작
         if (hov && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
             int id = e.id;
@@ -608,29 +668,29 @@ void Editor::drawScenarioTab() {
         } else scnTrigDragId_=-1;
     }
 
-    // ── 좌측 목록에서 끌어온 장면 제목을 맵에 놓아 실행지점(트리거) 등록 ──
-    if (scnTitleDrag_ >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        if (!scnTitleDragging_ &&
-            (std::abs(mouse.x-scnTitleDragStart_.x)+std::abs(mouse.y-scnTitleDragStart_.y) > 6))
-            scnTitleDragging_ = true;
-        if (scnTitleDragging_ && scnTitleDrag_ < (int)list.size()) {
+    // ── 좌측에서 끌어온 '제목(그룹)'을 맵에 놓아 그 제목의 발동지점 등록 ──
+    if (!scnGroupTrigDrag_.empty() && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        if (!scnLpDragging_ &&
+            (std::abs(mouse.x-scnLpDragStart_.x)+std::abs(mouse.y-scnLpDragStart_.y) > 6))
+            scnLpDragging_ = true;
+        if (scnLpDragging_) {
             if (inMap) { int tx,ty; s2t(tx,ty); Vector2 g=t2s((float)tx,(float)ty);
                 DrawPoly(g,5,9,0,Fade(ui::kGood,0.8f)); DrawCircleLines((int)g.x,(int)g.y,12,WHITE); }
-            std::string nm = "▶ " + list[scnTitleDrag_].name;
+            std::string nm = "발동: " + scnGroupTrigDrag_;
             int twd = MeasureTextU(nm.c_str(),12)+12;
             DrawRectangle((int)mouse.x+8,(int)mouse.y-10,twd,18,Fade(BLACK,0.85f));
             DrawTextU(nm.c_str(),(int)mouse.x+12,(int)mouse.y-8,12,ui::kAccentHi);
         }
-    } else if (scnTitleDrag_ >= 0) {   // 버튼을 뗌 → 드롭 처리
-        if (scnTitleDragging_ && inMap && scnTitleDrag_ < (int)list.size()) {
+    } else if (!scnGroupTrigDrag_.empty()) {   // 버튼을 뗌 → 드롭 처리
+        if (scnLpDragging_ && inMap) {
             int tx,ty; s2t(tx,ty);
             Event ne; ne.id = m->nextEventId(); ne.type = EventType::Message; ne.trigger = TriggerType::PlayerTouch;
-            ne.graphicAsset = -1; ne.sceneId = list[scnTitleDrag_].id;
-            ne.label = "[시나리오] " + list[scnTitleDrag_].name; ne.x = tx; ne.y = ty;
+            ne.graphicAsset = -1; ne.sceneId = -1; ne.sceneGroup = scnGroupTrigDrag_;
+            ne.label = "[시나리오 제목] " + scnGroupTrigDrag_; ne.x = tx; ne.y = ty;
             m->events.push_back(ne); p.save();
-            setStatus("실행지점 등록: " + list[scnTitleDrag_].name);
+            setStatus("'" + scnGroupTrigDrag_ + "' 발동지점 등록");
         }
-        scnTitleDrag_ = -1; scnTitleDragging_ = false;
+        scnGroupTrigDrag_.clear(); scnLpDragging_ = false;
     }
 
   if (!scnRecordMode_) {
@@ -705,15 +765,15 @@ void Editor::drawScenarioTab() {
         else { p.save(); scnDragIdx_=-1; }
     }
 
-    // (4) 발동지점 모드(맵 빈곳 클릭) — 기존 유지
+    // (4) 발동지점 모드(맵 빈곳 클릭) — 제목 선택 시 그 제목(그룹) 전체, 아니면 이 장면
     if (scnTrigMode_==1 && inMap && lclick && scnDragIdx_<0 && !clickUsed) {
         int tx, ty; s2t(tx, ty);
-        if (!trigPoint) {
-            Event ne; ne.id = m->nextEventId(); ne.type = EventType::Message; ne.trigger = TriggerType::PlayerTouch;
-            ne.graphicAsset = -1; ne.sceneId = sc.id; ne.label = "[시나리오 발동]"; ne.x = tx; ne.y = ty;
-            m->events.push_back(ne);
-        } else { trigPoint->x = tx; trigPoint->y = ty; }
-        scnTrigMode_ = 0; p.save(); setStatus("발동 지점 설정됨(밟으면 시작)");
+        Event ne; ne.id = m->nextEventId(); ne.type = EventType::Message; ne.trigger = TriggerType::PlayerTouch;
+        ne.graphicAsset = -1; ne.x = tx; ne.y = ty;
+        if (!scnGroupSel_.empty()) { ne.sceneGroup = scnGroupSel_; ne.label = "[시나리오 제목] " + scnGroupSel_; setStatus("'"+scnGroupSel_+"' 발동지점 설정"); }
+        else { ne.sceneId = sc.id; ne.label = "[시나리오 발동]"; setStatus("이 장면 발동지점 설정"); }
+        m->events.push_back(ne);
+        scnTrigMode_ = 0; p.save();
     }
   } else {
     // ── 녹화 모드 (RTS식): 마퀴 다중선택 · 그룹 드래그 이동 · 우클릭 전체 동작/삭제 ──

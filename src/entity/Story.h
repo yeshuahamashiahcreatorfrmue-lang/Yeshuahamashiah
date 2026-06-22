@@ -74,6 +74,7 @@ struct Scene {
     int id = -1;
     std::string name = "장면";
     int editMapId = -1;    // 편집 시 배경으로 보는 맵(런타임 동작과 무관)
+    std::string group;     // 소속 제목(그룹) — 좌측 패널에서 이 제목 아래로 묶임(빈칸=미분류)
     std::vector<SceneAction> actions;
 };
 

@@ -55,12 +55,14 @@ json sceneToJson(const Scene& s) {
                         {"x", a.x}, {"y", a.y}, {"time", a.time},
                         {"radius", a.radius}, {"removeTags", rt}});
     }
-    return {{"id", s.id}, {"name", s.name}, {"editMapId", s.editMapId}, {"actions", acts}};
+    return {{"id", s.id}, {"name", s.name}, {"editMapId", s.editMapId},
+            {"group", s.group}, {"actions", acts}};
 }
 Scene sceneFromJson(const json& j) {
     Scene s;
     s.id = j.value("id", -1); s.name = j.value("name", "장면");
     s.editMapId = j.value("editMapId", -1);
+    s.group = j.value("group", std::string());
     for (const auto& aj : j.value("actions", json::array())) {
         SceneAction a;
         a.type = aj.value("type", (int)SA_Wait);

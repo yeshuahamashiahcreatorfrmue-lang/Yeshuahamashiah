@@ -171,6 +171,7 @@ json Database::toJson() const {
     for (const auto& d : dialogues) j["dialogues"].push_back(dialogueToJson(d));
     j["scenes"] = json::array();
     for (const auto& s : scenes) j["scenes"].push_back(sceneToJson(s));
+    j["sceneGroups"] = sceneGroups;
     return j;
 }
 
@@ -217,6 +218,7 @@ void Database::fromJson(const json& j) {
     for (const auto& d : j.value("dialogues", json::array())) dialogues.push_back(dialogueFromJson(d));
     scenes.clear();
     for (const auto& s : j.value("scenes", json::array())) scenes.push_back(sceneFromJson(s));
+    sceneGroups = j.value("sceneGroups", std::vector<std::string>{});
 }
 
 } // namespace tsukuru
