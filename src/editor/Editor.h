@@ -66,6 +66,7 @@ public:
         }
     }
     void assetButton(Rectangle r, const std::string& label, int& assetId, int id);
+    void audioButton(Rectangle r, const std::string& label, int& assetId, int id); // 오디오 에셋 드롭다운(열릴 때만 목록 생성)
     void optionButtonStr(Rectangle r, const std::string& label,
                          const std::vector<std::string>& opts, const std::vector<std::string>& values,
                          std::string& target, int id);

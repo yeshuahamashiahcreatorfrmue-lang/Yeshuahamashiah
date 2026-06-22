@@ -141,6 +141,23 @@ void Editor::assetButton(Rectangle r, const std::string& label, int& assetId, in
     }
 }
 
+// audio asset dropdown: same lazy pattern as assetButton (full list only while open).
+void Editor::audioButton(Rectangle r, const std::string& label, int& assetId, int id) {
+    std::string cur = assetId < 0 ? "없음" : assetName(assetId);
+    std::string txt = label.empty() ? cur : (label + ": " + cur);
+    if (ui::button(r, txt, pickerId_ == id)) {
+        if (pickerId_ == id) pickerId_ = -1;
+        else { pickerId_ = id; pickerScroll_ = 0; }
+    }
+    if (pickerId_ == id) {
+        std::vector<std::string> opts = { "없음" }; std::vector<int> vals = { -1 };
+        for (const auto* a : engine_.project().assets.byType(AssetType::Audio)) { opts.push_back(a->name); vals.push_back(a->id); }
+        int cur2 = 0; for (int i = 0; i < (int)vals.size(); ++i) if (vals[i] == assetId) cur2 = i;
+        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerCurIdx_ = cur2;
+        pickerApply_ = [&assetId, vals](int i){ assetId = (i < (int)vals.size()) ? vals[i] : -1; };
+    }
+}
+
 // database-entity dropdown: pick item/mob/character/dialogue/scene by NAME, store
 // its id (-1 = 없음). The button always shows the current name; the full list is
 // built only when open.

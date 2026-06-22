@@ -388,12 +388,9 @@ void Editor::drawScenarioTab() {
                 scnGroupSel_.clear(); p.save();
             }
             cy += 26;
-            // 제목(그룹) 음악: 장면 음악이 없을 때 이 음악이 흐름
+            // 제목(그룹) 음악: 장면 음악이 없을 때 이 음악이 흐름(열릴 때만 목록 생성)
             if (gi >= 0 && gi < (int)db.sceneGroupBgm.size()) {
-                auto auds = p.assets.byType(AssetType::Audio);
-                std::vector<std::string> bo = { "제목음악 없음(맵 배경음)" }; std::vector<int> bv = { -1 };
-                for (auto* a : auds) { bo.push_back(a->name); bv.push_back(a->id); }
-                optionButton({ cx, cy, cw, 24 }, "제목음악", bo, bv, db.sceneGroupBgm[gi], 4630); cy += 28;
+                audioButton({ cx, cy, cw, 24 }, "제목음악", db.sceneGroupBgm[gi], 4630); cy += 28;
             }
         } else { DrawTextU("(좌측에서 제목을 클릭하면 이름변경)", (int)cx, (int)cy, 10, ui::kTextDim); cy += 16; }
     }
@@ -457,11 +454,8 @@ void Editor::drawScenarioTab() {
         for (auto& a : sc.actions) if (a.type==SA_Spawn) { o.push_back(spawnTagLabel(a.targetId)); v.push_back(a.targetId); }
         optionButton({ cx, cy, cw, 24 }, "중심 유닛", o, v, sc.camTag, 4610); cy += 28;
     }
-    // ── 장면 음악: 없으면 제목 음악 → 맵 배경음 순으로 자동 폴백 ──
-    { auto auds = p.assets.byType(AssetType::Audio);
-      std::vector<std::string> bo = { "음악없음(제목/맵 따름)" }; std::vector<int> bv = { -1 };
-      for (auto* a : auds) { bo.push_back(a->name); bv.push_back(a->id); }
-      optionButton({ cx, cy, cw, 24 }, "장면음악", bo, bv, sc.bgmAsset, 4620); cy += 28; }
+    // ── 장면 음악: 없으면 제목 음악 → 맵 배경음 순으로 자동 폴백(열릴 때만 목록 생성) ──
+    audioButton({ cx, cy, cw, 24 }, "장면음악", sc.bgmAsset, 4620); cy += 28;
     if (scnRecordMode_) {
         DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
         // step duration 0.42~1.42
