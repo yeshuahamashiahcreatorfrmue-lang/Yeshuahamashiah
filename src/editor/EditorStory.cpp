@@ -271,7 +271,11 @@ void Editor::drawScenarioTab() {
             for (int idx : ids) {
                 if (y + 22 > ly && y < ly + reg.height) {
                     Rectangle nameR = { lx + 12, y, lw - 52, 22 };
-                    if (ui::button(nameR, list[idx].name, scnSel_ == idx)) { scnSel_ = idx; scnActSel_ = -1; scnObjSel_ = -1; scnGroupSel_ = list[idx].group; }
+                    if (ui::button(nameR, list[idx].name, scnSel_ == idx)) {
+                        scnSel_ = idx; scnObjSel_ = -1; scnGroupSel_ = list[idx].group;
+                        // 대화 클립(첫 동작이 대화)이면 대사 편집이 바로 보이도록 그 동작을 선택
+                        scnActSel_ = (!list[idx].actions.empty() && list[idx].actions[0].type==SA_Dialogue) ? 0 : -1;
+                    }
                     if (ui::mouseIn(nameR) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                         scnSceneDragIdx_ = idx; scnLpDragStart_ = GetMousePosition(); scnLpDragging_ = false;
                     }
@@ -422,18 +426,17 @@ void Editor::drawScenarioTab() {
         liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
     }
     cy += 34;
-    // ── 녹화본 사이에 끼울 '대화 장면' 추가 → 대화 탭에서 대사 작성 ──
-    if (ui::button({ cx, cy, cw, 26 }, "+ 대화 장면 (녹화본 사이 대사)")) {
+    // ── 녹화본 사이에 끼울 '대화 장면' 클립을 미분류에 추가(탭 점프 없음) ──
+    //   재생 체인에서 영상 장면 → (이 대화) → 다음 영상 장면 순으로 자동 진행된다.
+    if (ui::button({ cx, cy, cw, 26 }, "+ 대화 장면 (영상 사이 대사)")) {
         DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
         nd.name="대화"+std::to_string(nd.id); nd.lines.push_back({ "", "...", -1, {} });
         db.dialogues.push_back(nd);
         Scene ds; ds.id=1; for(auto&e:list) if(e.id>=ds.id) ds.id=e.id+1;
         ds.name="대화 "+std::to_string(ds.id); ds.group.clear(); ds.editMapId=sc.editMapId;
         SceneAction a; a.type=SA_Dialogue; a.refId=nd.id; a.time=0; ds.actions.push_back(a);
-        list.push_back(ds); scnSel_=(int)list.size()-1; scnActSel_=0;
-        for (int k=0;k<(int)db.dialogues.size();++k) if (db.dialogues[k].id==nd.id) dlgSel_=k;
-        dlgLineSel_=0; dlgPopupOpen_=true; tab_=Tab::Dialogue; p.save();
-        setStatus("대화 장면 추가 — 대화 탭에서 대사 작성(미분류)"); return;
+        list.push_back(ds); scnSel_=(int)list.size()-1; scnActSel_=0; scnObjSel_=-1; p.save();
+        setStatus("대화 장면을 미분류에 추가 — '대화 편집'으로 대사 작성, 드래그로 제목에 끼움"); return;
     }
     cy += 30;
     // ── 시점(카메라): 재생 시 화면이 어디를 어느 배율로 비출지 ──
