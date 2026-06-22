@@ -216,9 +216,19 @@ void GamePlay::startScene(int id) {
 void GamePlay::updateScene(float dt) {
     if (sceneRunId_ < 0) return;
     if (phase_ == Phase::Dialogue) return;          // a scene dialogue is playing; wait
+    // 시네마틱이 끝나거나 건너뛸 때 플레이어 조작이 깔끔히 복구되도록 정리: 이동 상태를
+    // 끄고, 칸 격자에 맞춰 위치를 스냅하고, 동작을 걷기 기본으로 되돌린다.
+    auto releasePlayer = [&]() {
+        int ts = map_ ? map_->tileset.tileWidth : 32;
+        destX_ = (int)std::lround(pxX_ / ts); destY_ = (int)std::lround(pxY_ / ts);
+        pxX_ = destX_ * (float)ts; pxY_ = destY_ * (float)ts;
+        moving_ = false; playMotion_ = MO_Walk; motionFrame_ = 0; motionAnim_ = 0;
+        for (auto& n : npcs_) n.moving = false;
+    };
     // ESC skips the rest of a cutscene (and the whole chain).
     if (IsKeyPressed(KEY_ESCAPE)) {
         sceneRunId_ = -1; sceneStep_ = -1; sceneQueue_.clear(); toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f;
+        releasePlayer();
         if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));
         return;
     }
@@ -228,7 +238,8 @@ void GamePlay::updateScene(float dt) {
     if (!sc || sceneStep_ >= (int)sc->actions.size()) {
         sceneRunId_ = -1; sceneStep_ = -1;
         if (!sceneQueue_.empty()) { int nx = sceneQueue_.front(); sceneQueue_.erase(sceneQueue_.begin()); startScene(nx); }  // 다음 장면 이어재생
-        else if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset));  // 체인 종료 → 맵 배경음 복귀
+        else { releasePlayer();                                  // 체인 종료 → 조작 복구
+            if (map_ && map_->bgmAsset >= 0) engine_.audio().playBgm(engine_.assetPath(map_->bgmAsset)); }  // 맵 배경음 복귀
         return;
     }
     int TS = map_ ? map_->tileset.tileWidth : 32;
@@ -242,6 +253,7 @@ void GamePlay::updateScene(float dt) {
 
     // ── blocking actions (대화/대기/등장/제거): 한 번에 하나씩 ──
     if (!isConc(first.type)) {
+        moving_ = false; for (auto& n : npcs_) n.moving = false;   // 멈춤 구간엔 서있기
         bool advance = false;
         switch (first.type) {
             case SA_Wait: sceneTimer_ += dt; if (sceneTimer_ >= first.time) advance = true; break;
@@ -280,9 +292,18 @@ void GamePlay::updateScene(float dt) {
         return;
     }
 
-    // ── concurrent batch: 연속된 이동/이펙트/동작을 동시에 부드럽게 재생 ──
-    int endi = sceneStep_; float dur = 0;
-    while (endi < (int)sc->actions.size() && isConc(sc->actions[endi].type)) { dur = std::max(dur, sc->actions[endi].time); ++endi; }
+    // ── concurrent batch: 동시에 일어나는 이동/이펙트/동작을 부드럽게 재생 ──
+    // 단, 같은 대상의 '다음 이동'은 같은 배치에 넣지 않는다(웨이포인트를 건너뛰지 않고
+    // 한 칸씩 이어 걷도록). 다른 대상끼리·이펙트·동작은 동시에 묶는다.
+    int endi = sceneStep_; float dur = 0; std::vector<int> movedTargets;
+    while (endi < (int)sc->actions.size() && isConc(sc->actions[endi].type)) {
+        const SceneAction& a = sc->actions[endi];
+        if (a.type == SA_MoveChar) {
+            if (std::find(movedTargets.begin(), movedTargets.end(), a.targetId) != movedTargets.end()) break;
+            movedTargets.push_back(a.targetId);
+        }
+        dur = std::max(dur, a.time); ++endi;
+    }
     if (sceneTimer_ == 0.0f) {                       // 배치 시작 1회: 시작좌표 캡처·이펙트·동작 발동
         sceneMoveFrom_.clear(); sceneMoveTo_.clear(); sceneBatchDur_ = std::max(0.05f, dur);
         for (int i = sceneStep_; i < endi; ++i) {
@@ -310,14 +331,25 @@ void GamePlay::updateScene(float dt) {
         Vector2 f = sceneMoveFrom_[a.targetId], t = sceneMoveTo_[a.targetId];
         float px = f.x + (t.x-f.x)*ut, py = f.y + (t.y-f.y)*ut;
         int dir = std::fabs(t.x-f.x) > std::fabs(t.y-f.y) ? (t.x >= f.x ? 2 : 1) : (t.y >= f.y ? 0 : 3);
-        if (a.targetId == 0) { pxX_ = px; pxY_ = py; dir_ = dir; moving_ = (ut < 1.0f); if (ut >= 1.0f) { destX_=a.x; destY_=a.y; } }
+        if (a.targetId == 0) {
+            pxX_ = px; pxY_ = py; dir_ = dir; moving_ = (ut < 1.0f);
+            // 주인공 걷기 프레임도 함께 돌려 이동 중 그림이 멈춰 보이지 않게 한다
+            if (ut < 1.0f) { animTime_ += dt; if (animTime_ > 0.12f) { animTime_ = 0; frame_ = (frame_ + 1) % std::max(1, engine_.project().playerFrames); } }
+            if (ut >= 1.0f) { destX_=a.x; destY_=a.y; }
+        }
         else if (NpcInst* n = npcByTag(a.targetId)) {
             n->px = px; n->py = py; n->dir = dir; n->moving = (ut < 1.0f);
             n->animTime += dt; if (n->animTime > 0.12f) { n->animTime = 0; n->frame = (n->frame+1)%4; }
             if (ut >= 1.0f) { n->x=n->destX=a.x; n->y=n->destY=a.y; n->moving = false; }
         }
     }
-    if (sceneTimer_ >= dur) { sceneStep_ = endi; sceneTimer_ = 0; for (auto& n : npcs_) n.moving = false; moving_ = false; }
+    if (sceneTimer_ >= dur) {
+        sceneStep_ = endi; sceneTimer_ = 0;
+        // 다음 동작도 곧바로 이동/연출 배치면 멈춤 플래그를 초기화하지 않아(=서있는 1프레임
+        // 제거) 끊김 없이 연속해서 걷게 한다. 멈춤 구간(대기/대사 등)에서만 정지한다.
+        bool moreConc = endi < (int)sc->actions.size() && isConc(sc->actions[endi].type);
+        if (!moreConc) { for (auto& n : npcs_) n.moving = false; moving_ = false; }
+    }
 }
 
 } // namespace tsukuru

@@ -69,12 +69,20 @@ void Editor::liveBuildScene(Scene& sc, Map& m) {
     std::unordered_map<int, Vector2> cur;     // 태그별 현재 타일(이동시간 계산용)
     cur[0] = { m.tilemap.width() / 2.0f, m.tilemap.height() / 2.0f };
     const float speed = 5.0f;
-    float cursor = 0; size_t i = 0;
+    float cursor = 0; size_t i = 0; bool prevMove = false;
     while (i < recCmds_.size()) {
         float t = recCmds_[i].t;
-        if (t - cursor > 0.06f) { SceneAction w; w.type = SA_Wait; w.time = t - cursor; sc.actions.push_back(w); cursor = t; }
+        // 연속된 이동끼리는 대기(정지)를 넣지 않아 끊김 없이 이어 걷게 한다. 대기는
+        // 이동→비이동(대사/동작/이펙트 등) 사이의 의도된 멈춤일 때만 삽입한다.
+        bool upcomingMove = (recCmds_[i].type == 0);
+        if (t - cursor > 0.06f && !(prevMove && upcomingMove)) {
+            SceneAction w; w.type = SA_Wait; w.time = t - cursor; sc.actions.push_back(w);
+        }
+        cursor = t;
+        bool batchMove = false;
         while (i < recCmds_.size() && recCmds_[i].t <= t + 0.06f) {
             const RecCmd& c = recCmds_[i];
+            if (c.type == 0) batchMove = true;
             if (c.type == 2) {                                  // 등장
                 SceneAction a; a.type = SA_Spawn; a.targetId = c.tag;
                 a.refId = c.isMob ? c.charId : (-c.charId - 1); a.x = c.x; a.y = c.y;
@@ -96,6 +104,7 @@ void Editor::liveBuildScene(Scene& sc, Map& m) {
             }
             ++i;
         }
+        prevMove = batchMove;
     }
     engine_.project().save();
 }
