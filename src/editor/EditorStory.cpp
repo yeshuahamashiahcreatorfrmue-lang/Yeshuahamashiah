@@ -264,6 +264,7 @@ void Editor::drawScenarioTab() {
         for (auto& mm : p.maps) if (mm->placed) { sc.editMapId = mm->id; break; }
         if (sc.editMapId < 0 && !p.maps.empty()) sc.editMapId = p.maps.front()->id;
     }
+    if (scnLive_) { drawLiveRecorder(sc); return; }   // 라이브 RTS 녹화 화면(전체)
     { // name + delete
         Rectangle nf = { cx, cy, cw - 56, 24 };
         if (ui::mouseIn(nf) && lclick) scnFocus_ = 0; else if (lclick && !ui::mouseIn(nf) && scnFocus_ == 0) scnFocus_ = -1;
@@ -292,12 +293,18 @@ void Editor::drawScenarioTab() {
         else if (a.type == SA_Remove) { for (int t : a.removeTags) stage.erase(t); if (a.targetId >= 0) stage.erase(a.targetId); }
     }
 
-    // ── 장면녹화 모드 토글 + 컨트롤 ──
-    if (ui::button({ cx, cy, cw, 26 }, scnRecordMode_ ? "장면녹화 모드: 켜짐 (끄기)" : "장면녹화 모드 켜기", scnRecordMode_)) {
+    // ── RTS 라이브 녹화 진입 (실시간 조종·길찾기·동영상식 녹화) ──
+    if (ui::button({ cx, cy, cw, 28 }, "● RTS 라이브 녹화 (실시간 조종)")) {
+        scnLive_ = true; scnLiveInit_ = false; scnRecording_ = false; scnRecClock_ = 0;
+        liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
+    }
+    cy += 32;
+    // ── (구) 스냅샷 장면녹화 토글 ──
+    if (ui::button({ cx, cy, cw, 24 }, scnRecordMode_ ? "스냅샷 배치모드: 켜짐 (끄기)" : "스냅샷 배치모드", scnRecordMode_)) {
         scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear();
         scnSelTags_.clear(); scnGroupDrag_ = false; scnMarquee_ = false; scnCtxOpen_ = false; scnRecPlaceChar_ = -1;
     }
-    cy += 30;
+    cy += 28;
     if (scnRecordMode_) {
         DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
         // step duration 0.42~1.42

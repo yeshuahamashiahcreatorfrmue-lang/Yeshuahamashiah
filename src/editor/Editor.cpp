@@ -46,6 +46,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     if (getenv("TSUKURU_CHARBROWSER")) openCharBrowser([](int){});       // debug: open the char browser
     if (getenv("TSUKURU_DLGEDIT")) { dlgPopupOpen_ = true; dlgSel_ = 0; dlgLineSel_ = 0; } // debug: dialogue popup
     if (getenv("TSUKURU_REC")) { scnSel_ = 0; scnRecordMode_ = true; }                    // debug: 시나리오 녹화 모드
+    if (getenv("TSUKURU_LIVE")) { scnSel_ = 0; scnLive_ = true; }                         // debug: RTS 라이브 녹화
     if (getenv("TSUKURU_SEEDSTORY")) {             // debug: seed a dialogue+scene to view panels
         Database& d = engine_.project().database;
         Scene sc; sc.id = 1; sc.name = "도입 장면";

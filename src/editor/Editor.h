@@ -17,6 +17,22 @@ namespace tsukuru {
 
 class Engine;
 
+// ── 라이브 RTS 녹화: 실시간으로 유닛을 조종하며 타임라인을 기록 → 장면으로 변환 ──
+struct LiveUnit {
+    int tag = 0;                 // 0 = 플레이어, >=1 = 등장 유닛
+    int charId = -1; bool isMob = false;
+    float tx = 0, ty = 0;        // 현재 위치(타일, 부동소수 — 부드러운 이동)
+    int dir = 0;                 // 0아래 1왼 2오른 3위
+    std::vector<Vector2> path;   // 남은 경로 웨이포인트(타일)
+    int motion = 0; float motionT = 0;   // 재생 중 모션(공격/죽음 등)
+    float animT = 0; int frame = 0;
+    bool dead = false;
+};
+struct RecCmd {                  // 기록된 타임라인 명령
+    float t = 0; int type = 0;   // 0 이동, 1 동작(모션), 2 등장, 3 제거
+    int tag = 0, x = 0, y = 0, charId = -1, motion = 0; bool isMob = false;
+};
+
 class Editor {
 public:
     explicit Editor(Engine& engine);
@@ -203,6 +219,20 @@ private:
     int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)
     int   scnRecMob_ = -1;           // 무대에 등장시킬 몹
     int   scnRecPlaceChar_ = -1;     // 브라우저에서 고른 등록 캐릭터(맵에 드롭 대기, charId)
+    // 라이브 RTS 녹화 상태
+    bool  scnLive_ = false;          // 라이브 녹화 샌드박스 활성
+    bool  scnRecording_ = false;     // 타임라인 기록 중(동영상 녹화처럼)
+    bool  scnLiveInit_ = false;      // 유닛 초기화 완료 여부
+    float scnRecClock_ = 0;          // 녹화 경과 시간(초)
+    std::vector<LiveUnit> liveUnits_;
+    std::vector<RecCmd>   recCmds_;
+    std::vector<int>      liveSel_;  // 선택된 유닛 태그들
+    bool  liveMarquee_ = false; Vector2 liveMarqueeStart_{};
+    int   livePlaceChar_ = -1;       // 브라우저로 고른 유닛(맵 클릭으로 배치)
+    void  drawLiveRecorder(Scene& sc);                 // 라이브 녹화 메인(전체 화면)
+    void  liveInitUnits(Scene& sc, Map& m);            // 장면 데이터로 유닛 초기화
+    void  liveBuildScene(Scene& sc, Map& m);           // 타임라인 → 장면 동작
+    std::vector<Vector2> findPath(Map& m, int sx, int sy, int tx, int ty); // BFS 길찾기
     // RTS식 다중 선택/이동
     std::vector<int> scnSelTags_;    // 현재 선택된 토큰 태그들(다중 선택)
     bool  scnGroupDrag_ = false;     // 선택 그룹을 드래그 이동 중
