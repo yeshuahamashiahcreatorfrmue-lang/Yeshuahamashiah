@@ -130,7 +130,7 @@ void GamePlay::updateField(float dt) {
         int fx = destX_ + d.x, fy = destY_ + d.y;
         bool front = actionEventAt(fx, fy) || actionEventAt(destX_, destY_) || npcAt(fx, fy);
         if (front) interact();
-        else { chatOpen_ = true; chatInput_.clear(); }
+        else if (!previewMode_) { chatOpen_ = true; chatInput_.clear(); }  // 미리보기에선 채팅 비활성(닫기 막힘 방지)
     }
 
     // Debug autopilot: chase and attack the nearest monster (verifies combat).

@@ -48,6 +48,7 @@ void GamePlay::onEnter() {
     dir_ = gs.playerDir;
     moving_ = false;
     phase_ = Phase::Field;
+    chatOpen_ = false; chatInput_.clear();   // 진입 시 채팅 입력 상태 초기화(미리보기 닫기 막힘 방지)
     attackTimer_ = playerHurt_ = 0;
     for (float& c : skillCd_) c = 0;
     playMotion_ = MO_Walk; motionFrame_ = 0; motionAnim_ = motionTimer_ = dyingTimer_ = 0;

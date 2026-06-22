@@ -60,6 +60,10 @@ void Editor::liveInitUnits(Scene& sc, Map& m) {
 
 // 기록된 타임라인을 장면 동작들로 변환(동시 명령은 한 순간으로 묶고, 간격은 대기로).
 void Editor::liveBuildScene(Scene& sc, Map& m) {
+    if (recCmds_.empty()) {   // 기록된 게 없으면 기존 장면을 지우지 않는다(실수로 빈 장면 되는 것 방지)
+        setStatus("녹화된 동작이 없습니다 — 우클릭=이동, 공격/죽음/이펙트로 연기하세요");
+        return;
+    }
     std::sort(recCmds_.begin(), recCmds_.end(), [](const RecCmd& a, const RecCmd& b){ return a.t < b.t; });
     sc.actions.clear();
     std::unordered_map<int, Vector2> cur;     // 태그별 현재 타일(이동시간 계산용)
@@ -123,7 +127,13 @@ void Editor::drawLiveRecorder(Scene& sc) {
             liveInitUnits(sc, *m); recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true; scnPaused_ = false;
             for (auto& u : liveUnits_) if (u.tag != 0)
                 recCmds_.push_back({ 0, 2, u.tag, (int)std::lround(u.tx), (int)std::lround(u.ty), u.charId, 0, u.isMob });
-        } else { scnRecording_ = false; scnPaused_ = false; liveBuildScene(sc, *m); setStatus("녹화 완료 → 장면 저장됨"); }
+        } else {   // 녹화 완료 → 장면에 저장하고 녹화기를 닫아 '장면 목록'에서 바로 보이게 한다
+            scnRecording_ = false; scnPaused_ = false;
+            liveBuildScene(sc, *m);            // 빈 녹화면 기존 장면 유지(아래 guard), 아니면 동작 저장
+            scnLive_ = false;                  // 항상 녹화기를 닫아 결과를 장면 목록/동작 순서에서 확인
+            setStatus(TextFormat("녹화 완료 → 장면 '%s'에 %d개 동작 저장", sc.name.c_str(), (int)sc.actions.size()));
+            return;
+        }
     }
     if (tbtn(scnPaused_ ? "▶ 재개 (P)" : "일시정지 (P)", 130, scnPaused_) || IsKeyPressed(KEY_P)) scnPaused_ = !scnPaused_;
     if (tbtn("▶ 재생(테스트)", 120)) { engine_.startPlaytestScene(sc.id); scnLive_ = false; return; }
@@ -270,8 +280,9 @@ void Editor::drawLiveRecorder(Scene& sc) {
             if (scnRecording_) recCmds_.push_back({ scnRecClock_, 0, u.tag, tx, ty, 0, 0, false });
         }
     }
-    DrawTextU(TextFormat("유닛 %d · 선택 %d", (int)liveUnits_.size(), (int)liveSel_.size()),
-              (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kTextDim);
+    DrawTextU(TextFormat("유닛 %d · 선택 %d  ·  좌클릭/드래그=선택 · 우클릭=이동(녹화) · 공격/죽음/이펙트 버튼으로 연기 → '녹화 완료(저장)'",
+              (int)liveUnits_.size(), (int)liveSel_.size()),
+              (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, scnRecording_?ui::kAccentHi:ui::kTextDim);
 }
 
 } // namespace tsukuru
