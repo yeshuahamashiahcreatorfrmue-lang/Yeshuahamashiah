@@ -246,7 +246,11 @@ void Editor::drawScenarioTab() {
                 bool member = bucket ? (list[i].group.empty() || !inGroups(list[i].group)) : (list[i].group == g);
                 if (member) ids.push_back(i);
             }
-            // '제목없음'은 비어 있어도 항상 표시(녹화본이 들어오고, 드래그로 빼낼 대상)
+            // '미분류'는 맨 아래에 따로 분리(간격 + 구분선) — 비어 있어도 항상 표시(드롭 대상)
+            if (bucket) {
+                y += 12;
+                if (y + 2 > ly && y < ly + reg.height) DrawLine((int)lx, (int)y-4, (int)(lx+lw), (int)y-4, Fade(ui::kAccent, 0.45f));
+            }
             bool selG = (!bucket && scnGroupSel_ == g);
             Rectangle hr = { lx, y, lw - 44, 22 };
             headerHits.push_back({ hr, g });
@@ -402,7 +406,7 @@ void Editor::drawScenarioTab() {
 
     // ── 시나리오 배치·녹화 진입: NPC/유닛을 배치하고 실시간으로 조종하며 장면을 녹화 ──
     scnRecordMode_ = false;   // (구) 스냅샷 배치모드 제거 — 시나리오 배치·녹화로 일원화
-    if (ui::button({ cx, cy, cw, 30 }, "▶ 시나리오 배치·녹화 (NPC 배치→실시간 녹화)")) {
+    if (ui::button({ cx, cy, cw, 30 }, "▶ RTS 녹화 시작")) {
         scnLive_ = true; scnLiveInit_ = false; scnRecording_ = false; scnRecClock_ = 0;
         liveUnits_.clear(); recCmds_.clear(); liveSel_.clear();
     }

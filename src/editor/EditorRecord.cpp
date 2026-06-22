@@ -123,15 +123,24 @@ void Editor::drawLiveRecorder(Scene& sc) {
     float by = kToolbarH + 6, bx = 8;
     auto tbtn = [&](const char* t, float w, bool on=false)->bool { bool r = ui::button({ bx, by, w, 28 }, t, on); bx += w + 4; return r; };
     if (tbtn(scnRecording_ ? "녹화 완료(저장)" : "녹화 시작", 120, scnRecording_)) {
-        if (!scnRecording_) {                       // 시작: 초기화 + 등장 기록(t=0)
-            liveInitUnits(sc, *m); recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true; scnPaused_ = false;
-            for (auto& u : liveUnits_) if (u.tag != 0)
-                recCmds_.push_back({ 0, 2, u.tag, (int)std::lround(u.tx), (int)std::lround(u.ty), u.charId, 0, u.isMob });
-        } else {   // 녹화 완료 → 장면에 저장하고 녹화기를 닫아 '장면 목록'에서 바로 보이게 한다
+        if (!scnRecording_) {   // 시작: 초기화하지 않고 '지금 배치한 상태 그대로' 기록 시작(스튜디오식)
+            recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true; scnPaused_ = false;
+            int mcx = m->tilemap.width()/2, mcy = m->tilemap.height()/2;
+            for (auto& u : liveUnits_) {
+                int ux = (int)std::lround(u.tx), uy = (int)std::lround(u.ty);
+                if (u.tag != 0) recCmds_.push_back({ 0, 2, u.tag, ux, uy, u.charId, 0, u.isMob });   // 현재 위치에 등장
+                else if (ux != mcx || uy != mcy) recCmds_.push_back({ 0, 0, 0, ux, uy, 0, 0, false }); // 플레이어 배치 위치 반영
+            }
+        } else {   // 녹화 완료 → '미분류'에 새 녹화본(장면)으로 추가
             scnRecording_ = false; scnPaused_ = false;
-            liveBuildScene(sc, *m);            // 빈 녹화면 기존 장면 유지(아래 guard), 아니면 동작 저장
-            scnLive_ = false;                  // 항상 녹화기를 닫아 결과를 장면 목록/동작 순서에서 확인
-            setStatus(TextFormat("녹화 완료 → 장면 '%s'에 %d개 동작 저장", sc.name.c_str(), (int)sc.actions.size()));
+            if (recCmds_.empty()) { scnLive_ = false; setStatus("녹화된 동작이 없습니다 — 우클릭=이동 등으로 연기하세요"); return; }
+            Scene ns; ns.id = 1; for (auto& e : db.scenes) if (e.id >= ns.id) ns.id = e.id + 1;
+            ns.name = "녹화 " + std::to_string(ns.id); ns.group.clear(); ns.editMapId = sc.editMapId;
+            db.scenes.push_back(ns);
+            liveBuildScene(db.scenes.back(), *m);      // 동작 채우고 저장
+            scnSel_ = (int)db.scenes.size() - 1; scnActSel_ = -1; scnObjSel_ = -1;
+            scnLive_ = false;
+            setStatus(TextFormat("녹화 완료 → 미분류에 '%s' 추가 (%d동작)", db.scenes.back().name.c_str(), (int)db.scenes.back().actions.size()));
             return;
         }
     }
