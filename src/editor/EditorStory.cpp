@@ -254,6 +254,67 @@ void Editor::drawScenarioTab() {
         }
         return "#" + std::to_string(tag);
     };
+
+    // ── simulate the "stage": each tag's position after all recorded actions ──
+    auto m0 = p.map(sc.editMapId);
+    std::unordered_map<int, Vector2> stage;
+    int mcx = m0 ? m0->tilemap.width()/2 : 0, mcy = m0 ? m0->tilemap.height()/2 : 0;
+    stage[0] = { (float)mcx, (float)mcy };                 // 플레이어(태그0) 기본 위치
+    for (auto& a : sc.actions) {
+        if (a.type == SA_Spawn || a.type == SA_MoveChar) stage[a.targetId] = { (float)a.x, (float)a.y };
+        else if (a.type == SA_Remove) { for (int t : a.removeTags) stage.erase(t); if (a.targetId >= 0) stage.erase(a.targetId); }
+    }
+
+    // ── 장면녹화 모드 토글 + 컨트롤 ──
+    if (ui::button({ cx, cy, cw, 26 }, scnRecordMode_ ? "장면녹화 모드: 켜짐 (끄기)" : "장면녹화 모드 켜기", scnRecordMode_)) {
+        scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear(); scnRecDragTag_ = -1000;
+    }
+    cy += 30;
+    if (scnRecordMode_) {
+        DrawTextU("무대에서 토큰을 끌어 배치 → '장면 녹화'로 한 장면 기록", (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
+        // step duration 0.42~1.42
+        { int csd = (int)(scnStepDur_*100+0.5f); if (csd<42) csd=42; if (csd>142) csd=142;
+          ui::intStepper({ cx, cy, cw, 24 }, "장면시간(×0.01초)", csd, 10, 42, 142); scnStepDur_ = csd/100.0f; }
+        cy += 28;
+        // 무대에 몹 등장 추가
+        entityButton({ cx, cy, cw/2-4, 24 }, "몹", scnRecMob_, ENT_Mob, 4700);
+        if (ui::button({ cx+cw/2+2, cy, cw/2-4, 24 }, "+ 무대 등장")) {
+            int tag = 1; for (auto& a : sc.actions) if (a.type==SA_Spawn && a.targetId>=tag) tag = a.targetId+1;
+            SceneAction sp; sp.type = SA_Spawn; sp.targetId = tag; sp.refId = scnRecMob_; sp.x = mcx; sp.y = mcy;
+            sc.actions.push_back(sp); p.save();
+        }
+        cy += 28;
+        // 이펙트 뿌리기: 오른쪽 목록에서 선택 후 맵 클릭
+        assetButton({ cx, cy, cw/2-4, 24 }, "이펙트", scnRecEffect_, 4710);
+        ui::intStepper({ cx+cw/2+2, cy, cw/2-4, 24 }, "반경", scnRecRadius_, 1, 1, 30); cy += 28;
+        DrawTextU(TextFormat("대기 이펙트 %d개 (맵 클릭=뿌리기)", (int)scnPendingFx_.size()), (int)cx, (int)cy, 11, ui::kTextDim); cy += 16;
+        // 녹화 / 취소
+        if (ui::button({ cx, cy, cw, 28 }, "● 장면 녹화 (현재 배치 기록)")) {
+            int rec = 0;
+            for (auto& kv : stage) {
+                auto it = scnDraft_.find(kv.first);
+                if (it != scnDraft_.end() && (it->second.x != kv.second.x || it->second.y != kv.second.y)) {
+                    SceneAction mv; mv.type = SA_MoveChar; mv.targetId = kv.first;
+                    mv.x = (int)it->second.x; mv.y = (int)it->second.y; mv.time = scnStepDur_;
+                    sc.actions.push_back(mv); ++rec;
+                }
+            }
+            for (auto& fx : scnPendingFx_) { fx.time = scnStepDur_; sc.actions.push_back(fx); ++rec; }
+            scnPendingFx_.clear(); scnDraft_.clear();
+            p.save(); setStatus(TextFormat("장면 녹화됨 (+%d 동작)", rec));
+        }
+        cy += 32;
+        if (ui::button({ cx, cy, cw, 22 }, "마지막 녹화 취소")) {
+            // 직전 녹화로 추가된 연속 이동/이펙트 블록을 통째로 제거
+            while (!sc.actions.empty() &&
+                   (sc.actions.back().type == SA_MoveChar || sc.actions.back().type == SA_Effect))
+                sc.actions.pop_back();
+            scnActSel_ = -1; scnDraft_.clear(); p.save();
+        }
+        cy += 28;
+        DrawLine((int)cx, (int)cy, (int)(cx+cw), (int)cy, ui::kPanelHi); cy += 6;
+    } else { scnDraft_.clear(); scnPendingFx_.clear(); }
+
     // add-action toolbar (6 types) — appends + selects
     DrawTextU("동작 추가:", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
     const char* an[6] = { kSceneActNames[0],kSceneActNames[1],kSceneActNames[2],kSceneActNames[3],kSceneActNames[4],kSceneActNames[5] };
@@ -410,6 +471,7 @@ void Editor::drawScenarioTab() {
             scnDragIdx_ = -2;
     }
 
+  if (!scnRecordMode_) {
     // action markers (effect/spawn/move) — draggable (RTS)
     auto markerColor = [&](int t){ return t==SA_Effect?Color{250,180,60,255}:t==SA_Spawn?Color{120,200,120,255}:t==SA_MoveChar?Color{120,170,250,255}:ui::kTextDim; };
     for (int i = 0; i < (int)sc.actions.size(); ++i) {
@@ -472,8 +534,41 @@ void Editor::drawScenarioTab() {
             }
         }
     }
+  } else {
+    // ── 녹화 모드: 무대 토큰(플레이어/등장 몹)을 드래그 + 이펙트 뿌리기 ──
+    for (auto& kv : stage) if (!scnDraft_.count(kv.first)) scnDraft_[kv.first] = kv.second;  // init draft
+    bool pressedToken = false;
+    for (auto& kv : scnDraft_) {
+        int tag = kv.first;
+        bool drag = (scnRecDragTag_ == tag);
+        Vector2 sp = drag ? mouse : t2s(kv.second.x, kv.second.y);
+        Color col = (tag == 0) ? Color{120,170,250,255} : Color{120,200,120,255};
+        DrawCircleV(sp, 10, Fade(BLACK,0.6f)); DrawCircleV(sp, 8, col);
+        DrawTextU((tag==0 ? std::string("플레이어") : spawnTagLabel(tag)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, WHITE);
+        if (scnRecDragTag_==-1000 && CheckCollisionPointCircle(mouse, sp, 11) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { scnRecDragTag_ = tag; pressedToken = true; }
+    }
+    if (scnRecDragTag_ != -1000) {
+        int tx, ty; s2t(tx, ty);
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) scnDraft_[scnRecDragTag_] = { (float)tx, (float)ty };
+        else scnRecDragTag_ = -1000;
+    }
+    // pending (placed-but-not-recorded) effects
+    for (auto& fx : scnPendingFx_) {
+        Vector2 sp = t2s((float)fx.x, (float)fx.y); float rr = std::max(1, fx.radius) * tileSp;
+        DrawCircleLines((int)sp.x,(int)sp.y, rr, Color{250,180,60,255});
+        DrawCircle((int)sp.x,(int)sp.y, rr, Fade(Color{250,180,60,255}, 0.12f));
+        DrawCircleV(sp, 4, Color{250,180,60,255});
+    }
+    // drop an effect at the clicked tile (오른쪽 목록에서 이펙트 선택 후 맵 클릭)
+    if (scnRecEffect_ >= 0 && inMap && lclick && !pressedToken && scnRecDragTag_==-1000) {
+        int tx, ty; s2t(tx, ty);
+        SceneAction fx; fx.type = SA_Effect; fx.refId = scnRecEffect_; fx.x = tx; fx.y = ty; fx.radius = scnRecRadius_;
+        scnPendingFx_.push_back(fx);
+    }
+  }
     // hint line
-    const char* hint = scnTrigMode_==1 ? "발동지점: 맵 빈곳을 클릭" : scnTrigMode_==2 ? "발동 NPC: 맵의 NPC를 클릭"
+    const char* hint = scnRecordMode_ ? "녹화: 토큰 드래그로 배치 → '장면 녹화' · 이펙트 선택 후 맵 클릭=뿌리기"
+                     : scnTrigMode_==1 ? "발동지점: 맵 빈곳을 클릭" : scnTrigMode_==2 ? "발동 NPC: 맵의 NPC를 클릭"
                      : "마커 드래그=이동 · 빈곳 클릭=배치 · 휠=이펙트 반경";
     DrawTextU(hint, (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kAccentHi);
 }

@@ -197,6 +197,15 @@ private:
     bool  dlgPopupOpen_ = false;     // 대화 탭: NPC 클릭 시 뜨는 편집 팝업 표시
     int   scnTrigMode_ = 0;          // 시나리오 발동지정 모드: 0=없음 1=맵지점 2=NPC대화
     int   scnDragIdx_ = -1;          // 시나리오: 드래그 중인 마커(액션 인덱스, -2=발동지점)
+    // ── 장면녹화(RTS식 무대) 상태 ──
+    bool  scnRecordMode_ = false;    // 녹화 모드: 무대 토큰을 끌어 배치 → '장면 녹화'로 기록
+    int   scnRecDragTag_ = -1000;    // 드래그 중인 무대 토큰의 태그(-1000=없음, 0=플레이어)
+    int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)
+    int   scnRecMob_ = -1;           // 무대에 등장시킬 몹
+    int   scnRecRadius_ = 2;         // 뿌릴 이펙트 반경(칸)
+    float scnStepDur_ = 1.0f;        // 한 장면(스텝) 표시시간 0.42~1.42초
+    std::unordered_map<int, Vector2> scnDraft_;  // 태그 -> 이번 스텝의 드래프트 위치(칸)
+    std::vector<SceneAction> scnPendingFx_;      // 배치했지만 아직 녹화 안 된 이펙트들
 
     // dropdown picker state (see optionButton/drawPickerOverlay)
     int   pickerId_ = -1;
