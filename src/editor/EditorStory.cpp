@@ -438,8 +438,12 @@ void Editor::drawScenarioTab() {
         addAct(na); scnAwaitDest_=true; setStatus("이펙트 추가 — 지도 클릭=위치, 휠=반경");
     }
     if (ui::button({ cx+cw/3, cy, cw/3-4, 26 }, "+대화")) {
-        SceneAction na; na.type=SA_Dialogue; na.time=0.0f; addAct(na);
-        setStatus("대화 추가 — 오른쪽 '대화 편집'으로 대사 작성");
+        SceneAction na; na.type=SA_Dialogue; na.time=0.0f;
+        // 빈 대화록을 즉시 만들어 연결 — refId=-1로 남아 재생 때 조용히 무시되는 것 방지
+        DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
+        nd.name = sc.name + " 대사"; nd.lines.push_back({ "", "...", -1, {} });
+        db.dialogues.push_back(nd); na.refId = nd.id;
+        addAct(na); setStatus("대화 추가(빈 대화 생성) — '대화 편집'으로 대사 작성");
     }
     if (ui::button({ cx+2*cw/3, cy, cw/3-4, 26 }, "+대기")) {
         SceneAction na; na.type=SA_Wait; na.time=0.5f; addAct(na); setStatus("대기 추가");
@@ -527,9 +531,21 @@ void Editor::drawScenarioTab() {
             cy += 22;
             durControl(a.time);
         } else if (a.type == SA_Spawn) {
-            ui::intStepper({ cx, cy, cw/2-4, 24 }, "태그", a.targetId, 1, 1, 99);
-            entityButton({ cx+cw/2+2, cy, cw/2-4, 24 }, "몹", a.refId, ENT_Mob, 4300); cy += 28;
-            DrawTextU(TextFormat("등장: %d,%d", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim);
+            ui::intStepper({ cx, cy, cw, 24 }, "태그(번호)", a.targetId, 1, 1, 99); cy += 28;
+            DrawTextU(("등장 대상: " + spawnEntName(a.refId)).c_str(), (int)cx, (int)cy, 11, ui::kAccentHi); cy += 16;
+            if (ui::button({ cx, cy, cw/2-4, 24 }, "등록 캐릭터")) {   // 캐릭터로 지정(refId = -id-1)
+                int idx = scnActSel_;
+                openCharBrowser([this, idx](int cid){
+                    if (cid < 0) return;
+                    Database& d2 = engine_.project().database;
+                    if (scnSel_<0 || scnSel_>=(int)d2.scenes.size()) return;
+                    Scene& s2 = d2.scenes[scnSel_];
+                    if (idx<0 || idx>=(int)s2.actions.size()) return;
+                    s2.actions[idx].refId = -cid-1; engine_.project().save();
+                });
+            }
+            entityButton({ cx+cw/2+2, cy, cw/2-4, 24 }, "몹", a.refId, ENT_Mob, 4300); cy += 28;   // 몹으로 지정(refId>=0)
+            DrawTextU(TextFormat("위치: %d,%d", a.x, a.y), (int)cx, (int)cy, 11, ui::kTextDim);
             if (ui::button({ cx+cw-110, cy-2, 110, 20 }, "지도에서 지정", scnAwaitDest_)) scnAwaitDest_ = !scnAwaitDest_;
             cy += 22;
         } else if (a.type == SA_Remove) {
@@ -605,12 +621,13 @@ void Editor::drawScenarioTab() {
     // full context markers (이벤트·NPC·몹·오브젝트·몹스폰) like the world preview
     drawMapElementMarkers(*m, bx, by, pw, ph, true);
     // NPC click targets for 발동 NPC mode + current-trigger highlight
+    float npcHit = std::max(11.0f, tileSp*0.7f);
     for (auto& e : m->events) {
         if (e.graphicAsset < 0 && e.charId < 0) continue;
         Vector2 sp = t2s((float)e.x, (float)e.y);
-        if (e.id == trigNpcId) { DrawCircleLines((int)sp.x,(int)sp.y,9,ui::kGood); DrawTextU("발동", (int)sp.x+8,(int)sp.y-8,11,ui::kGood); }
-        if (scnTrigMode_==2 && CheckCollisionPointCircle(mouse, sp, 8)) {
-            DrawCircleLines((int)sp.x,(int)sp.y,9,WHITE);
+        if (e.id == trigNpcId) { DrawCircleLines((int)sp.x,(int)sp.y,(int)npcHit,ui::kGood); DrawTextU("발동", (int)sp.x+8,(int)sp.y-8,11,ui::kGood); }
+        if (scnTrigMode_==2 && CheckCollisionPointCircle(mouse, sp, npcHit)) {
+            DrawCircleLines((int)sp.x,(int)sp.y,(int)npcHit,WHITE);
             if (lclick) { for (auto& e2 : m->events) if (e2.sceneId==sc.id && e2.graphicAsset>=0) e2.sceneId=-1; e.sceneId=sc.id; scnTrigMode_=0; p.save(); setStatus("이 NPC와 대화 시 시나리오 발동"); }
         }
     }
