@@ -404,68 +404,8 @@ void Editor::drawScenarioTab() {
         DrawLine((int)cx, (int)cy, (int)(cx+cw), (int)cy, ui::kPanelHi); cy += 6;
     } else { scnDraft_.clear(); scnPendingFx_.clear(); }
 
-    // ── 선택 캐릭터(객체) 표시 + 그 캐릭터에 적용되는 명령 7버튼 ──
-    if (scnObjSel_ >= 0 && !stage.count(scnObjSel_)) { scnObjSel_ = -1; scnAwaitDest_ = false; } // 사라진 대상 해제
-    {
-        std::string who = scnObjSel_ < 0 ? "(없음 — 지도에서 캐릭터 클릭)"
-                        : scnObjSel_ == 0 ? "플레이어(0)" : spawnTagLabel(scnObjSel_);
-        DrawTextU(("선택 캐릭터: " + who).c_str(), (int)cx, (int)cy, 12, scnObjSel_<0?ui::kTextDim:ui::kAccentHi);
-        cy += 18;
-    }
-    auto addAct = [&](SceneAction na){ sc.actions.push_back(na); scnActSel_ = (int)sc.actions.size()-1; p.save(); };
-    int tgt = scnObjSel_ < 0 ? 0 : scnObjSel_;   // 미선택 시 플레이어(0) 기본
-    DrawTextU("명령 추가 (선택 캐릭터에 적용):", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
-    // 1행: 이동 / 동작 / 제거
-    if (ui::button({ cx, cy, cw/3-4, 26 }, "+이동", scnAwaitDest_)) {
-        SceneAction na; na.type=SA_MoveChar; na.targetId=tgt; na.time=1.0f;
-        if (stage.count(tgt)) { na.x=(int)stage[tgt].x; na.y=(int)stage[tgt].y; }
-        addAct(na); scnAwaitDest_=true;
-        setStatus(scnObjSel_<0?"대상 미선택 → 플레이어 이동: 목적지 클릭":"이동: 지도에서 목적지 클릭");
-    }
-    if (ui::button({ cx+cw/3, cy, cw/3-4, 26 }, "+동작")) {
-        SceneAction na; na.type=SA_Motion; na.targetId=tgt; na.refId=MO_Attack; na.time=0.8f;
-        addAct(na); setStatus("동작 추가 — 오른쪽에서 동작(공격/죽음 등) 선택");
-    }
-    if (ui::button({ cx+2*cw/3, cy, cw/3-4, 26 }, "+제거")) {
-        if (tgt<=0) setStatus("플레이어는 제거 불가 · 등장 캐릭터를 먼저 선택");
-        else { SceneAction na; na.type=SA_Remove; na.targetId=tgt; na.removeTags={tgt}; addAct(na); scnObjSel_=-1; setStatus("제거 추가됨"); }
-    }
-    cy += 30;
-    // 2행: 이펙트 / 대화 / 대기
-    if (ui::button({ cx, cy, cw/3-4, 26 }, "+이펙트", scnAwaitDest_)) {
-        SceneAction na; na.type=SA_Effect; na.refId=scnRecEffect_; na.radius=1; na.time=0.8f;
-        if (scnObjSel_>=0 && stage.count(scnObjSel_)) { na.x=(int)stage[scnObjSel_].x; na.y=(int)stage[scnObjSel_].y; }
-        addAct(na); scnAwaitDest_=true; setStatus("이펙트 추가 — 지도 클릭=위치, 휠=반경");
-    }
-    if (ui::button({ cx+cw/3, cy, cw/3-4, 26 }, "+대화")) {
-        SceneAction na; na.type=SA_Dialogue; na.time=0.0f;
-        // 빈 대화록을 즉시 만들어 연결 — refId=-1로 남아 재생 때 조용히 무시되는 것 방지
-        DialogueScenario nd; nd.id=(int)db.dialogues.size()+1; while(db.dialogue(nd.id))++nd.id;
-        nd.name = sc.name + " 대사"; nd.lines.push_back({ "", "...", -1, {} });
-        db.dialogues.push_back(nd); na.refId = nd.id;
-        addAct(na); setStatus("대화 추가(빈 대화 생성) — '대화 편집'으로 대사 작성");
-    }
-    if (ui::button({ cx+2*cw/3, cy, cw/3-4, 26 }, "+대기")) {
-        SceneAction na; na.type=SA_Wait; na.time=0.5f; addAct(na); setStatus("대기 추가");
-    }
-    cy += 30;
-    // 3행: 캐릭터 등장 (등록 캐릭터/몹 브라우저에서 고른 뒤 자동 선택)
-    if (ui::button({ cx, cy, cw, 26 }, "+ 캐릭터 등장 (등록 캐릭터에서)")) {
-        openCharBrowser([this](int cid){
-            if (cid < 0) return;
-            Project& pr = engine_.project(); Database& d2 = pr.database;
-            if (scnSel_ < 0 || scnSel_ >= (int)d2.scenes.size()) return;
-            Scene& s2 = d2.scenes[scnSel_];
-            int tag = 1; for (auto& a : s2.actions) if (a.type==SA_Spawn && a.targetId>=tag) tag = a.targetId+1;
-            auto mp = pr.map(s2.editMapId);
-            int mx = mp ? mp->tilemap.width()/2 : 0, my = mp ? mp->tilemap.height()/2 : 0;
-            SceneAction na; na.type=SA_Spawn; na.targetId=tag; na.refId=-cid-1; na.x=mx; na.y=my;
-            s2.actions.push_back(na); pr.save();
-            scnObjSel_=tag; scnActSel_=(int)s2.actions.size()-1; scnAwaitDest_=true;
-            setStatus("캐릭터 등장 추가 — 지도에서 위치 클릭");
-        });
-    }
-    cy += 34;
+    // 선택 캐릭터가 제거되어 사라졌으면 선택 해제(장면 편집은 스냅샷 배치모드/라이브 녹화로)
+    if (scnObjSel_ >= 0 && !stage.count(scnObjSel_)) { scnObjSel_ = -1; scnAwaitDest_ = false; }
     // action sequence chips (numbered) — click to select, reorder, delete
     DrawTextU(TextFormat("동작 순서 (%d) — 선택 후 맵에서 편집", (int)sc.actions.size()), (int)cx, (int)cy, 12, ui::kAccentHi); cy += 18;
     Rectangle chreg = { cx, cy, cw, 96 };
