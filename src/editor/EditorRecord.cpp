@@ -86,6 +86,9 @@ void Editor::liveBuildScene(Scene& sc, Map& m) {
                 sc.actions.push_back(a);
             } else if (c.type == 3) {                           // 제거
                 SceneAction a; a.type = SA_Remove; a.targetId = c.tag; sc.actions.push_back(a);
+            } else if (c.type == 4) {                           // 이펙트
+                SceneAction a; a.type = SA_Effect; a.refId = c.charId; a.x = c.x; a.y = c.y;
+                a.radius = std::max(1, c.motion); a.time = 0.8f; sc.actions.push_back(a);
             }
             ++i;
         }
@@ -102,6 +105,7 @@ void Editor::drawLiveRecorder(Scene& sc) {
     if (!m) { scnLive_ = false; return; }
     if (!scnLiveInit_) liveInitUnits(sc, *m);
     float dt = GetFrameTime(); if (dt > 0.05f) dt = 0.05f;
+    float simDt = scnPaused_ ? 0.0f : dt;       // 일시정지면 시간·이동 정지(상황 세팅용)
     bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     bool rclick = IsMouseButtonPressed(MOUSE_RIGHT_BUTTON);
     Vector2 mouse = GetMousePosition();
@@ -110,35 +114,40 @@ void Editor::drawLiveRecorder(Scene& sc) {
     };
     auto selected = [&](int tag){ return std::find(liveSel_.begin(), liveSel_.end(), tag) != liveSel_.end(); };
 
-    // ---- top control bar ----
+    // ---- top control bar (2 rows) ----
     float by = kToolbarH + 6, bx = 8;
-    auto tbtn = [&](const char* t, float w)->bool { bool r = ui::button({ bx, by, w, 30 }, t); bx += w + 4; return r; };
-    if (tbtn(scnRecording_ ? "■ 녹화 완료" : "● 녹화 시작", 130)) {
+    auto tbtn = [&](const char* t, float w, bool on=false)->bool { bool r = ui::button({ bx, by, w, 28 }, t, on); bx += w + 4; return r; };
+    if (tbtn(scnRecording_ ? "■ 녹화 완료" : "● 녹화 시작", 120, scnRecording_)) {
         if (!scnRecording_) {                       // 시작: 초기화 + 등장 기록(t=0)
-            liveInitUnits(sc, *m); recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true;
+            liveInitUnits(sc, *m); recCmds_.clear(); scnRecClock_ = 0; scnRecording_ = true; scnPaused_ = false;
             for (auto& u : liveUnits_) if (u.tag != 0)
                 recCmds_.push_back({ 0, 2, u.tag, (int)std::lround(u.tx), (int)std::lround(u.ty), u.charId, 0, u.isMob });
-        } else { scnRecording_ = false; liveBuildScene(sc, *m); setStatus("녹화 완료 → 장면 저장됨"); }
+        } else { scnRecording_ = false; scnPaused_ = false; liveBuildScene(sc, *m); setStatus("녹화 완료 → 장면 저장됨"); }
     }
+    if (tbtn(scnPaused_ ? "▶ 재개" : "⏸ 일시정지", 110, scnPaused_)) scnPaused_ = !scnPaused_;
     if (tbtn("▶ 재생(테스트)", 120)) { engine_.startPlaytestScene(sc.id); scnLive_ = false; return; }
+    if (tbtn("닫기", 64)) { scnLive_ = false; scnRecording_ = false; scnPaused_ = false; liveFxMode_ = false; return; }
+    if (scnRecording_) { if (!scnPaused_) scnRecClock_ += dt;
+        DrawTextU(TextFormat(scnPaused_ ? "❚❚ 일시정지  %.1f초  (명령 %d)" : "● REC  %.1f초  (명령 %d)", scnRecClock_, (int)recCmds_.size()),
+                  (int)bx + 6, (int)by + 6, 15, scnPaused_ ? ui::kAccentHi : ui::kDanger); }
+    // row 2
+    by += 32; bx = 8;
     if (tbtn("+ 유닛", 80)) openCharBrowser([this](int cid){ livePlaceChar_ = cid; });
-    // selection actions
     auto applyMotion = [&](int mo){
         for (auto& u : liveUnits_) if (selected(u.tag)) { u.motion = mo; u.motionT = 0.8f;
             if (scnRecording_) recCmds_.push_back({ scnRecClock_, 1, u.tag, 0,0, 0, mo, false }); }
     };
-    if (tbtn("공격", 70)) applyMotion(MO_Attack);
-    if (tbtn("죽음", 70)) applyMotion(MO_Death);
-    if (tbtn("제거", 70)) {
+    if (tbtn("공격", 64)) applyMotion(MO_Attack);
+    if (tbtn("죽음", 64)) applyMotion(MO_Death);
+    if (tbtn("제거", 64)) {
         for (auto& u : liveUnits_) if (selected(u.tag) && u.tag != 0) {
             u.dead = true; if (scnRecording_) recCmds_.push_back({ scnRecClock_, 3, u.tag, 0,0,0,0,false }); }
         liveUnits_.erase(std::remove_if(liveUnits_.begin(), liveUnits_.end(), [](const LiveUnit& u){ return u.dead; }), liveUnits_.end());
         liveSel_.clear();
     }
-    if (tbtn("닫기", 70)) { scnLive_ = false; scnRecording_ = false; return; }
-    if (scnRecording_) { scnRecClock_ += dt;
-        DrawTextU(TextFormat("● REC  %.1f초  (명령 %d)", scnRecClock_, (int)recCmds_.size()), (int)bx + 6, (int)by + 7, 16, ui::kDanger); }
-    else DrawTextU("드래그=선택 · 우클릭=이동(길찾기) · 공격/죽음/제거=선택 유닛", (int)bx + 6, (int)by + 8, 13, ui::kTextDim);
+    if (tbtn(liveFxMode_ ? "이펙트: 맵클릭" : "이펙트 뿌리기", 110, liveFxMode_)) liveFxMode_ = !liveFxMode_;
+    assetButton({ bx, by, 130, 28 }, "", scnRecEffect_, 4810); bx += 134;
+    ui::intStepper({ bx, by, 96, 28 }, "반경", scnRecRadius_, 1, 1, 20); bx += 100;
 
     // ---- map canvas ----
     Rectangle canvas = { 8, by + 38, W - 16, H - (by + 38) - 10 };
@@ -161,17 +170,17 @@ void Editor::drawLiveRecorder(Scene& sc) {
     int hov = -1;
     for (int i = 0; i < (int)liveUnits_.size(); ++i) if (CheckCollisionPointCircle(mouse, t2s(liveUnits_[i].tx, liveUnits_[i].ty), unitR+2)) hov = i;
     for (auto& u : liveUnits_) {
-        // movement along path
-        if (!u.path.empty()) {
+        // movement along path (frozen while paused: simDt == 0)
+        if (!u.path.empty() && simDt > 0) {
             Vector2 w = u.path.front();
             float ddx = w.x - u.tx, ddy = w.y - u.ty, dist = std::sqrt(ddx*ddx + ddy*ddy);
-            float step = 5.0f * dt;
+            float step = 5.0f * simDt;
             if (dist <= step) { u.tx = w.x; u.ty = w.y; u.path.erase(u.path.begin()); }
             else { u.tx += ddx/dist*step; u.ty += ddy/dist*step; }
             u.dir = std::fabs(ddx) > std::fabs(ddy) ? (ddx >= 0 ? 2 : 1) : (ddy >= 0 ? 0 : 3);
-            u.animT += dt; if (u.animT > 0.12f) { u.animT = 0; u.frame = (u.frame+1)%4; }
+            u.animT += simDt; if (u.animT > 0.12f) { u.animT = 0; u.frame = (u.frame+1)%4; }
         }
-        if (u.motionT > 0) { u.motionT -= dt; u.animT += dt; if (u.animT > 0.1f) { u.animT = 0; u.frame = (u.frame+1)%4; } if (u.motionT <= 0) u.motion = MO_Walk; }
+        if (u.motionT > 0 && simDt > 0) { u.motionT -= simDt; u.animT += simDt; if (u.animT > 0.1f) { u.animT = 0; u.frame = (u.frame+1)%4; } if (u.motionT <= 0) u.motion = MO_Walk; }
         // draw sprite
         Vector2 sp = t2s(u.tx, u.ty);
         if (selected(u.tag)) { DrawCircleLines((int)sp.x,(int)sp.y, unitR+4, ui::kAccentHi); DrawCircleLines((int)sp.x,(int)sp.y, unitR+5, ui::kAccentHi); }
@@ -208,6 +217,29 @@ void Editor::drawLiveRecorder(Scene& sc) {
             }
         }
         return;   // placement mode consumes input
+    }
+
+    // recorded effects: show rings (배치한 이펙트 위치)
+    for (auto& c : recCmds_) if (c.type == 4) {
+        Vector2 fp = t2s((float)c.x, (float)c.y); float rr = std::max(1, c.motion) * (pw/mwT);
+        DrawCircleLines((int)fp.x,(int)fp.y, rr, Fade(Color{250,180,60,255}, 0.8f));
+        DrawCircle((int)fp.x,(int)fp.y, rr, Fade(Color{250,180,60,255}, 0.10f));
+    }
+
+    // ---- effect placement mode: 맵 클릭 = 이펙트 기록(현재 시계 시각) ----
+    if (liveFxMode_) {
+        if (inMap) {
+            int tx, ty; s2t(tx, ty);
+            Vector2 g = t2s((float)tx,(float)ty); float rr = std::max(1, scnRecRadius_) * (pw/mwT);
+            DrawCircleLines((int)g.x,(int)g.y, rr, ui::kAccentHi);
+            if (lclick && scnRecEffect_ >= 0) {
+                recCmds_.push_back({ scnRecClock_, 4, 0, tx, ty, scnRecEffect_, scnRecRadius_, false });
+                setStatus(scnRecording_ ? "이펙트 기록됨" : "녹화 중이 아닙니다(이펙트는 녹화 중에만 기록)");
+            }
+        }
+        DrawTextU("이펙트 모드: 맵 클릭=뿌리기(녹화 중 기록) · 오른쪽 위 목록에서 이펙트 선택",
+                  (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kAccentHi);
+        return;   // effect mode consumes input
     }
 
     // ---- selection + commands ----

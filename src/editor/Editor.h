@@ -229,6 +229,8 @@ private:
     std::vector<int>      liveSel_;  // 선택된 유닛 태그들
     bool  liveMarquee_ = false; Vector2 liveMarqueeStart_{};
     int   livePlaceChar_ = -1;       // 브라우저로 고른 유닛(맵 클릭으로 배치)
+    bool  scnPaused_ = false;        // 라이브 녹화 일시정지(시간·이동 멈춤, 상황 세팅)
+    bool  liveFxMode_ = false;       // 이펙트 뿌리기 모드(맵 클릭=이펙트)
     void  drawLiveRecorder(Scene& sc);                 // 라이브 녹화 메인(전체 화면)
     void  liveInitUnits(Scene& sc, Map& m);            // 장면 데이터로 유닛 초기화
     void  liveBuildScene(Scene& sc, Map& m);           // 타임라인 → 장면 동작
