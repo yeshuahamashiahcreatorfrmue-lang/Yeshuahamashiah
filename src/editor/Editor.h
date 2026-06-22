@@ -192,6 +192,9 @@ private:
     int   scnActSel_ = -1;            // 맵에서 편집 중인 동작(액션) 인덱스
     int   dlgMapId_ = -1;            // 대화 탭에서 배경으로 보는 맵
     int   dlgNpcEventId_ = -1;       // 대화 탭에서 맵에서 선택한 NPC(event) id
+    bool  dlgPopupOpen_ = false;     // 대화 탭: NPC 클릭 시 뜨는 편집 팝업 표시
+    int   scnTrigMode_ = 0;          // 시나리오 발동지정 모드: 0=없음 1=맵지점 2=NPC대화
+    int   scnDragIdx_ = -1;          // 시나리오: 드래그 중인 마커(액션 인덱스, -2=발동지점)
 
     // dropdown picker state (see optionButton/drawPickerOverlay)
     int   pickerId_ = -1;
