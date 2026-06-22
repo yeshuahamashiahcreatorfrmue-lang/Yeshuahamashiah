@@ -97,6 +97,7 @@ void Engine::startScenePreview(const std::vector<int>& sceneIds) {
                    project_->startGold, project_->startItems);
     state_.currentMap = mapId; state_.playerX = project_->startX; state_.playerY = project_->startY;
     play_->setPreviewMode(true);
+    play_->setPreviewInteractive(false);   // 시작은 작은(자동) 미리보기
     play_->onEnter();                 // 맵 로드(미리보기 모드)
     if (sceneIds.size() == 1) play_->beginScene(sceneIds[0]);
     else play_->beginSceneChain(sceneIds);
@@ -105,7 +106,11 @@ void Engine::startScenePreview(const std::vector<int>& sceneIds) {
 
 void Engine::stopScenePreview() {
     scenePreview_ = false;
-    if (play_) play_->setPreviewMode(false);
+    if (play_) { play_->setPreviewMode(false); play_->setPreviewInteractive(false); }
+}
+
+void Engine::setScenePreviewInteractive(bool v) {
+    if (play_) play_->setPreviewInteractive(v);
 }
 
 // Render the running scene into scenePreviewRT_ at a fixed 640×360. Called from

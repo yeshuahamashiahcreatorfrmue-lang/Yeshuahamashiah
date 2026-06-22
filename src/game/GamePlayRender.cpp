@@ -370,8 +370,9 @@ void GamePlay::drawField() {
     // weather particles
     drawWeather(GetFrameTime());
 
-    // 에디터 미리보기 재생 중에는 미니맵/HUD/버튼/스킬패널을 숨겨 장면만 보이게 한다.
-    if (previewMode_) {
+    // 자동(작은) 미리보기에서는 미니맵/HUD/버튼/스킬패널을 숨겨 장면만 보이게 한다.
+    // (확대·상호작용 미리보기는 실제 플레이처럼 HUD를 그대로 보여준다.)
+    if (previewMode_ && !previewInteractive_) {
         if (sceneRunId_ >= 0) {
             const char* msg = "장면 재생중";
             int tw = MeasureTextU(msg, 14);

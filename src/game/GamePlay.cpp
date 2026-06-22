@@ -205,7 +205,8 @@ void GamePlay::updatePreview(float dt) {
 }
 
 void GamePlay::update(float dt) {
-    if (previewMode_) { updatePreview(dt); return; }
+    // 작은(자동) 미리보기는 컷신만 진행, 확대(상호작용) 미리보기는 전체 업데이트로 키 조작 허용.
+    if (previewMode_ && !previewInteractive_) { updatePreview(dt); return; }
     // IME on only while typing chat, off otherwise so WASD/keys always register
     // even if the input language is Korean.
     plat::setImeEnabled(chatOpen_);

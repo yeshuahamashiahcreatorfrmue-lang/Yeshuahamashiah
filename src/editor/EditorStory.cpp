@@ -916,6 +916,7 @@ void Editor::drawScenarioTab() {
 void Editor::drawScenePreviewOverlay() {
     const Texture2D& tex = engine_.scenePreviewTexture();
     if (tex.id == 0) return;
+    { static bool envBig=false; if (!envBig) { envBig=true; if (getenv("TSUKURU_PREVIEW_BIG")) scnPrevBig_=true; } } // debug
     float W = (float)screenW(), H = (float)screenH();
     float tw = (float)tex.width, th = (float)tex.height;     // 640×360
     Rectangle box;
@@ -927,6 +928,8 @@ void Editor::drawScenePreviewOverlay() {
         float bw = std::min(360.0f, W * 0.42f), bh = bw * th / tw;
         box = { 10, H - bh - 44, bw, bh };
     }
+    // 확대(큰 화면)면 키보드/조작이 게임에 전달되도록 상호작용 모드 ON.
+    engine_.setScenePreviewInteractive(scnPrevBig_);
     // 제목줄(영역 위) + 외곽 프레임. scnPrevBox_ 는 입력 가림 판정에 쓰이므로 제목줄 포함.
     Rectangle frame = { box.x - 3, box.y - 26, box.width + 6, box.height + 29 };
     scnPrevBox_ = frame;
@@ -936,22 +939,26 @@ void Editor::drawScenePreviewOverlay() {
     std::string title = "장면 미리보기";
     if (!engine_.scenePreviewName().empty()) title += " — " + engine_.scenePreviewName();
     DrawTextU(title.c_str(), (int)box.x + 4, (int)box.y - 22, 14, ui::kAccentHi);
-    // X 닫기
+    Vector2 m = GetMousePosition();
+    // X 닫기 / (확대 시) 작게 버튼 — 확대 모드에선 화면 클릭이 게임으로 가도록 토글은 버튼으로만.
     if (ui::button({ box.x + box.width - 24, box.y - 25, 22, 22 }, "x")) {
         engine_.stopScenePreview(); scnPrevBig_ = false; return;
+    }
+    if (scnPrevBig_) {
+        if (ui::button({ box.x + box.width - 78, box.y - 25, 50, 22 }, "작게")) { scnPrevBig_ = false; return; }
     }
     // 장면 화면(상하 반전)
     DrawTexturePro(tex, { 0, 0, tw, -th }, box, { 0, 0 }, 0, WHITE);
     DrawRectangleLinesEx(box, 1, Fade(BLACK, 0.6f));
-    // 화면 클릭 → 작게/크게 토글
-    Vector2 m = GetMousePosition();
-    if (CheckCollisionPointRec(m, box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-        scnPrevBig_ = !scnPrevBig_;
+    // 작은 화면일 때만 화면 클릭으로 확대(확대 상태에선 클릭이 게임 조작으로 전달됨)
+    if (!scnPrevBig_ && CheckCollisionPointRec(m, box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        scnPrevBig_ = true;
     // 안내
-    const char* hint = scnPrevBig_ ? "클릭=작게 · X=닫기" : "클릭=크게 · X=닫기";
+    const char* hint = scnPrevBig_ ? "키보드로 조작 (방향키 이동·Enter 대화·Esc 건너뛰기) · '작게'/X"
+                                   : "클릭=크게(키 조작) · X=닫기";
     int hw = MeasureTextU(hint, 11);
-    DrawRectangle((int)box.x + 4, (int)(box.y + box.height - 16), hw + 6, 14, Fade(BLACK, 0.55f));
-    DrawTextU(hint, (int)box.x + 6, (int)(box.y + box.height - 15), 11, Fade(ui::kText, 0.9f));
+    DrawRectangle((int)box.x + 4, (int)(box.y + box.height - 16), hw + 6, 14, Fade(BLACK, 0.6f));
+    DrawTextU(hint, (int)box.x + 6, (int)(box.y + box.height - 15), 11, Fade(ui::kText, 0.95f));
 }
 
 } // namespace tsukuru

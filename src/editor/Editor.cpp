@@ -139,8 +139,10 @@ void Editor::update(float dt) {
         if (IsKeyPressed(KEY_T)) { tool_ = Tool::Stamp;  collisionMode_ = false; }
         if (IsKeyPressed(KEY_C)) collisionMode_ = !collisionMode_;
     }
-    if (IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
-    if (IsKeyPressed(KEY_F6)) {   // playtest starting on the current map (nearest walkable tile)
+    // 확대(상호작용) 장면 미리보기가 켜져 있으면 방향키/F5·F6를 미리보기에 양보한다.
+    bool interactivePreview = engine_.scenePreviewActive() && scnPrevBig_;
+    if (!interactivePreview && IsKeyPressed(KEY_F5)) { engine_.project().save(); engine_.startPlaytest(); return; }
+    if (!interactivePreview && IsKeyPressed(KEY_F6)) {   // playtest starting on the current map (nearest walkable tile)
         if (auto m = activeMap()) {
             engine_.project().save();
             int cx = m->tilemap.width() / 2, cy = m->tilemap.height() / 2;
@@ -158,7 +160,7 @@ void Editor::update(float dt) {
 
     // Camera pan (arrow keys) & zoom (wheel) when not typing
     bool typing = eventTextFocus_ || dbNameFocus_ >= 0 || skillNameFocus_;
-    if (!typing) {
+    if (!typing && !interactivePreview) {
         float panSpeed = 400 * dt / cam_.zoom;
         if (IsKeyDown(KEY_RIGHT)) cam_.target.x += panSpeed;
         if (IsKeyDown(KEY_LEFT))  cam_.target.x -= panSpeed;

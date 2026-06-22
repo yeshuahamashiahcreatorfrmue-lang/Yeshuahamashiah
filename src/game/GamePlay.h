@@ -44,6 +44,8 @@ public:
     void beginSceneChain(std::vector<int> ids);  // 여러 장면을 차례로 재생(맵 전체재생)
     // 에디터 장면 미리보기: 플레이 모드로 전환하지 않고 컷신만 재생(입력·전투·HUD 없음).
     void setPreviewMode(bool v) { previewMode_ = v; }
+    // 확대(큰 화면) 미리보기에서는 키보드/조작이 동작하도록 전체 업데이트를 돌린다.
+    void setPreviewInteractive(bool v) { previewInteractive_ = v; }
     bool sceneFinished() const { return sceneRunId_ < 0 && sceneQueue_.empty(); }
 
 private:
@@ -228,6 +230,7 @@ private:
     bool  debugVarsOpen_ = false;// F3: switch/variable inspector
     bool  helpOpen_ = false;     // F1: controls help overlay
     bool  previewMode_ = false;  // 에디터 미리보기 재생 중(입력·전투·HUD 생략)
+    bool  previewInteractive_ = false; // 확대 미리보기: 전체 업데이트(키 조작·HUD 허용)
 
     // custom-character motion playback
     int   playMotion_ = 0;      // MotionId currently playing (MO_Walk by default)

@@ -48,6 +48,7 @@ public:
     // 에디터가 작은(좌측 하단)/큰(중앙) 화면으로 그 텍스처를 띄운다.
     void startScenePreview(const std::vector<int>& sceneIds);
     void stopScenePreview();
+    void setScenePreviewInteractive(bool v);   // 확대 시 키보드/조작 동작
     bool scenePreviewActive() const { return scenePreview_; }
     const Texture2D& scenePreviewTexture() const { return scenePreviewRT_.texture; }
     const std::string& scenePreviewName() const { return scenePreviewName_; }
