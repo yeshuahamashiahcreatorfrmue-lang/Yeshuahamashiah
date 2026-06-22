@@ -11,6 +11,7 @@
 #include "database/Database.h"
 #include "project/AssetManager.h"   // AssetType (asset-cycle helpers)
 #include "render/Segmenter.h"
+#include "render/UI.h"               // ui::button (used by inline optionButtonEnum<>)
 
 namespace tsukuru {
 
@@ -33,6 +34,21 @@ public:
     void optionButton(Rectangle r, const std::string& label,
                       const std::vector<std::string>& opts, const std::vector<int>& values,
                       int& target, int id);
+    // enum-typed convenience: identity option indices map to the enum value. Avoids
+    // reinterpret_cast<int&> on an enum (which violates strict aliasing).
+    template <class E>
+    void optionButtonEnum(Rectangle r, const std::string& label,
+                          const std::vector<std::string>& opts, E& target, int id) {
+        int cur = (int)target;
+        std::string disp = (cur >= 0 && cur < (int)opts.size()) ? opts[cur] : std::string();
+        if (ui::button(r, label.empty() ? disp : (label + ": " + disp), pickerId_ == id)) {
+            if (pickerId_ == id) pickerId_ = -1; else { pickerId_ = id; pickerScroll_ = 0; }
+        }
+        if (pickerId_ == id) {
+            pickerAnchor_ = r; pickerOpts_ = opts; pickerCurIdx_ = cur;
+            pickerApply_ = [&target](int i){ target = (E)i; };
+        }
+    }
     void assetButton(Rectangle r, const std::string& label, int& assetId, int id);
     void optionButtonStr(Rectangle r, const std::string& label,
                          const std::vector<std::string>& opts, const std::vector<std::string>& values,
@@ -172,11 +188,9 @@ private:
     // dropdown picker state (see optionButton/drawPickerOverlay)
     int   pickerId_ = -1;
     Rectangle pickerAnchor_{};
-    std::vector<std::string> pickerOpts_;
-    std::vector<int> pickerValues_;   // option index -> stored value (empty = identity)
-    int*  pickerTarget_ = nullptr;
-    std::string* pickerStrTarget_ = nullptr;       // string-valued picker (e.g. sfx)
-    std::vector<std::string> pickerStrValues_;
+    std::vector<std::string> pickerOpts_;          // option labels shown in the open list
+    int   pickerCurIdx_ = -1;                      // currently-selected option index (highlight)
+    std::function<void(int)> pickerApply_;         // deferred write: apply chosen option index
     float pickerScroll_ = 0;
     // web-style middle-click autoscroll (toggle on, move to scroll, speed ∝ distance)
     void* autoScrollTarget_ = nullptr;

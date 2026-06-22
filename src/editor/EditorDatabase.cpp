@@ -134,7 +134,7 @@ void Editor::drawDatabaseTab() {
                 step("이동 +", it.bonusSpd, 1, -99, 99);
             } else {                                             // 기타
                 step("효과량", it.power, 5, 0, 9999);
-                optionButton({dx,dy,200,26}, "효과", {"없음","HP회복","MP회복","데미지"}, {}, reinterpret_cast<int&>(it.effect), 1004);
+                optionButtonEnum({dx,dy,200,26}, "효과", {"없음","HP회복","MP회복","데미지"}, it.effect, 1004);
                 dy+=32;
                 if (ui::button({dx,dy,200,26}, it.consumable?"소모성: 예":"소모성: 아니오")) it.consumable=!it.consumable;
                 dy+=36;

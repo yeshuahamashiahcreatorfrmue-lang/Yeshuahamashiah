@@ -54,8 +54,11 @@ void GamePlay::interact() {
 
 // ----------------------------- message box -----------------------------
 static int utf8Len(unsigned char c) {
-    if (c < 0x80) return 1; if ((c >> 5) == 0x6) return 2;
-    if ((c >> 4) == 0xE) return 3; if ((c >> 3) == 0x1E) return 4; return 1;
+    if (c < 0x80) return 1;
+    if ((c >> 5) == 0x6) return 2;
+    if ((c >> 4) == 0xE) return 3;
+    if ((c >> 3) == 0x1E) return 4;
+    return 1;
 }
 // Wrap a string to maxW pixels, breaking at spaces when possible and at glyph
 // boundaries otherwise (so Korean, which can run without spaces, still wraps).
@@ -596,7 +599,8 @@ void GamePlay::drawMessage() {
             size_t nl = pg.find('\n', p);
             std::string ln = pg.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
             DrawTextU(ln.c_str(), (int)textX, ly, 22, ui::kText); ly += 28;
-            if (nl == std::string::npos) break; p = nl + 1;
+            if (nl == std::string::npos) break;
+            p = nl + 1;
         }
     }
     if (choice) {

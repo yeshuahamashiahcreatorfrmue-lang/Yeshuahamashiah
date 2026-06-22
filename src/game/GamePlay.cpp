@@ -86,9 +86,9 @@ void GamePlay::onEnter() {
         DialogueLine l; l.speaker = "내레이션"; l.text = "그날, 마을에 그림자가 드리웠다...";
         d.lines.push_back(l); dbm.dialogues.push_back(d);
         Scene sc; sc.id = 9002; sc.name = "도입 장면";
-        sc.actions.push_back({ SA_MoveChar, 0, -1, destX_+2, destY_, 0.6f });
-        sc.actions.push_back({ SA_Dialogue, -1, 9002, 0, 0, 0.0f });
-        sc.actions.push_back({ SA_Wait, -1, -1, 0, 0, 0.5f });
+        sc.actions.push_back({ SA_MoveChar, 0, -1, destX_+2, destY_, 0.6f, 1, {} });
+        sc.actions.push_back({ SA_Dialogue, -1, 9002, 0, 0, 0.0f, 1, {} });
+        sc.actions.push_back({ SA_Wait, -1, -1, 0, 0, 0.5f, 1, {} });
         dbm.scenes.push_back(sc);
         startScene(9002);
     }

@@ -37,9 +37,13 @@ void GamePlay::updateDialogue() {
     bool hasAns = dlgRunLine_ < (int)d->lines.size() && !d->lines[dlgRunLine_].answers.empty();
     if (hasAns) {
         // ESC cancels the whole conversation (never leaves the player stuck);
+        // number keys 1–4 pick an answer by keyboard (in addition to clicking);
         // autowalk auto-picks the first answer so headless smoke never hangs.
+        int nAns = (int)d->lines[dlgRunLine_].answers.size();
         if (IsKeyPressed(KEY_ESCAPE)) { dlgRunId_ = -1; phase_ = Phase::Field; }
         else if (autodismiss) applyDialogueAnswer(0);
+        else for (int k = 0; k < nAns && k < 4; ++k)
+            if (IsKeyPressed(KEY_ONE + k) || IsKeyPressed(KEY_KP_1 + k)) { applyDialogueAnswer(k); break; }
         return;
     }
     if (autodismiss || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ESCAPE)) {
@@ -184,6 +188,8 @@ void GamePlay::startScene(int id) {
 void GamePlay::updateScene(float dt) {
     if (sceneRunId_ < 0) return;
     if (phase_ == Phase::Dialogue) return;          // a scene dialogue is playing; wait
+    // ESC skips the rest of a cutscene (never trap the player in a Wait/Move loop).
+    if (IsKeyPressed(KEY_ESCAPE)) { sceneRunId_ = -1; sceneStep_ = -1; toast_ = "컷신 건너뜀"; toastTimer_ = 1.0f; return; }
     const Database& db = engine_.project().database;
     const Scene* sc = nullptr;
     for (const auto& s : db.scenes) if (s.id == sceneRunId_) sc = &s;

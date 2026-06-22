@@ -46,8 +46,8 @@ Editor::Editor(Engine& engine) : engine_(engine) {
     if (getenv("TSUKURU_SEEDSTORY")) {             // debug: seed a dialogue+scene to view panels
         Database& d = engine_.project().database;
         Scene sc; sc.id = 1; sc.name = "도입 장면";
-        sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f });
-        sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f });
+        sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f, 1, {} });
+        sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f, 1, {} });
         d.scenes.push_back(sc);
         DialogueScenario dl; dl.id = 1; dl.name = "촌장 대화";
         DialogueLine ln; ln.speaker = "촌장"; ln.text = "용사여, 무엇을 도와줄까?";
@@ -250,7 +250,7 @@ void Editor::drawToolbar() {
 
     float x = 6;
     auto tabBtn = [&](const char* name, Tab t) {
-        if (ui::button({ x, 6, 58, 28 }, name, tab_ == t)) { tab_ = t; pickerId_ = -1; pickerTarget_ = nullptr; }
+        if (ui::button({ x, 6, 58, 28 }, name, tab_ == t)) { tab_ = t; pickerId_ = -1; pickerApply_ = nullptr; }
         x += 60;
     };
     tabBtn("월드", Tab::World);

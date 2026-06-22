@@ -73,7 +73,8 @@ void Editor::scrollbar(Rectangle r, float& scroll, float contentH) {
             scroll = ((m.y - barDragGrab_) - r.y) / denom * maxS;
         } else barDragTarget_ = nullptr;
     }
-    if (scroll < 0) scroll = 0; if (scroll > maxS) scroll = maxS;
+    if (scroll < 0) scroll = 0;
+    if (scroll > maxS) scroll = maxS;
     float thumbY = r.y + (th - thumbH) * (scroll / maxS);
     Rectangle thumb = { tx, thumbY, trackW, thumbH };
     DrawRectangleRounded({ tx, r.y, trackW, th }, 0.5f, 4, Fade(BLACK, 0.30f));
@@ -85,6 +86,8 @@ void Editor::scrollbar(Rectangle r, float& scroll, float contentH) {
 }
 
 // Open this picker, recording the trigger button rect (called when clicked).
+// Selection is applied later (in drawPickerOverlay) via the deferred pickerApply_
+// callback, so different value/target types share one overlay with no casts.
 void Editor::optionButton(Rectangle r, const std::string& label,
                           const std::vector<std::string>& opts, const std::vector<int>& values,
                           int& target, int id) {
@@ -97,8 +100,8 @@ void Editor::optionButton(Rectangle r, const std::string& label,
         else { pickerId_ = id; pickerScroll_ = 0; }
     }
     if (pickerId_ == id) {   // keep the open list's data fresh against layout/scroll
-        pickerAnchor_ = r; pickerOpts_ = opts; pickerValues_ = values;
-        pickerTarget_ = &target; pickerStrTarget_ = nullptr;
+        pickerAnchor_ = r; pickerOpts_ = opts; pickerCurIdx_ = cur;
+        pickerApply_ = [&target, values](int i){ target = values.empty() ? i : values[i]; };
     }
 }
 
@@ -106,17 +109,17 @@ void Editor::optionButton(Rectangle r, const std::string& label,
 void Editor::optionButtonStr(Rectangle r, const std::string& label,
                              const std::vector<std::string>& opts, const std::vector<std::string>& values,
                              std::string& target, int id) {
-    int cur = 0;
+    int cur = -1;
     for (int i = 0; i < (int)values.size(); ++i) if (values[i] == target) cur = i;
-    std::string disp = opts.empty() ? "" : opts[cur];
+    std::string disp = (cur >= 0 && cur < (int)opts.size()) ? opts[cur] : std::string();
     std::string txt = label.empty() ? disp : (label + ": " + disp);
     if (ui::button(r, txt, pickerId_ == id)) {
         if (pickerId_ == id) pickerId_ = -1;
         else { pickerId_ = id; pickerScroll_ = 0; }
     }
     if (pickerId_ == id) {
-        pickerAnchor_ = r; pickerOpts_ = opts; pickerStrValues_ = values;
-        pickerStrTarget_ = &target; pickerTarget_ = nullptr;
+        pickerAnchor_ = r; pickerOpts_ = opts; pickerCurIdx_ = cur;
+        pickerApply_ = [&target, values](int i){ if (i < (int)values.size()) target = values[i]; };
     }
 }
 
@@ -132,8 +135,9 @@ void Editor::assetButton(Rectangle r, const std::string& label, int& assetId, in
     if (pickerId_ == id) {
         std::vector<std::string> opts = { "없음" }; std::vector<int> vals = { -1 };
         for (const auto* a : engine_.project().assets.byType(AssetType::Image)) { opts.push_back(a->name); vals.push_back(a->id); }
-        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerValues_ = std::move(vals);
-        pickerTarget_ = &assetId; pickerStrTarget_ = nullptr;
+        int cur2 = 0; for (int i = 0; i < (int)vals.size(); ++i) if (vals[i] == assetId) cur2 = i;
+        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerCurIdx_ = cur2;
+        pickerApply_ = [&assetId, vals](int i){ assetId = (i < (int)vals.size()) ? vals[i] : -1; };
     }
 }
 
@@ -165,14 +169,15 @@ void Editor::entityButton(Rectangle r, const std::string& label, int& id, int ki
         else if (kind == ENT_Character) for (auto& c  : db.characters) add(c.id,  c.name);
         else if (kind == ENT_Dialogue)  for (auto& d  : db.dialogues)  add(d.id,  d.name);
         else if (kind == ENT_Scene)     for (auto& s  : db.scenes)     add(s.id,  s.name);
-        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerValues_ = std::move(vals);
-        pickerTarget_ = &id; pickerStrTarget_ = nullptr;
+        int cur = 0; for (int i = 0; i < (int)vals.size(); ++i) if (vals[i] == id) cur = i;
+        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerCurIdx_ = cur;
+        pickerApply_ = [&id, vals](int i){ id = (i < (int)vals.size()) ? vals[i] : -1; };
     }
 }
 
 // Drawn ON TOP, after the active tab, so the expanded list overlays everything.
 void Editor::drawPickerOverlay() {
-    if (pickerId_ < 0 || (!pickerTarget_ && !pickerStrTarget_) || pickerOpts_.empty()) return;
+    if (pickerId_ < 0 || !pickerApply_ || pickerOpts_.empty()) return;
     int n = (int)pickerOpts_.size();
     float rowH = 24, w = std::max(pickerAnchor_.width, 180.0f);
     float x = pickerAnchor_.x;
@@ -185,17 +190,16 @@ void Editor::drawPickerOverlay() {
     DrawRectangleLinesEx(box, 2, ui::kAccent);
     if (ui::mouseIn(box)) pickerScroll_ -= GetMouseWheelMove() * rowH * 2;
     float maxScroll = std::max(0.0f, fullH - listH);
-    if (pickerScroll_ < 0) pickerScroll_ = 0; if (pickerScroll_ > maxScroll) pickerScroll_ = maxScroll;
+    if (pickerScroll_ < 0) pickerScroll_ = 0;
+    if (pickerScroll_ > maxScroll) pickerScroll_ = maxScroll;
     BeginScissorMode((int)(box.x * uiScale()), (int)(box.y * uiScale()), (int)(box.width * uiScale()), (int)(box.height * uiScale()));
     float oy = y - pickerScroll_;
     for (int i = 0; i < n; ++i) {
-        bool sel = pickerStrTarget_ ? (i < (int)pickerStrValues_.size() && pickerStrValues_[i] == *pickerStrTarget_)
-                                    : ((pickerValues_.empty() ? i : pickerValues_[i]) == *pickerTarget_);
+        bool sel = (i == pickerCurIdx_);
         if (oy + rowH > y - rowH && oy < y + listH) {
             if (ui::button({ x, oy, w, rowH - 2 }, pickerOpts_[i], sel)) {
-                if (pickerStrTarget_) { if (i < (int)pickerStrValues_.size()) *pickerStrTarget_ = pickerStrValues_[i]; }
-                else *pickerTarget_ = pickerValues_.empty() ? i : pickerValues_[i];
-                pickerId_ = -1; pickerTarget_ = nullptr; pickerStrTarget_ = nullptr;
+                pickerApply_(i);
+                pickerId_ = -1; pickerApply_ = nullptr;
                 engine_.project().save();
                 EndScissorMode(); return;
             }
@@ -205,7 +209,7 @@ void Editor::drawPickerOverlay() {
     EndScissorMode();
     // click outside the list (and not on the anchor) closes it
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
-        !ui::mouseIn(box) && !ui::mouseIn(pickerAnchor_)) { pickerId_ = -1; pickerTarget_ = nullptr; pickerStrTarget_ = nullptr; }
+        !ui::mouseIn(box) && !ui::mouseIn(pickerAnchor_)) { pickerId_ = -1; pickerApply_ = nullptr; }
 }
 
 } // namespace tsukuru

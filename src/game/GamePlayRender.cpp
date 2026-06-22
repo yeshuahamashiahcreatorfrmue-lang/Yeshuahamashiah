@@ -215,7 +215,8 @@ void GamePlay::drawChat() {
         Vector2 sp = GetWorldToScreen2D({ pxX_ + map_->tileset.tileWidth/2.0f, pxY_ }, cam_);
         int fs = 15, tw = MeasureTextU(chatBubble_.c_str(), fs);
         int bw = tw + 20, bx = (int)sp.x - bw/2, by = (int)sp.y - 46;
-        if (bx < 4) bx = 4; if (bx + bw > sw - 4) bx = sw - 4 - bw;
+        if (bx < 4) bx = 4;
+        if (bx + bw > sw - 4) bx = sw - 4 - bw;
         DrawRectangleRounded({ (float)bx, (float)by, (float)bw, 26 }, 0.4f, 6, Fade(WHITE, 0.95f));
         DrawTriangle({ sp.x-6, (float)by+26 }, { sp.x+6, (float)by+26 }, { sp.x, (float)by+36 }, Fade(WHITE,0.95f));
         DrawTextU(chatBubble_.c_str(), bx + 10, by + 5, fs, BLACK);
@@ -430,6 +431,13 @@ void GamePlay::drawField() {
         int tw = MeasureTextU(toast_.c_str(), 18);
         DrawRectangle(screenW()/2 - tw/2 - 10, 40, tw + 20, 30, Fade(ui::kAccent, 0.9f));
         DrawTextU(toast_.c_str(), screenW()/2 - tw/2, 46, 18, BLACK);
+    }
+    // cutscene indicator: a running scene drives the world; ESC skips it
+    if (sceneRunId_ >= 0) {
+        const char* msg = "컷신 진행중 · ESC 건너뛰기";
+        int tw = MeasureTextU(msg, 14);
+        DrawRectangle(screenW() - tw - 24, screenH() - 34, tw + 16, 24, Fade(BLACK, 0.6f));
+        DrawTextU(msg, screenW() - tw - 16, screenH() - 30, 14, ui::kAccentHi);
     }
     // area-name banner on entering a new map (fades out)
     if (areaBannerT_ > 0 && !areaBanner_.empty()) {

@@ -17,10 +17,10 @@ namespace tsukuru {
 // Map-tab NPC inspector AND the Events-tab NPC block).
 void Editor::drawNpcStatRows(Event& ev, float x, float& y, float w) {
     static const Color fcol[3] = { Color{200,200,200,255}, Color{120,200,255,255}, Color{255,130,130,255} };
-    optionButton({ x, y, w, 24 }, "진영", { "중립", "아군", "적군" }, {}, reinterpret_cast<int&>(ev.faction), 2001);
+    optionButtonEnum({ x, y, w, 24 }, "진영", { "중립", "아군", "적군" }, ev.faction, 2001);
     DrawRectangle((int)(x + w - 16), (int)y + 6, 12, 12, fcol[(int)ev.faction]);
     y += 28;
-    optionButton({ x, y, w, 24 }, "AI 행동", { "대기", "배회", "순찰", "추격", "도망" }, {}, reinterpret_cast<int&>(ev.behavior), 2002);
+    optionButtonEnum({ x, y, w, 24 }, "AI 행동", { "대기", "배회", "순찰", "추격", "도망" }, ev.behavior, 2002);
     y += 28;
     // tile footprint (칸): drag/click the grid; the sprite fits the chosen block
     drawFootprintControl(x, y, w, ev.drawTilesW, ev.drawTilesH, ev.drawPct, ev.graphicAsset, true);
@@ -357,13 +357,6 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !ui::mouseIn(r) && eventFieldFocus_ == fid) eventFieldFocus_ = 0;
         ui::textField(r, s, eventFieldFocus_ == fid, maxlen); y += 32;
     };
-    auto cycleImg = [&](int& asset) {   // cycle through registered images (-1 = none)
-        auto imgs = engine_.project().assets.byType(AssetType::Image);
-        if (imgs.empty()) { asset = -1; return; }
-        int idx = -1; for (int i = 0; i < (int)imgs.size(); ++i) if (imgs[i]->id == asset) idx = i;
-        idx++; asset = (idx >= (int)imgs.size()) ? -1 : imgs[idx]->id;
-    };
-
     // ---- event type, laid out as a labelled grid so every kind is visible ----
     DrawTextU("이벤트 종류 (탭에서 선택)", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 20;
     const char* typeNames[9] = { "메시지", "이동", "아이템지급", "스위치", "전투", "상점", "퀘스트·보상", "엔딩", "회복" };

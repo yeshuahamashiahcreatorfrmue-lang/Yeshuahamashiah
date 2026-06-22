@@ -598,7 +598,7 @@ void Editor::drawWorldPreviewOverlay() {
                 DialogueScenario d; d.id = (int)db.dialogues.size() + 1;
                 while (db.dialogue(d.id)) ++d.id;
                 d.name = e.label.empty() ? ("대화" + std::to_string(d.id)) : e.label;
-                d.lines.push_back({ e.speakerName, e.text.empty() ? "..." : e.text, {} });
+                d.lines.push_back({ e.speakerName, e.text.empty() ? "..." : e.text, e.graphicAsset, {} });
                 db.dialogues.push_back(d);
                 e.dialogueId = d.id;
             }

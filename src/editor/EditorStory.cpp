@@ -158,7 +158,8 @@ void Editor::drawDialogueTab() {
         y += 30;
         Rectangle reg = { lineX, y, lineW, top + panelH - y - 8 };
         uiScissor((int)lineX, (int)y, (int)lineW, (int)reg.height);
-        if (ui::mouseIn(reg)) dlgLineScroll_ -= GetMouseWheelMove()*36; if (dlgLineScroll_<0) dlgLineScroll_=0;
+        if (ui::mouseIn(reg)) dlgLineScroll_ -= GetMouseWheelMove()*36;
+        if (dlgLineScroll_<0) dlgLineScroll_=0;
         float ly = y - dlgLineScroll_;
         for (int i = 0; i < (int)d.lines.size(); ++i) {
             if (ly + 28 > y && ly < y + reg.height) {
@@ -216,7 +217,8 @@ void Editor::drawDialogueTab() {
     y += 32;
     Rectangle areg = { edX, y, edW, top + panelH - y - 8 };
     uiScissor((int)edX, (int)y, (int)edW, (int)areg.height);
-    if (ui::mouseIn(areg)) dlgAnsScroll_ -= GetMouseWheelMove()*36; if (dlgAnsScroll_<0) dlgAnsScroll_=0;
+    if (ui::mouseIn(areg)) dlgAnsScroll_ -= GetMouseWheelMove()*36;
+    if (dlgAnsScroll_<0) dlgAnsScroll_=0;
     float ay = y - dlgAnsScroll_;
     for (int i = 0; i < (int)ln.answers.size(); ++i) {
         DialogueAnswer& a = ln.answers[i];

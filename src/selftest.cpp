@@ -62,17 +62,22 @@ static void testDatabase() {
     db.mobs.push_back(mob);
     // dialogue scenario with a branching answer + response
     DialogueScenario d; d.id = 1; d.name = "촌장 대화";
-    DialogueLine l; l.speaker = "촌장"; l.text = "도와줄까?";
+    DialogueLine l; l.speaker = "촌장"; l.text = "도와줄까?"; l.speakerAsset = 7;  // NPC 초상
     DialogueAnswer a; a.text = "보상"; a.respType = DR_Reward; a.rewardGold = 100; a.gotoLine = 2;
     DialogueAnswer a2; a2.text = "동료"; a2.respType = DR_NpcFollow; a2.npcCharId = 1; a2.durationSecs = 30; a2.dismissFollowers = false;
     l.answers.push_back(a); l.answers.push_back(a2);
-    d.lines.push_back(l);
+    DialogueLine l2; l2.speaker = "마을 주민"; l2.text = "고맙습니다!"; l2.speakerAsset = -1;  // 다른 NPC가 이어 말함
+    d.lines.push_back(l); d.lines.push_back(l2);
     db.dialogues.push_back(d);
-    // scene with a few action types
-    Scene sc; sc.id = 1; sc.name = "도입부";
-    sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f });
-    sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f });
-    sc.actions.push_back({ SA_Spawn, 3, 1, 8, 8, 0.0f });
+    // scene with a few action types incl. effect radius + multi-tag remove + editMapId
+    Scene sc; sc.id = 1; sc.name = "도입부"; sc.editMapId = 3;
+    sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f, 1, {} });
+    sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f, 1, {} });
+    sc.actions.push_back({ SA_Spawn, 3, 1, 8, 8, 0.0f, 1, {} });
+    SceneAction eff{ SA_Effect, -1, 2, 10, 12, 1.5f, 4, {} };  // 반경 4칸 이펙트
+    SceneAction rem{ SA_Remove, -1, -1, 0, 0, 0.0f, 1, {} };   // 복수 태그 제거
+    rem.removeTags = { 3, 5 };
+    sc.actions.push_back(eff); sc.actions.push_back(rem);
     db.scenes.push_back(sc);
 
     Database db2;
@@ -81,15 +86,24 @@ static void testDatabase() {
     CHECK(db2.actor(1) && db2.actor(1)->maxHp == 120, "actor round-trip");
     CHECK(db2.enemy(1) && db2.enemy(1)->goldReward == 8, "enemy round-trip");
     CHECK(db2.mob(1) && db2.mob(1)->respawnSecs == 5 && db2.mob(1)->dropRate == 30, "mob round-trip");
-    CHECK(db2.dialogue(1) && db2.dialogue(1)->lines.size() == 1 &&
+    CHECK(db2.dialogue(1) && db2.dialogue(1)->lines.size() == 2 &&
           db2.dialogue(1)->lines[0].answers.size() == 2, "dialogue round-trip");
+    CHECK(db2.dialogue(1)->lines[0].speakerAsset == 7 &&
+          db2.dialogue(1)->lines[1].speaker == "마을 주민" && db2.dialogue(1)->lines[1].speakerAsset == -1,
+          "dialogue speaker-portrait (여러 NPC) round-trip");
     CHECK(db2.dialogue(1)->lines[0].answers[0].respType == DR_Reward &&
           db2.dialogue(1)->lines[0].answers[0].rewardGold == 100, "dialogue answer response round-trip");
     CHECK(db2.dialogue(1)->lines[0].answers[1].respType == DR_NpcFollow &&
           db2.dialogue(1)->lines[0].answers[1].durationSecs == 30, "dialogue follow answer round-trip");
-    CHECK(db2.scenes.size() == 1 && db2.scenes[0].actions.size() == 3 &&
-          db2.scenes[0].actions[1].type == SA_Dialogue && db2.scenes[0].actions[1].refId == 1,
-          "scene round-trip");
+    CHECK(db2.scenes.size() == 1 && db2.scenes[0].actions.size() == 5 &&
+          db2.scenes[0].actions[1].type == SA_Dialogue && db2.scenes[0].actions[1].refId == 1 &&
+          db2.scenes[0].editMapId == 3,
+          "scene round-trip (editMapId)");
+    CHECK(db2.scenes[0].actions[3].type == SA_Effect && db2.scenes[0].actions[3].radius == 4,
+          "scene 이펙트 반경 round-trip");
+    CHECK(db2.scenes[0].actions[4].type == SA_Remove && db2.scenes[0].actions[4].removeTags.size() == 2 &&
+          db2.scenes[0].actions[4].removeTags[0] == 3 && db2.scenes[0].actions[4].removeTags[1] == 5,
+          "scene 제거 복수태그 round-trip");
 }
 
 static void testInventory(Database& db) {
