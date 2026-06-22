@@ -104,6 +104,13 @@ void Editor::drawDialogueTab() {
             if (ui::mouseIn(nf) && lclick) dlgFocus_ = 50; else if (lclick && !ui::mouseIn(nf) && dlgFocus_==50) dlgFocus_=-1;
             ui::textField(nf, npc->speakerName, dlgFocus_ == 50, 40); y += 28;
             assetButton({ x, y, w, 24 }, "이미지", npc->graphicAsset, 9060); y += 28;
+            if (ui::button({ x, y, w, 24 }, "등록된 캐릭터에서 선택")) {
+                int mid = dlgMapId_, eid = npc->id;
+                openCharBrowser([this, mid, eid](int aid){
+                    if (auto m = engine_.project().map(mid)) for (auto& e : m->events) if (e.id == eid) e.graphicAsset = aid;
+                });
+            }
+            y += 28;
             if (ui::button({ x, y, w, 24 }, "외부 이미지 추가")) { activeMapId_ = dlgMapId_; pendingNpcEventId_ = npc->id; pendingNpcCharImport_ = true; }
             y += 28;
         } else {

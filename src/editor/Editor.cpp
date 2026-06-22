@@ -43,6 +43,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* pk = getenv("TSUKURU_PICKER")) pickerId_ = atoi(pk); // debug: force-open a dropdown
+    if (getenv("TSUKURU_CHARBROWSER")) openCharBrowser([](int){});       // debug: open the char browser
     if (getenv("TSUKURU_SEEDSTORY")) {             // debug: seed a dialogue+scene to view panels
         Database& d = engine_.project().database;
         Scene sc; sc.id = 1; sc.name = "도입 장면";
@@ -104,6 +105,15 @@ void Editor::update(float dt) {
     if (pendingItemIcon_)     { pendingItemIcon_     = false; pickAndImportItemIcon(); }
     if (pendingTilesetImport_){ pendingTilesetImport_= false; pickAndImportTileset(); }
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
+    if (charBrowserImport_) {   // 브라우저의 "외부에서 추가": import one image, assign, close
+        charBrowserImport_ = false;
+        std::vector<std::string> files = plat::openImageFiles();
+        if (!files.empty()) {
+            int id = stageImportImage(files.front(), "npc_char");
+            if (id >= 0 && charBrowserApply_) { charBrowserApply_(id); setStatus("캐릭터 적용됨: " + assetName(id)); }
+        }
+        charBrowserOpen_ = false; charBrowserApply_ = nullptr;
+    }
     if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
     if (pendingEfxFrameImport_){ pendingEfxFrameImport_= false; pickAndImportEfxFrame(); }
 
@@ -194,7 +204,7 @@ void Editor::draw() {
     // input so a click can't fall through to a button behind the dialog.
     // tab content is locked while a dropdown picker (or confirm dialog) is open,
     // so clicks only reach the open overlay.
-    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0;
+    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0 && !charBrowserOpen_;
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
@@ -208,7 +218,7 @@ void Editor::draw() {
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
-    ui::g_inputEnabled = !confirmOpen_;   // toolbar stays usable with a picker open
+    ui::g_inputEnabled = !confirmOpen_ && !charBrowserOpen_;   // toolbar usable with a picker open
     drawToolbar();
 
     if (statusTimer_ > 0) {
@@ -219,6 +229,7 @@ void Editor::draw() {
 
     ui::g_inputEnabled = true;   // overlays accept input
     drawPickerOverlay();
+    if (charBrowserOpen_) drawCharBrowser();
     if (confirmOpen_) drawConfirmOverlay();
 }
 

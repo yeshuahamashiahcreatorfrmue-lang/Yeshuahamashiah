@@ -58,6 +58,12 @@ public:
     void entityButton(Rectangle r, const std::string& label, int& id, int kind, int pickerId);
     void drawPickerOverlay();
     bool pickerOpen() const { return pickerId_ >= 0; }
+    // Explorer-like visual browser: a thumbnail grid of every registered character
+    // image (+ "없음" + "외부에서 추가") with a search box. `apply` receives the chosen
+    // image asset id (-1 = none). Used when assigning an NPC's character graphic.
+    void openCharBrowser(std::function<void(int)> apply);
+    void drawCharBrowser();
+    bool charBrowserOpen() const { return charBrowserOpen_; }
 
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
@@ -201,6 +207,12 @@ private:
     // per-list search queries + which search box is focused
     int   searchFocusId_ = -1;
     std::string dlgSearch_, scnSearch_, charSearch_, npcSearch_, dbSearch_, evSearch_;
+    // Explorer-like character/image browser overlay
+    bool  charBrowserOpen_ = false;
+    bool  charBrowserImport_ = false;             // deferred "외부에서 추가" request
+    std::string charBrowserSearch_;
+    float charBrowserScroll_ = 0;
+    std::function<void(int)> charBrowserApply_;   // chosen asset id (-1=없음) → caller
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

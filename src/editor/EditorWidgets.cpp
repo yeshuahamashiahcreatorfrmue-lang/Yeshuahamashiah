@@ -212,4 +212,82 @@ void Editor::drawPickerOverlay() {
         !ui::mouseIn(box) && !ui::mouseIn(pickerAnchor_)) { pickerId_ = -1; pickerApply_ = nullptr; }
 }
 
+// Open the Explorer-like character/image browser. `apply` gets the chosen asset id.
+void Editor::openCharBrowser(std::function<void(int)> apply) {
+    charBrowserOpen_ = true; charBrowserApply_ = std::move(apply);
+    charBrowserSearch_.clear(); charBrowserScroll_ = 0; pickerId_ = -1;
+}
+
+// Full-screen modal: a searchable thumbnail grid of every registered image asset
+// (the pool NPC/character graphics are picked from), plus 없음 and 외부에서 추가.
+void Editor::drawCharBrowser() {
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.72f));
+    Rectangle box = { 40, 40, (float)sw - 80, (float)sh - 80 };
+    ui::panel(box, ui::kPanel);
+    DrawRectangleLinesEx(box, 2, ui::kAccent);
+    DrawTextU("등록된 캐릭터/이미지에서 선택 (검색·클릭)", (int)box.x + 16, (int)box.y + 12, 20, ui::kAccent);
+    if (ui::button({ box.x + box.width - 96, box.y + 10, 84, 30 }, "닫기") || IsKeyPressed(KEY_ESCAPE)) {
+        charBrowserOpen_ = false; charBrowserApply_ = nullptr; return;
+    }
+    float x = box.x + 16, top = box.y + 50;
+    searchBox({ x, top, 320, 28 }, charBrowserSearch_, 9400);
+    if (ui::button({ x + 332, top, 96, 28 }, "없음")) {
+        if (charBrowserApply_) charBrowserApply_(-1);
+        charBrowserOpen_ = false; charBrowserApply_ = nullptr; return;
+    }
+    if (ui::button({ x + 436, top, 150, 28 }, "외부에서 추가")) { charBrowserImport_ = true; return; }
+
+    // grid of image-asset thumbnails (filtered by name)
+    auto imgs = engine_.project().assets.byType(AssetType::Image);
+    float gridTop = top + 40;
+    Rectangle grid = { box.x + 8, gridTop, box.width - 16, box.y + box.height - gridTop - 12 };
+    const float cell = 112, thumb = 92, pad = 10;
+    int cols = std::max(1, (int)((grid.width - pad) / (cell + pad)));
+    // count matches for scroll height
+    std::vector<const AssetEntry*> shown;
+    for (const auto* a : imgs) if (nameMatch(a->name, charBrowserSearch_)) shown.push_back(a);
+    int rows = ((int)shown.size() + cols - 1) / cols;
+    float contentH = rows * (cell + pad) + pad;
+
+    uiScissor((int)grid.x, (int)grid.y, (int)grid.width, (int)grid.height);
+    Vector2 m = GetMousePosition();
+    int chosen = -2;   // -2 = none clicked this frame
+    for (int i = 0; i < (int)shown.size(); ++i) {
+        int r = i / cols, c = i % cols;
+        float cx = grid.x + pad + c * (cell + pad);
+        float cy = grid.y + pad + r * (cell + pad) - charBrowserScroll_;
+        if (cy + cell < grid.y || cy > grid.y + grid.height) continue;   // cull
+        Rectangle cellR = { cx, cy, cell, cell };
+        bool hot = CheckCollisionPointRec(m, cellR);
+        DrawRectangleRec(cellR, hot ? ui::kPanelHi : Color{ 30, 33, 42, 255 });
+        DrawRectangleLinesEx(cellR, hot ? 2 : 1, hot ? ui::kAccent : Fade(BLACK, 0.5f));
+        const Texture2D& tex = engine_.assetTexture(shown[i]->id);
+        if (tex.id) {
+            // fit, keeping aspect; if it looks like a 4-dir sheet show the first cell
+            float fw = tex.width >= tex.height * 2 ? tex.width / 4.0f : (float)tex.width;
+            float s = std::min(thumb / fw, thumb / (float)tex.height);
+            float dw = fw * s, dh = tex.height * s;
+            DrawTexturePro(tex, { 0, 0, fw, (float)tex.height },
+                           { cx + (cell - dw) / 2, cy + 6 + (thumb - dh) / 2, dw, dh }, { 0, 0 }, 0, WHITE);
+        }
+        std::string nm = shown[i]->name;
+        if ((int)nm.size() > 14) nm = nm.substr(0, 13) + "..";
+        int tw = MeasureTextU(nm.c_str(), 12);
+        DrawTextU(nm.c_str(), (int)(cx + (cell - tw) / 2), (int)(cy + cell - 16), 12, ui::kText);
+        if (hot && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) chosen = shown[i]->id;
+    }
+    EndScissorMode();
+    scrollbar(grid, charBrowserScroll_, contentH);
+    if (shown.empty())
+        DrawTextU("등록된 이미지가 없습니다. '외부에서 추가'로 불러오세요.",
+                  (int)grid.x + 12, (int)grid.y + 12, 14, ui::kTextDim);
+
+    if (chosen != -2) {
+        if (charBrowserApply_) charBrowserApply_(chosen);
+        charBrowserOpen_ = false; charBrowserApply_ = nullptr;
+        engine_.project().save();
+    }
+}
+
 } // namespace tsukuru

@@ -44,6 +44,13 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
 
     assetButton({ x, y, 300, 26 }, "캐릭터", ev.graphicAsset, 2003);
     y += 30;
+    if (ui::button({ x, y, 300, 26 }, "등록된 캐릭터에서 선택 (목록·검색)", true)) {
+        int mid = activeMapId_, eid = ev.id;
+        openCharBrowser([this, mid, eid](int aid){
+            if (auto m = engine_.project().map(mid)) for (auto& e : m->events) if (e.id == eid) e.graphicAsset = aid;
+        });
+    }
+    y += 30;
     if (ui::button({ x, y, 300, 24 }, "캐릭터 에셋 가져오기 (외부 이미지)", true)) {
         pendingNpcEventId_ = ev.id; pendingNpcCharImport_ = true;
     }
