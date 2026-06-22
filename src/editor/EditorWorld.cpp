@@ -197,8 +197,7 @@ void Editor::drawWorldTab() {
     float cx = dx + 300, cy = ly + 92;
     ui::label("분위기", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
     ui::intStepper({ cx, cy, 250, 26 }, "어둠", m->darkness, 15, 0, 255); cy += 32;
-    const char* wx[3] = { "날씨: 없음", "날씨: 비", "날씨: 눈" };
-    if (ui::button({ cx, cy, 250, 26 }, wx[m->weather % 3])) m->weather = (m->weather + 1) % 3;
+    optionButton({ cx, cy, 250, 26 }, "날씨", { "없음", "비", "눈" }, {}, m->weather, 5001);
     cy += 32;
     if (ui::button({ cx, cy, 250, 26 }, m->dayNight ? "낮/밤: 켜짐" : "낮/밤: 꺼짐", m->dayNight))
         m->dayNight = !m->dayNight;
@@ -206,12 +205,10 @@ void Editor::drawWorldTab() {
 
     ui::label("배경음악 (BGM)", (int)cx, (int)cy, 16, ui::kTextDim); cy += 24;
     auto auds = p.assets.byType(AssetType::Audio);
-    const AssetEntry* curB = p.assets.find(m->bgmAsset);
-    if (ui::button({ cx, cy, 250, 26 }, std::string("BGM: ") + (curB ? curB->name : "없음"))) {
-        int idx = -1;
-        for (int i = 0; i < (int)auds.size(); ++i) if (auds[i]->id == m->bgmAsset) idx = i;
-        idx++;
-        m->bgmAsset = (idx >= (int)auds.size()) ? -1 : auds[idx]->id;
+    {
+        std::vector<std::string> bo = { "없음" }; std::vector<int> bv = { -1 };
+        for (auto* a : auds) { bo.push_back(a->name); bv.push_back(a->id); }
+        optionButton({ cx, cy, 250, 26 }, "BGM", bo, bv, m->bgmAsset, 5002);
     }
     cy += 30;
     if (ui::button({ cx, cy, 250, 24 }, "BGM 파일 찾아 등록 (외부)", true)) {

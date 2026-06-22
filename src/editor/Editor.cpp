@@ -42,6 +42,7 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "assets") tab_ = Tab::Assets;
         else if (s == "db") tab_ = Tab::Database;
     }
+    if (const char* pk = getenv("TSUKURU_PICKER")) pickerId_ = atoi(pk); // debug: force-open a dropdown
     if (const char* c = getenv("TSUKURU_DBCAT")) { // debug: pick DB category + first entry
         tab_ = Tab::Database; dbCategory_ = atoi(c); dbSelected_ = 0;
         if (const char* s = getenv("TSUKURU_DBSEL")) dbSelected_ = atoi(s);
@@ -172,7 +173,9 @@ void Editor::update(float dt) {
 void Editor::draw() {
     // While a confirm dialog is open, draw the tabs for context but block their
     // input so a click can't fall through to a button behind the dialog.
-    ui::g_inputEnabled = !confirmOpen_;
+    // tab content is locked while a dropdown picker (or confirm dialog) is open,
+    // so clicks only reach the open overlay.
+    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0;
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
@@ -186,6 +189,7 @@ void Editor::draw() {
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
+    ui::g_inputEnabled = !confirmOpen_;   // toolbar stays usable with a picker open
     drawToolbar();
 
     if (statusTimer_ > 0) {
@@ -194,7 +198,8 @@ void Editor::draw() {
         DrawTextU(status_.c_str(), screenW() - w - 18, screenH() - 30, 16, BLACK);
     }
 
-    ui::g_inputEnabled = true;   // the dialog itself accepts input
+    ui::g_inputEnabled = true;   // overlays accept input
+    drawPickerOverlay();
     if (confirmOpen_) drawConfirmOverlay();
 }
 
@@ -226,7 +231,7 @@ void Editor::drawToolbar() {
 
     float x = 6;
     auto tabBtn = [&](const char* name, Tab t) {
-        if (ui::button({ x, 6, 58, 28 }, name, tab_ == t)) tab_ = t;
+        if (ui::button({ x, 6, 58, 28 }, name, tab_ == t)) { tab_ = t; pickerId_ = -1; pickerTarget_ = nullptr; }
         x += 60;
     };
     tabBtn("월드", Tab::World);

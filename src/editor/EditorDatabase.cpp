@@ -94,12 +94,10 @@ void Editor::drawDatabaseTab() {
                 ui::textField(tf, it.description, focus, 64);
                 dy += 36;
             }
-            const char* kinds[] = {"기타","식품(음식/음료)","장비"};
-            if (ui::button({dx,dy,260,26}, TextFormat("분류: %s", kinds[it.kind%3]))) it.kind=(it.kind+1)%3;
+            optionButton({dx,dy,260,26}, "분류", {"기타","식품(음식/음료)","장비"}, {}, it.kind, 1001);
             dy+=32;
-            // icon image: cycle existing assets, or import an external picture
-            if (ui::button({dx,dy,260,26}, std::string("이미지: ")+assetName(it.iconAsset), it.iconAsset>=0))
-                cycleAsset(it.iconAsset, AssetType::Image);
+            // icon image: pick from registered assets, or import an external picture
+            assetButton({dx,dy,260,26}, "이미지", it.iconAsset, 1002);
             dy+=30;
             if (ui::button({dx,dy,260,24}, "이미지 가져오기 (외부 파일)", true)) {
                 pendingItemIcon_ = true; pendingItemIconId_ = it.id;
@@ -118,24 +116,21 @@ void Editor::drawDatabaseTab() {
                 step("이동 +", it.bonusSpd, 1, -99, 99);
                 step("버프 지속(초·0=영구)", it.buffSecs, 10, 0, 9999);
             } else if (it.kind == 2) {                           // 장비(equipment)
-                const char* bn[] = {"없음","머리","몸통","손","다리","발","무기","장신구"};
-                if (ui::button({dx,dy,260,26}, TextFormat("장착 부위: %s", bn[it.bodySlot%8]))) it.bodySlot=(it.bodySlot+1)%8;
+                optionButton({dx,dy,260,26}, "장착 부위", {"없음","머리","몸통","손","다리","발","무기","장신구"}, {}, it.bodySlot, 1003);
                 dy+=32;
                 step("공격 +", it.bonusAtk, 1, -999, 999);
                 step("방어 +", it.bonusDef, 1, -999, 999);
                 step("이동 +", it.bonusSpd, 1, -99, 99);
             } else {                                             // 기타
                 step("효과량", it.power, 5, 0, 9999);
-                const char* effs[] = {"없음","HP회복","MP회복","데미지"};
-                if (ui::button({dx,dy,200,26}, TextFormat("효과: %s", effs[(int)it.effect]))) it.effect=(ItemEffect)(((int)it.effect+1)%4);
+                optionButton({dx,dy,200,26}, "효과", {"없음","HP회복","MP회복","데미지"}, {}, reinterpret_cast<int&>(it.effect), 1004);
                 dy+=32;
                 if (ui::button({dx,dy,200,26}, it.consumable?"소모성: 예":"소모성: 아니오")) it.consumable=!it.consumable;
                 dy+=36;
             }
             break; }
         case 1: { ActorDef& a = db.actors[dbSelected_]; nameField(a.name);
-            if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(a.spriteAsset), a.spriteAsset>=0))
-                cycleAsset(a.spriteAsset, AssetType::Image);
+            assetButton({dx,dy,260,26}, "스프라이트", a.spriteAsset, 1010);
             dy+=32;
             step("최대 HP", a.maxHp, 10, 1, 9999);
             step("최대 GP", a.maxMp, 5, 0, 9999);
@@ -144,8 +139,7 @@ void Editor::drawDatabaseTab() {
             step("속도", a.spd, 1, 0, 999);
             break; }
         case 2: { EnemyDef& e = db.enemies[dbSelected_]; nameField(e.name);
-            if (ui::button({dx,dy,260,26}, std::string("스프라이트: ")+assetName(e.spriteAsset), e.spriteAsset>=0))
-                cycleAsset(e.spriteAsset, AssetType::Image);
+            assetButton({dx,dy,260,26}, "스프라이트", e.spriteAsset, 1011);
             dy+=32;
             step("최대 HP", e.maxHp, 10, 1, 9999);
             step("공격", e.atk, 1, 0, 999);

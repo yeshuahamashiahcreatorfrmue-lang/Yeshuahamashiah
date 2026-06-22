@@ -26,6 +26,20 @@ public:
     // Ctrl+wheel handler must yield while that tab is open.
     bool wantsCtrlWheel() const;
 
+    // Dropdown picker: a button shows the current choice; clicking it expands the
+    // FULL list of options below, and you pick one (replaces click-to-cycle).
+    // Rendered on top after the tab via drawPickerOverlay(); writes are deferred
+    // to the stable `target` int the same frame the option list is shown.
+    void optionButton(Rectangle r, const std::string& label,
+                      const std::vector<std::string>& opts, const std::vector<int>& values,
+                      int& target, int id);
+    void assetButton(Rectangle r, const std::string& label, int& assetId, int id);
+    void optionButtonStr(Rectangle r, const std::string& label,
+                         const std::vector<std::string>& opts, const std::vector<std::string>& values,
+                         std::string& target, int id);
+    void drawPickerOverlay();
+    bool pickerOpen() const { return pickerId_ >= 0; }
+
 private:
     enum class Tab { World, WorldView, Map, Npc, Events, Chars, Mob, Dialogue, Scenario, Assets, Database };
     enum class Tool { Pencil, Erase, Fill, Rect, Stamp };
@@ -144,6 +158,16 @@ private:
     float dlgLineScroll_ = 0, dlgAnsScroll_ = 0;
     int   scnSel_ = -1, scnFocus_ = -1;
     float scnActScroll_ = 0;
+
+    // dropdown picker state (see optionButton/drawPickerOverlay)
+    int   pickerId_ = -1;
+    Rectangle pickerAnchor_{};
+    std::vector<std::string> pickerOpts_;
+    std::vector<int> pickerValues_;   // option index -> stored value (empty = identity)
+    int*  pickerTarget_ = nullptr;
+    std::string* pickerStrTarget_ = nullptr;       // string-valued picker (e.g. sfx)
+    std::vector<std::string> pickerStrValues_;
+    float pickerScroll_ = 0;
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

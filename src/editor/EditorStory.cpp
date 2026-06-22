@@ -111,9 +111,10 @@ void Editor::drawDialogueTab() {
             ui::textField(af, a.text, dlgFocus_ == fid, 60);
             if (ui::button({ ix + iw - 30, iy, 30, 24 }, "x")) { ln.answers.erase(ln.answers.begin()+i); p.save(); EndScissorMode(); return; }
             iy += 28;
-            // response type cycle
-            if (ui::button({ ix, iy, 150, 24 }, (std::string("대응: ")+kDlgRespNames[a.respType]).c_str()))
-                { a.respType = (a.respType+1) % 6; p.save(); }
+            // response type picker
+            optionButton({ ix, iy, 150, 24 }, "대응",
+                { kDlgRespNames[0],kDlgRespNames[1],kDlgRespNames[2],kDlgRespNames[3],kDlgRespNames[4],kDlgRespNames[5] },
+                {}, a.respType, 3000 + i);
             // goto line stepper
             ui::intStepper({ ix + 158, iy, iw - 158, 24 }, "→라인", a.gotoLine, 1, -1, 99); iy += 28;
             // type-specific params
@@ -195,8 +196,9 @@ void Editor::drawScenarioTab() {
             ui::panel({ x-2, ay, w+4, cardH-6 }, ui::kPanelHi);
             float ix = x + 6, iw = w - 12, iy = ay + 6;
             DrawTextU(TextFormat("%d.", i+1), (int)ix, (int)iy+4, 14, ui::kAccentHi);
-            if (ui::button({ ix + 28, iy, 130, 24 }, (std::string("종류: ")+kSceneActNames[a.type]).c_str()))
-                { a.type = (a.type+1) % 6; p.save(); }
+            optionButton({ ix + 28, iy, 130, 24 }, "종류",
+                { kSceneActNames[0],kSceneActNames[1],kSceneActNames[2],kSceneActNames[3],kSceneActNames[4],kSceneActNames[5] },
+                {}, a.type, 4000 + i);
             if (ui::button({ ix + iw - 60, iy, 28, 24 }, "위로")) { if(i>0){ std::swap(sc.actions[i],sc.actions[i-1]); p.save(); } }
             if (ui::button({ ix + iw - 30, iy, 30, 24 }, "x")) { sc.actions.erase(sc.actions.begin()+i); p.save(); EndScissorMode(); return; }
             iy += 28;

@@ -16,17 +16,11 @@ namespace tsukuru {
 // Shared faction / AI / size / combat-stat rows (one source of truth for the
 // Map-tab NPC inspector AND the Events-tab NPC block).
 void Editor::drawNpcStatRows(Event& ev, float x, float& y, float w) {
-    static const char* fac[3] = { "중립", "아군", "적군" };
     static const Color fcol[3] = { Color{200,200,200,255}, Color{120,200,255,255}, Color{255,130,130,255} };
-    if (ui::button({ x, y, w, 24 }, TextFormat("진영: %s", fac[(int)ev.faction]))) {
-        ev.faction = (NpcFaction)(((int)ev.faction + 1) % 3);
-    }
+    optionButton({ x, y, w, 24 }, "진영", { "중립", "아군", "적군" }, {}, reinterpret_cast<int&>(ev.faction), 2001);
     DrawRectangle((int)(x + w - 16), (int)y + 6, 12, 12, fcol[(int)ev.faction]);
     y += 28;
-    static const char* beh[5] = { "대기", "배회", "순찰", "추격", "도망" };
-    if (ui::button({ x, y, w, 24 }, TextFormat("AI 행동: %s", beh[(int)ev.behavior]))) {
-        ev.behavior = (NpcBehavior)(((int)ev.behavior + 1) % 5);
-    }
+    optionButton({ x, y, w, 24 }, "AI 행동", { "대기", "배회", "순찰", "추격", "도망" }, {}, reinterpret_cast<int&>(ev.behavior), 2002);
     y += 28;
     // tile footprint (칸): drag/click the grid; the sprite fits the chosen block
     drawFootprintControl(x, y, w, ev.drawTilesW, ev.drawTilesH, ev.drawPct, ev.graphicAsset, true);
@@ -48,8 +42,7 @@ void Editor::drawNpcInspector(Event& ev, Rectangle panel) {
     float x = panel.x + 12, y = panel.y + 10;
     ui::label("NPC 데이터", (int)x, (int)y, 22, ui::kAccent); y += 38;
 
-    if (ui::button({ x, y, 300, 26 }, std::string("캐릭터: ") + assetName(ev.graphicAsset), ev.graphicAsset >= 0))
-        cycleAsset(ev.graphicAsset, AssetType::Image);
+    assetButton({ x, y, 300, 26 }, "캐릭터", ev.graphicAsset, 2003);
     y += 30;
     if (ui::button({ x, y, 300, 24 }, "캐릭터 에셋 가져오기 (외부 이미지)", true)) {
         pendingNpcEventId_ = ev.id; pendingNpcCharImport_ = true;
@@ -383,8 +376,7 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
     switch (ev->type) {
         case EventType::Message:
             textF("화자 이름(선택):", ev->speakerName, 2, 24);
-            if (ui::button({ panel.x + 12, y, 296, 24 }, std::string("초상화: ") + (ev->faceAsset >= 0 ? assetName(ev->faceAsset) : "없음"), ev->faceAsset >= 0))
-                cycleImg(ev->faceAsset);
+            assetButton({ panel.x + 12, y, 296, 24 }, "초상화", ev->faceAsset, 2010);
             y += 30;
             DrawTextU("─ 선택지(2개 이상 입력 시 분기) ─", (int)panel.x + 12, (int)y, 13, ui::kAccentHi); y += 18;
             textF("선택 A:", ev->choiceA, 3, 24);
@@ -402,10 +394,8 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
             nameHint(tm ? tm->name : "(없는 맵)", tm ? ui::kAccentHi : ui::kDanger);
             stepN("X", ev->targetX, 1, 0, 999);
             stepN("Y", ev->targetY, 1, 0, 999);
-            const char* dirs[5] = { "유지", "아래", "왼쪽", "오른쪽", "위" };
-            int di = ev->faceDir < 0 ? 0 : ev->faceDir + 1;
-            if (ui::button({ panel.x + 12, y, 296, 24 }, TextFormat("도착 방향: %s", dirs[di % 5])))
-                { di = (di + 1) % 5; ev->faceDir = di == 0 ? -1 : di - 1; }
+            optionButton({ panel.x + 12, y, 296, 24 }, "도착 방향",
+                         { "유지", "아래", "왼쪽", "오른쪽", "위" }, { -1, 0, 1, 2, 3 }, ev->faceDir, 2011);
             y += 28;
             break;
         }
@@ -550,14 +540,10 @@ void Editor::drawEventInspector(Event& evRef, Map& m, Rectangle panel) {
         ev->enabled = !ev->enabled;
     y += 30;
     // per-event sound effect (cycle through common built-in sfx)
-    {
-        static const char* kSfx[] = { "", "select", "coin", "levelup", "defeat", "slash", "magic", "boom" };
-        const int N = (int)(sizeof(kSfx) / sizeof(kSfx[0]));
-        int cur = 0; for (int i = 0; i < N; ++i) if (ev->sfx == kSfx[i]) cur = i;
-        if (ui::button({ panel.x + 12, y, 296, 24 }, std::string("효과음: ") + (cur == 0 ? "기본" : kSfx[cur]), cur != 0))
-            ev->sfx = kSfx[(cur + 1) % N];
-        y += 28;
-    }
+    optionButtonStr({ panel.x + 12, y, 296, 24 }, "효과음",
+                    { "기본", "select", "coin", "levelup", "defeat", "slash", "magic", "boom" },
+                    { "",     "select", "coin", "levelup", "defeat", "slash", "magic", "boom" }, ev->sfx, 2012);
+    y += 28;
     if (ui::button({ panel.x + 12, y, 144, 24 }, ev->once ? "1회만: 예" : "1회만: 아니오")) ev->once = !ev->once;
     if (ui::button({ panel.x + 164, y, 144, 24 }, ev->graphicAsset >= 0 ? "그래픽: 있음" : "그래픽: 없음")) {
         auto imgs = engine_.project().assets.byType(AssetType::Image);
