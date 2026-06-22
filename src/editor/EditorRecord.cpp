@@ -124,7 +124,7 @@ void Editor::drawLiveRecorder(Scene& sc) {
                 recCmds_.push_back({ 0, 2, u.tag, (int)std::lround(u.tx), (int)std::lround(u.ty), u.charId, 0, u.isMob });
         } else { scnRecording_ = false; scnPaused_ = false; liveBuildScene(sc, *m); setStatus("녹화 완료 → 장면 저장됨"); }
     }
-    if (tbtn(scnPaused_ ? "▶ 재개" : "⏸ 일시정지", 110, scnPaused_)) scnPaused_ = !scnPaused_;
+    if (tbtn(scnPaused_ ? "▶ 재개 (P)" : "⏸ 일시정지 (P)", 130, scnPaused_) || IsKeyPressed(KEY_P)) scnPaused_ = !scnPaused_;
     if (tbtn("▶ 재생(테스트)", 120)) { engine_.startPlaytestScene(sc.id); scnLive_ = false; return; }
     if (tbtn("닫기", 64)) { scnLive_ = false; scnRecording_ = false; scnPaused_ = false; liveFxMode_ = false; return; }
     if (scnRecording_) { if (!scnPaused_) scnRecClock_ += dt;
