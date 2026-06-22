@@ -573,15 +573,17 @@ void Editor::drawScenarioTab() {
         bool hov = CheckCollisionPointCircle(mouse, t2s((float)e.x,(float)e.y), 11);
         if (scnTrigSel_ == e.id || hov)
             DrawTextU(("▶ " + sceneName(e.sceneId)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, col);
-        if (hov && scnTrigMode_==0 && scnDragIdx_<0 && scnTrigDragId_<0) {
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { scnTrigSel_ = e.id; scnTrigDragId_ = e.id; }
-            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-                int id = e.id;
-                m->events.erase(std::remove_if(m->events.begin(), m->events.end(),
-                                [id](const Event& x){ return x.id==id; }), m->events.end());
-                if (scnTrigSel_==id) scnTrigSel_=-1;
-                p.save(); setStatus("실행지점 삭제됨"); break;
-            }
+        // 우클릭 = 즉시 삭제(확인 없이) — 어떤 모드에서든 동작
+        if (hov && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+            int id = e.id;
+            m->events.erase(std::remove_if(m->events.begin(), m->events.end(),
+                            [id](const Event& x){ return x.id==id; }), m->events.end());
+            if (scnTrigSel_==id) scnTrigSel_=-1;
+            scnTrigMode_ = 0; p.save(); setStatus("실행지점 삭제됨(우클릭)"); break;
+        }
+        if (hov && scnTrigMode_==0 && scnDragIdx_<0 && scnTrigDragId_<0
+            && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            scnTrigSel_ = e.id; scnTrigDragId_ = e.id;
         }
     }
     // 실행지점 드래그 이동/놓기
