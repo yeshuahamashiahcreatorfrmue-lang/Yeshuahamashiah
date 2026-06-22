@@ -216,6 +216,7 @@ void Editor::drawPickerOverlay() {
 void Editor::openCharBrowser(std::function<void(int)> apply) {
     charBrowserOpen_ = true; charBrowserApply_ = std::move(apply);
     charBrowserSearch_.clear(); charBrowserScroll_ = 0; pickerId_ = -1;
+    browserJustOpened_ = true;   // 여는 클릭이 모달 버튼까지 누르지 않도록 첫 프레임 입력 무시
 }
 
 // A registered character's representative sprite asset (걷기 아래 첫 프레임), or any
@@ -337,6 +338,9 @@ void Editor::deleteCharacterDef(int idx) {
 // Left-click = 선택, 우클릭 = 삭제, plus 없음 and '캐릭터 탭에서 제작'.
 void Editor::drawCharBrowser() {
     Database& db = engine_.project().database;
+    // 모달을 연 첫 프레임에는 입력을 무시(여는 버튼의 릴리즈가 모달 버튼까지 누르는 것 방지).
+    bool savedInput = ui::g_inputEnabled;
+    if (browserJustOpened_) { browserJustOpened_ = false; ui::g_inputEnabled = false; }
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.72f));
     Rectangle box = { 40, 40, (float)sw - 80, (float)sh - 80 };
@@ -407,24 +411,29 @@ void Editor::drawCharBrowser() {
         DrawTextU("등록된 캐릭터가 없습니다. '캐릭터 탭에서 제작'으로 만드세요.",
                   (int)grid.x + 12, (int)grid.y + 12, 14, ui::kTextDim);
 
-    if (toDelete >= 0) { deleteCharacterDef(toDelete); return; }   // db changed; bail this frame
+    if (toDelete >= 0) { ui::g_inputEnabled = savedInput; deleteCharacterDef(toDelete); return; }   // db changed; bail this frame
     if (chosen != -2) {
         if (charBrowserApply_) charBrowserApply_(chosen);
         charBrowserOpen_ = false; charBrowserApply_ = nullptr;
         engine_.project().save();
     }
+    ui::g_inputEnabled = savedInput;
 }
 
 // Open the Explorer-like 이펙트(이미지) browser. `apply` gets the chosen image asset id.
 void Editor::openFxBrowser(std::function<void(int)> apply) {
     fxBrowserOpen_ = true; fxBrowserApply_ = std::move(apply);
     fxBrowserSearch_.clear(); fxBrowserScroll_ = 0; pickerId_ = -1;
+    browserJustOpened_ = true;   // 여는 클릭이 모달 버튼까지 누르지 않도록 첫 프레임 입력 무시
 }
 
 // Full-screen modal: a searchable thumbnail grid of every registered IMAGE asset
 // (usable as an effect), plus '없음' and '외부에서 추가(파일)'. Left-click = 선택.
 void Editor::drawFxBrowser() {
     Project& p = engine_.project();
+    // 모달을 연 첫 프레임에는 입력을 무시(여는 버튼의 릴리즈가 모달 버튼까지 누르는 것 방지).
+    bool savedInput = ui::g_inputEnabled;
+    if (browserJustOpened_) { browserJustOpened_ = false; ui::g_inputEnabled = false; }
     int sw = screenW(), sh = screenH();
     DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.72f));
     Rectangle box = { 40, 40, (float)sw - 80, (float)sh - 80 };
@@ -494,6 +503,7 @@ void Editor::drawFxBrowser() {
         if (fxBrowserApply_) fxBrowserApply_(chosen);
         fxBrowserOpen_ = false; fxBrowserApply_ = nullptr;
     }
+    ui::g_inputEnabled = savedInput;
 }
 
 } // namespace tsukuru

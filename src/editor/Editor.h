@@ -296,6 +296,8 @@ private:
     float fxBrowserScroll_ = 0;
     std::function<void(int)> fxBrowserApply_;      // chosen effect(image) asset id (-1=없음)
     bool  pendingFxImport_ = false;                // 외부 파일 가져오기 요청(드로우 프레임 밖에서 처리)
+    // 모달을 연 그 프레임의 클릭(=여는 버튼의 릴리즈)이 모달 내부 버튼까지 누르는 것을 막는다.
+    bool  browserJustOpened_ = false;
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;
