@@ -155,7 +155,7 @@ private:
     void drawNpcTab();                                 // NPC/몹/플레이어 통합 관리 탭
     void drawPlayerEditor(Rectangle panel);            // edit the player character's stats/footprint
     void drawNpcStatRows(Event& ev, float x, float& y, float w); // 진영/AI/크기/전투 rows (shared)
-    int  stageImportImage(const std::string& src, const char* prefix); // copy ext image -> asset id, -1 fail
+    int  stageImportImage(const std::string& src, const char* prefix, bool aiCut = true); // copy ext image -> asset id (aiCut=true면 신경망 배경제거), -1 fail
     void pickAndImportNpcChar();                     // file picker -> assign an NPC's character sprite
     void pickAndImportMapFile();                     // file picker -> load a map .json for preview/registration
     void handleAssetDrop();

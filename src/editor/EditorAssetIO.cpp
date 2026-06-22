@@ -389,13 +389,36 @@ void Editor::pickAndImportEffect() {
 // Copy an external image into the project's assets/ (UTF-8 safe, no crop/bg
 // removal so tile grids & character sheets stay intact) and register it.
 // Returns the new asset id, or -1 on failure. Shared by the tileset & NPC pickers.
-int Editor::stageImportImage(const std::string& src, const char* prefix) {
+int Editor::stageImportImage(const std::string& src, const char* prefix, bool aiCut) {
     Project& p = engine_.project();
     std::error_code ec;
     std::string ext = fs::path(src).extension().string();
     for (auto& c : ext) c = (char)tolower((unsigned char)c);
     if (!isImageExt(ext)) return -1;
     fs::create_directories(fs::path(p.dir) / "assets", ec);
+    // 스프라이트/캐릭터 등은 신경망(U^2-Net) 배경제거를 거쳐 PNG로 저장한다.
+    // (타일셋/그리드처럼 원본을 보존해야 하는 경우만 aiCut=false로 원본 복사.)
+    if (aiCut) {
+        // UTF-8 경로(한글 등)에서도 디코드되도록 ASCII 임시본으로 스테이징 후 로드.
+        fs::path tmp = fs::path(p.dir)/"assets"/(std::string("_aistaging")+ext);
+        int t = 1; while (fs::exists(tmp, ec)) tmp = fs::path(p.dir)/"assets"/("_aistaging"+std::to_string(t++)+ext);
+        if (plat::copyFileUtf8(src, tmp.string())) {
+            Image img = LoadImage(tmp.string().c_str());
+            fs::remove(tmp, ec);
+            if (img.data) {
+                bool ai = aiCutout(img);           // 신경망(U^2-Net) 배경/테두리 제거
+                if (!ai) autoRemoveBg(img);        // 모델 없으면 색기반 폴백
+                shrinkForAsset(img);
+                int n = 1; fs::path dest;
+                do { dest = fs::path(p.dir)/"assets"/(std::string(prefix)+"_"+std::to_string(n++)+".png"); } while (fs::exists(dest, ec));
+                ExportImage(img, dest.string().c_str());
+                UnloadImage(img);
+                std::string rel = (fs::path("assets")/dest.filename()).generic_string();
+                return p.assets.addExisting(AssetType::Image, dest.stem().string(), rel);
+            }
+        }
+        // 디코드 실패 시 아래 원본 복사로 폴백
+    }
     int n = 1; fs::path dest;
     do { dest = fs::path(p.dir)/"assets"/(std::string(prefix)+"_"+std::to_string(n++)+ext); } while (fs::exists(dest, ec));
     if (!plat::copyFileUtf8(src, dest.string())) return -1;
@@ -408,7 +431,7 @@ void Editor::pickAndImportTileset() {
     if (!m) { setStatus("먼저 맵을 선택하세요."); return; }
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("타일셋 불러오기 취소됨."); return; }
-    int id = stageImportImage(files.front(), "tileset");
+    int id = stageImportImage(files.front(), "tileset", /*aiCut=*/false);   // 타일 그리드는 원본 보존(신경망 제외)
     if (id < 0) { setStatus("타일셋 불러오기 실패 (이미지 아님)."); return; }
     Project& p = engine_.project();
     m->tileset.assetId = id;
@@ -541,11 +564,11 @@ void Editor::pickAndImportNpcChar() {
     if (!ev) { setStatus("NPC를 찾지 못했습니다."); return; }
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("캐릭터 불러오기 취소됨."); return; }
-    int id = stageImportImage(files.front(), "npc_char");
+    int id = stageImportImage(files.front(), "npc_char");   // 신경망 배경제거 적용
     if (id < 0) { setStatus("캐릭터 불러오기 실패 (이미지 아님)."); return; }
     ev->graphicAsset = id;
     engine_.project().save();
-    setStatus("NPC 캐릭터 적용됨: " + assetName(id));
+    setStatus("NPC 캐릭터 적용됨 (AI 배경제거): " + assetName(id));
 }
 
 // Load a map .json from disk into mapPreview_ (World tab previews it before the
