@@ -415,4 +415,85 @@ void Editor::drawCharBrowser() {
     }
 }
 
+// Open the Explorer-like 이펙트(이미지) browser. `apply` gets the chosen image asset id.
+void Editor::openFxBrowser(std::function<void(int)> apply) {
+    fxBrowserOpen_ = true; fxBrowserApply_ = std::move(apply);
+    fxBrowserSearch_.clear(); fxBrowserScroll_ = 0; pickerId_ = -1;
+}
+
+// Full-screen modal: a searchable thumbnail grid of every registered IMAGE asset
+// (usable as an effect), plus '없음' and '외부에서 추가(파일)'. Left-click = 선택.
+void Editor::drawFxBrowser() {
+    Project& p = engine_.project();
+    int sw = screenW(), sh = screenH();
+    DrawRectangle(0, 0, sw, sh, Fade(BLACK, 0.72f));
+    Rectangle box = { 40, 40, (float)sw - 80, (float)sh - 80 };
+    ui::panel(box, ui::kPanel);
+    DrawRectangleLinesEx(box, 2, ui::kAccent);
+    DrawTextU("이펙트 선택 — 등록 이미지에서 고르거나 외부 파일에서 추가 (검색·클릭=선택)",
+              (int)box.x + 16, (int)box.y + 12, 20, ui::kAccent);
+    if (ui::button({ box.x + box.width - 96, box.y + 10, 84, 30 }, "닫기") || IsKeyPressed(KEY_ESCAPE)) {
+        fxBrowserOpen_ = false; fxBrowserApply_ = nullptr; return;
+    }
+    float x = box.x + 16, top = box.y + 50;
+    searchBox({ x, top, 320, 28 }, fxBrowserSearch_, 9410);
+    if (ui::button({ x + 332, top, 96, 28 }, "없음")) {
+        if (fxBrowserApply_) fxBrowserApply_(-1);
+        fxBrowserOpen_ = false; fxBrowserApply_ = nullptr; return;
+    }
+    if (ui::button({ x + 436, top, 200, 28 }, "외부에서 추가(파일)")) {
+        pendingFxImport_ = true;   // 네이티브 파일 다이얼로그는 드로우 프레임 밖(update)에서 연다
+        return;
+    }
+
+    float gridTop = top + 40;
+    Rectangle grid = { box.x + 8, gridTop, box.width - 16, box.y + box.height - gridTop - 12 };
+    const float cell = 110, thumb = 92, pad = 10;
+    int cols = std::max(1, (int)((grid.width - pad) / (cell + pad)));
+    auto allFx = p.assets.byType(AssetType::Image);
+    decltype(allFx) shown;
+    for (auto* a : allFx)
+        if (nameMatch(a->name, fxBrowserSearch_)) shown.push_back(a);
+    int rows = ((int)shown.size() + cols - 1) / cols;
+    float contentH = rows * (cell + pad) + pad;
+
+    uiScissor((int)grid.x, (int)grid.y, (int)grid.width, (int)grid.height);
+    Vector2 m = GetMousePosition();
+    int chosen = -2;
+    for (int k = 0; k < (int)shown.size(); ++k) {
+        auto* a = shown[k];
+        int r = k / cols, c = k % cols;
+        float cx = grid.x + pad + c * (cell + pad);
+        float cy = grid.y + pad + r * (cell + pad) - fxBrowserScroll_;
+        if (cy + cell < grid.y || cy > grid.y + grid.height) continue;
+        Rectangle cellR = { cx, cy, cell, cell };
+        bool hot = CheckCollisionPointRec(m, cellR);
+        DrawRectangleRec(cellR, hot ? ui::kPanelHi : Color{ 30, 33, 42, 255 });
+        DrawRectangleLinesEx(cellR, hot ? 2 : 1, hot ? ui::kAccent : Fade(BLACK, 0.5f));
+        const Texture2D& tex = engine_.assetTexture(a->id);
+        if (tex.id) {
+            // effect images are often horizontal strips → show the first frame square
+            float fw = tex.width >= tex.height * 2 ? (float)tex.height : (float)tex.width;
+            float s = std::min(thumb / fw, thumb / (float)tex.height);
+            float dw = fw * s, dh = tex.height * s;
+            DrawTexturePro(tex, { 0, 0, fw, (float)tex.height },
+                           { cx + (cell - dw) / 2, cy + 6 + (thumb - dh) / 2, dw, dh }, { 0, 0 }, 0, WHITE);
+        } else DrawTextU("(이미지)", (int)cx + 20, (int)cy + 42, 12, ui::kTextDim);
+        std::string nm = a->name; if ((int)nm.size() > 14) nm = nm.substr(0, 13) + "..";
+        int tw = MeasureTextU(nm.c_str(), 12);
+        DrawTextU(nm.c_str(), (int)(cx + (cell - tw) / 2), (int)(cy + cell - 16), 12, ui::kText);
+        if (hot && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) chosen = a->id;
+    }
+    EndScissorMode();
+    scrollbar(grid, fxBrowserScroll_, contentH);
+    if (shown.empty())
+        DrawTextU("등록된 이미지가 없습니다. '외부에서 추가(파일)'로 가져오세요.",
+                  (int)grid.x + 12, (int)grid.y + 12, 14, ui::kTextDim);
+
+    if (chosen != -2) {
+        if (fxBrowserApply_) fxBrowserApply_(chosen);
+        fxBrowserOpen_ = false; fxBrowserApply_ = nullptr;
+    }
+}
+
 } // namespace tsukuru

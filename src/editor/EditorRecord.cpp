@@ -106,8 +106,9 @@ void Editor::drawLiveRecorder(Scene& sc) {
     if (!scnLiveInit_) liveInitUnits(sc, *m);
     float dt = GetFrameTime(); if (dt > 0.05f) dt = 0.05f;
     float simDt = scnPaused_ ? 0.0f : dt;       // 일시정지면 시간·이동 정지(상황 세팅용)
-    bool lclick = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-    bool rclick = IsMouseButtonPressed(MOUSE_RIGHT_BUTTON);
+    bool modalOpen = charBrowserOpen_ || fxBrowserOpen_ || pickerOpen();   // 모달 열림 중 맵 입력 차단
+    bool lclick = !modalOpen && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    bool rclick = !modalOpen && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON);
     Vector2 mouse = GetMousePosition();
     auto unitDef = [&](const LiveUnit& u)->const CharacterDef* {
         return u.charId < 0 ? nullptr : (u.isMob ? db.mob(u.charId) : db.character(u.charId));
@@ -146,7 +147,10 @@ void Editor::drawLiveRecorder(Scene& sc) {
         liveSel_.clear();
     }
     if (tbtn(liveFxMode_ ? "이펙트: 맵클릭" : "이펙트 뿌리기", 110, liveFxMode_)) liveFxMode_ = !liveFxMode_;
-    assetButton({ bx, by, 130, 28 }, "", scnRecEffect_, 4810); bx += 134;
+    // 이펙트 선택: 윈도우 탐색기식 브라우저(내부 등록 이미지 + 외부 파일 가져오기)
+    { std::string fxn = scnRecEffect_<0 ? "이펙트 선택(목록·외부)" : assetName(scnRecEffect_);
+      if (ui::button({ bx, by, 168, 28 }, fxn)) openFxBrowser([this](int id){ scnRecEffect_ = id; if (id>=0) liveFxMode_ = true; });
+      bx += 172; }
     ui::intStepper({ bx, by, 96, 28 }, "반경", scnRecRadius_, 1, 1, 20); bx += 100;
 
     // ---- map canvas ----

@@ -231,6 +231,36 @@ void Editor::handleAssetDrop() {
 // Open the native OS file picker (Windows Explorer) and import every selected
 // image. Source files are copied with a Unicode-safe copy into the project under
 // ASCII names, so Korean/Unicode source paths and filenames work correctly.
+// 이펙트 브라우저의 '외부에서 추가': 외부 이미지 1개를 에셋으로 등록하고 곧바로 선택.
+void Editor::pickAndImportFx() {
+    std::vector<std::string> files = plat::openImageFiles();
+    if (files.empty()) { setStatus("가져오기 취소됨."); return; }
+    Project& p = engine_.project();
+    int id = -1;
+    for (const std::string& src : files) {
+        try {
+            std::error_code ec;
+            std::string ext = fs::path(src).extension().string();
+            for (auto& c : ext) c = (char)tolower((unsigned char)c);
+            if (!isImageExt(ext)) continue;
+            fs::create_directories(fs::path(p.dir) / "assets", ec);
+            fs::path tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + ext);
+            int k = 1;
+            while (fs::exists(tmp, ec)) tmp = fs::path(p.dir) / "assets" / ("_fxstaging" + std::to_string(k++) + ext);
+            if (!plat::copyFileUtf8(src, tmp.string())) continue;
+            id = importImageFile(tmp.string());
+            fs::remove(tmp, ec);
+            if (id >= 0) break;
+        } catch (const std::exception& e) { setStatus(std::string("가져오기 실패: ") + e.what()); }
+    }
+    if (id >= 0) {
+        p.save();
+        if (fxBrowserApply_) fxBrowserApply_(id);     // 가져온 이펙트를 즉시 선택
+        setStatus("이펙트 가져옴 → 선택됨");
+    } else setStatus("가져온 이미지가 없습니다.");
+    fxBrowserOpen_ = false; fxBrowserApply_ = nullptr;
+}
+
 void Editor::pickAndImportImages() {
     std::vector<std::string> files = plat::openImageFiles();
     if (files.empty()) { setStatus("불러오기 취소됨."); return; }

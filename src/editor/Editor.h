@@ -80,6 +80,11 @@ public:
     void openCharBrowser(std::function<void(int)> apply);
     void drawCharBrowser();
     bool charBrowserOpen() const { return charBrowserOpen_; }
+    // 이펙트(이미지) 탐색기: 내부 등록 이미지 그리드 + '외부에서 추가' 파일 가져오기.
+    void openFxBrowser(std::function<void(int)> apply);
+    void drawFxBrowser();
+    void pickAndImportFx();                        // 외부 이미지 1개 가져와 에셋 등록 후 선택
+    bool fxBrowserOpen() const { return fxBrowserOpen_; }
     int  charThumbAsset(const CharacterDef& c);   // a character's representative sprite asset
     void deleteCharacterDef(int idx);             // remove a registered character + scrub refs
     void applyCharToNpc(int mapId, int eventId, int charId); // NPC에 등록 캐릭터(상하좌우) 적용
@@ -285,6 +290,12 @@ private:
     std::string charBrowserSearch_;
     float charBrowserScroll_ = 0;
     std::function<void(int)> charBrowserApply_;   // chosen asset id (-1=없음) → caller
+    // Explorer-like 이펙트(이미지 에셋) 브라우저: 내부 목록 + 외부 파일 가져오기
+    bool  fxBrowserOpen_ = false;
+    std::string fxBrowserSearch_;
+    float fxBrowserScroll_ = 0;
+    std::function<void(int)> fxBrowserApply_;      // chosen effect(image) asset id (-1=없음)
+    bool  pendingFxImport_ = false;                // 외부 파일 가져오기 요청(드로우 프레임 밖에서 처리)
     // World / map management
     int  worldSelected_ = -1;       // map index selected in the World tab
     bool mapNameFocus_ = false;

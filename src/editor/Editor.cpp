@@ -110,6 +110,8 @@ void Editor::update(float dt) {
     if (pendingNpcCharImport_){ pendingNpcCharImport_= false; pickAndImportNpcChar(); }
     if (pendingMapImport_)    { pendingMapImport_    = false; pickAndImportMapFile(); }
     if (pendingEfxFrameImport_){ pendingEfxFrameImport_= false; pickAndImportEfxFrame(); }
+    if (pendingFxImport_)     { pendingFxImport_     = false; pickAndImportFx(); }
+    { static bool fxEnv=false; if(!fxEnv){ fxEnv=true; if(getenv("TSUKURU_FXBROWSER")) openFxBrowser([this](int id){ scnRecEffect_=id; }); } } // debug
 
     // Enable the OS IME only while a text field is focused, so Korean names can be
     // typed there; everywhere else the IME is off so tool hotkeys/arrows aren't
@@ -203,7 +205,7 @@ void Editor::draw() {
     // 장면 미리보기가 떠 있고 마우스가 그 위(또는 확대 모드)면 뒤 탭 입력을 막는다.
     bool prevModal = engine_.scenePreviewActive() &&
                      (scnPrevBig_ || CheckCollisionPointRec(GetMousePosition(), scnPrevBox_));
-    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0 && !charBrowserOpen_ && !prevModal;
+    ui::g_inputEnabled = !confirmOpen_ && pickerId_ < 0 && !charBrowserOpen_ && !fxBrowserOpen_ && !prevModal;
     switch (tab_) {
         case Tab::World:    drawWorldTab();    break;
         case Tab::WorldView: drawWorldViewTab(); break;
@@ -217,7 +219,7 @@ void Editor::draw() {
         case Tab::Assets:   drawAssetsTab();   break;
         case Tab::Database: drawDatabaseTab(); break;
     }
-    ui::g_inputEnabled = !confirmOpen_ && !charBrowserOpen_;   // toolbar usable with a picker open
+    ui::g_inputEnabled = !confirmOpen_ && !charBrowserOpen_ && !fxBrowserOpen_;   // toolbar usable with a picker open
     drawToolbar();
 
     if (statusTimer_ > 0) {
@@ -230,6 +232,7 @@ void Editor::draw() {
     if (engine_.scenePreviewActive()) drawScenePreviewOverlay();
     drawPickerOverlay();
     if (charBrowserOpen_) drawCharBrowser();
+    if (fxBrowserOpen_)   drawFxBrowser();
     if (confirmOpen_) drawConfirmOverlay();
 }
 
