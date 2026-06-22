@@ -225,16 +225,40 @@ void Editor::drawScenarioTab() {
     // scene picker + new
     std::vector<std::string> sopt; std::vector<int> sval;
     for (int i = 0; i < (int)list.size(); ++i) { sopt.push_back(list[i].name); sval.push_back(i); }
+    auto createScene = [&]{
+        Scene s; s.id = (int)list.size()+1; s.name = "장면" + std::to_string(s.id);
+        for (auto& mm : p.maps) if (mm->placed) { s.editMapId = mm->id; break; }
+        if (s.editMapId < 0 && !p.maps.empty()) s.editMapId = p.maps.front()->id;
+        list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; p.save();
+    };
     if (!list.empty()) {
         if (scnSel_ < 0 || scnSel_ >= (int)list.size()) scnSel_ = 0;
         optionButton({ cx, cy, cw - 30, 26 }, "", sopt, sval, scnSel_, 4400);
-    } else DrawTextU("장면이 없습니다", (int)cx, (int)cy + 4, 13, ui::kTextDim);
-    if (ui::button({ cx + cw - 26, cy, 26, 26 }, "+")) {
-        Scene s; s.id = (int)list.size()+1; s.name = "장면" + std::to_string(s.id);
-        list.push_back(s); scnSel_ = (int)list.size()-1; scnActSel_ = -1; p.save();
-    }
+    } else DrawTextU("장면(시나리오) 없음", (int)cx, (int)cy + 4, 13, ui::kTextDim);
+    if (ui::button({ cx + cw - 26, cy, 26, 26 }, "+")) createScene();
     cy += 32;
-    if (scnSel_ < 0 || scnSel_ >= (int)list.size()) return;
+    if (scnSel_ < 0 || scnSel_ >= (int)list.size()) {
+        // ── empty state: never leave the tab blank — show the map + a big create button ──
+        if (ui::button({ cx, cy, cw, 34 }, "+ 새 장면 만들기")) createScene();
+        cy += 42;
+        DrawTextU("새 장면을 만들면 왼쪽 큰 지도에서", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
+        DrawTextU("· NPC/몹/이펙트를 끌어 배치", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
+        DrawTextU("· '장면 녹화'로 장면을 이어 제작", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
+        DrawTextU("· 발동 지점/NPC도 지정", (int)cx, (int)cy, 12, ui::kTextDim);
+        Rectangle canvas = { mapX, top, mapW, panelH };
+        DrawRectangleRec(canvas, Color{ 18, 20, 26, 255 });
+        std::shared_ptr<Map> bm; for (auto& mm : p.maps) if (mm->placed) { bm = mm; break; }
+        if (!bm && !p.maps.empty()) bm = p.maps.front();
+        const RenderTexture2D* bt = bm ? mapThumb(bm->id) : nullptr;
+        if (bt && bm->tilemap.width() > 0) {
+            float tw=(float)bt->texture.width, tht=(float)bt->texture.height;
+            float s=std::min(canvas.width/tw, canvas.height/tht);
+            float pw=tw*s, ph=tht*s, bx=canvas.x+(canvas.width-pw)/2, by=canvas.y+(canvas.height-ph)/2;
+            DrawTexturePro(bt->texture, {0,0,tw,-tht}, {bx,by,pw,ph}, {0,0}, 0, Fade(WHITE,0.5f));
+        }
+        DrawTextU("← 오른쪽 위 '+ 새 장면 만들기'로 시작", (int)canvas.x+16, (int)(canvas.y+canvas.height/2), 18, ui::kAccentHi);
+        return;
+    }
     Scene& sc = list[scnSel_];
     if (sc.editMapId < 0 || !p.map(sc.editMapId)) {
         for (auto& mm : p.maps) if (mm->placed) { sc.editMapId = mm->id; break; }

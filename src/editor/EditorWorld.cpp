@@ -824,6 +824,8 @@ void Editor::ensureThumbsForTab() {
         if (scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size()) {
             int mid = p.database.scenes[scnSel_].editMapId;
             if (mid >= 0 && p.map(mid) && !mapThumb(mid)) buildMapThumb(*p.map(mid));
+        } else {   // empty-state background: first placed map
+            for (auto& m : p.maps) if (m->placed) { if (!mapThumb(m->id)) buildMapThumb(*m); break; }
         }
     } else if (tab_ == Tab::Dialogue) {
         // background map for the 대화 탭 (NPC 선택용)

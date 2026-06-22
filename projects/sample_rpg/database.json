@@ -7,10 +7,6 @@
       "maxHp": 140,
       "maxMp": 30,
       "name": "용사",
-      "skills": [
-        1,
-        2
-      ],
       "spd": 7,
       "spriteAsset": 2
     }
@@ -22,9 +18,15 @@
       "drawPct": 125,
       "drawTilesH": 1,
       "drawTilesW": 1,
+      "dropItemId": -1,
+      "dropRate": 0,
+      "expReward": 10,
+      "goldReward": 5,
       "id": 1,
       "maxGp": 30,
       "maxHp": 100,
+      "maxHunger": 42000,
+      "maxThirst": 42000,
       "motions": [
         {
           "fps": 8,
@@ -102,7 +104,9 @@
         }
       ],
       "name": "용사(파랑)",
+      "respawnSecs": 0,
       "skills": [],
+      "spawnFreezeSecs": 1.2000000476837158,
       "spd": 5
     },
     {
@@ -111,9 +115,15 @@
       "drawPct": 125,
       "drawTilesH": 1,
       "drawTilesW": 1,
+      "dropItemId": -1,
+      "dropRate": 0,
+      "expReward": 10,
+      "goldReward": 5,
       "id": 2,
       "maxGp": 30,
       "maxHp": 100,
+      "maxHunger": 42000,
+      "maxThirst": 42000,
       "motions": [
         {
           "fps": 6,
@@ -191,7 +201,9 @@
         }
       ],
       "name": "기사(빨강)",
+      "respawnSecs": 0,
       "skills": [],
+      "spawnFreezeSecs": 1.2000000476837158,
       "spd": 5
     },
     {
@@ -200,9 +212,15 @@
       "drawPct": 125,
       "drawTilesH": 1,
       "drawTilesW": 1,
+      "dropItemId": -1,
+      "dropRate": 0,
+      "expReward": 10,
+      "goldReward": 5,
       "id": 3,
       "maxGp": 30,
       "maxHp": 100,
+      "maxHunger": 42000,
+      "maxThirst": 42000,
       "motions": [
         {
           "fps": 11,
@@ -280,84 +298,113 @@
         }
       ],
       "name": "궁수(초록)",
+      "respawnSecs": 0,
       "skills": [],
+      "spawnFreezeSecs": 1.2000000476837158,
       "spd": 5
+    }
+  ],
+  "dialogues": [
+    {
+      "id": 1,
+      "lines": [
+        {
+          "answers": [
+            {
+              "dismissFollowers": false,
+              "durationSecs": 0.0,
+              "gotoLine": -1,
+              "mobId": -1,
+              "npcCharId": -1,
+              "respType": 6,
+              "rewardExp": 0,
+              "rewardGold": 0,
+              "rewardItemCount": 1,
+              "rewardItemId": -1,
+              "sceneId": 1,
+              "text": "꼭 되찾아 오겠습니다"
+            },
+            {
+              "dismissFollowers": false,
+              "durationSecs": 0.0,
+              "gotoLine": -1,
+              "mobId": -1,
+              "npcCharId": -1,
+              "respType": 1,
+              "rewardExp": 20,
+              "rewardGold": 100,
+              "rewardItemCount": 1,
+              "rewardItemId": -1,
+              "sceneId": -1,
+              "text": "보상을 주시겠소?"
+            }
+          ],
+          "speaker": "촌장",
+          "speakerAsset": 21,
+          "text": "용사여! 동굴의 수호자가 마을의 크리스탈을 훔쳐갔다네."
+        },
+        {
+          "answers": [],
+          "speaker": "마을 주민",
+          "speakerAsset": 21,
+          "text": "부디 조심하세요, 용사님!"
+        }
+      ],
+      "name": "촌장 대화"
     }
   ],
   "enemies": [
     {
       "atk": 9,
       "def": 4,
+      "dropItemId": -1,
+      "dropRate": 0,
       "expReward": 9,
       "goldReward": 7,
       "id": 1,
       "maxHp": 34,
-      "maxMp": 0,
       "name": "슬라임",
       "spd": 4,
-      "spriteAsset": 7,
-      "dropItemId": 1,
-      "dropRate": 30
+      "spriteAsset": 7
     },
     {
       "atk": 12,
       "def": 3,
+      "dropItemId": -1,
+      "dropRate": 0,
       "expReward": 11,
       "goldReward": 9,
       "id": 2,
       "maxHp": 26,
-      "maxMp": 0,
       "name": "박쥐",
       "spd": 7,
-      "spriteAsset": 8,
-      "dropItemId": 5,
-      "dropRate": 20
+      "spriteAsset": 8
     },
     {
       "atk": 15,
       "def": 6,
+      "dropItemId": -1,
+      "dropRate": 0,
       "expReward": 22,
       "goldReward": 18,
       "id": 3,
       "maxHp": 60,
-      "maxMp": 0,
       "name": "멧돼지",
       "spd": 5,
-      "spriteAsset": 9,
-      "dropItemId": 7,
-      "dropRate": 40
+      "spriteAsset": 9
     },
     {
       "atk": 18,
       "def": 9,
+      "dropItemId": -1,
+      "dropRate": 0,
       "expReward": 150,
       "goldReward": 120,
       "id": 4,
       "maxHp": 220,
-      "maxMp": 0,
       "name": "동굴 수호자",
       "spd": 4,
       "spriteAsset": 10
-    }
-  ],
-  "equipment": [
-    {
-      "atk": 12,
-      "def": 0,
-      "iconAsset": -1,
-      "id": 1,
-      "name": "철검",
-      "price": 140,
-      "slot": "weapon"
-    },
-    {
-      "atk": 0,
-      "def": 8,
-      "iconAsset": -1,
-      "id": 2,
-      "name": "가죽 갑옷",
-      "price": 120,
-      "slot": "armor"
     }
   ],
   "fieldSkills": [
@@ -568,240 +615,154 @@
   ],
   "items": [
     {
+      "bodySlot": 0,
+      "bonusAtk": 0,
+      "bonusDef": 0,
+      "bonusSpd": 0,
+      "buffSecs": 0,
       "consumable": true,
       "description": "HP를 60 회복합니다.",
       "effect": "healHP",
+      "healGp": 0,
+      "healHp": 0,
+      "hydration": 0,
       "iconAsset": -1,
       "id": 1,
+      "kind": 0,
       "name": "포션",
       "power": 60,
-      "price": 30
+      "price": 30,
+      "satiety": 0
     },
     {
+      "bodySlot": 0,
+      "bonusAtk": 0,
+      "bonusDef": 0,
+      "bonusSpd": 0,
+      "buffSecs": 0,
       "consumable": true,
       "description": "HP를 200 회복합니다.",
       "effect": "healHP",
+      "healGp": 0,
+      "healHp": 0,
+      "hydration": 0,
       "iconAsset": -1,
       "id": 2,
+      "kind": 0,
       "name": "하이포션",
       "power": 200,
-      "price": 120
+      "price": 120,
+      "satiety": 0
     },
     {
+      "bodySlot": 0,
+      "bonusAtk": 0,
+      "bonusDef": 0,
+      "bonusSpd": 0,
+      "buffSecs": 0,
       "consumable": true,
       "description": "MP를 40 회복합니다.",
       "effect": "healMP",
+      "healGp": 0,
+      "healHp": 0,
+      "hydration": 0,
       "iconAsset": -1,
       "id": 3,
+      "kind": 0,
       "name": "에테르",
       "power": 40,
-      "price": 80
+      "price": 80,
+      "satiety": 0
     },
     {
+      "bodySlot": 0,
+      "bonusAtk": 0,
+      "bonusDef": 0,
+      "bonusSpd": 0,
+      "buffSecs": 0,
       "consumable": false,
       "description": "마을의 신성한 크리스탈.",
       "effect": "none",
+      "healGp": 0,
+      "healHp": 0,
+      "hydration": 0,
       "iconAsset": -1,
       "id": 4,
+      "kind": 0,
       "name": "크리스탈",
       "power": 0,
-      "price": 0
-    },
-    {
-      "id": 5,
-      "name": "빵",
-      "description": "",
-      "price": 20,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 1,
-      "satiety": 8000,
-      "hydration": 0,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 0,
-      "bonusAtk": 0,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 6,
-      "name": "물병",
-      "description": "",
-      "price": 15,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 1,
-      "satiety": 0,
-      "hydration": 9000,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 0,
-      "bonusAtk": 0,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 7,
-      "name": "고기구이",
-      "description": "",
-      "price": 60,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 1,
-      "satiety": 15000,
-      "hydration": 0,
-      "healHp": 40,
-      "healGp": 0,
-      "bodySlot": 0,
-      "bonusAtk": 1,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 8,
-      "name": "회복포션",
-      "description": "",
-      "price": 80,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 1,
-      "satiety": 0,
-      "hydration": 2000,
-      "healHp": 120,
-      "healGp": 0,
-      "bodySlot": 0,
-      "bonusAtk": 0,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 9,
-      "name": "철검",
-      "description": "",
-      "price": 120,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 2,
-      "satiety": 0,
-      "hydration": 0,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 6,
-      "bonusAtk": 8,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 10,
-      "name": "가죽갑옷",
-      "description": "",
-      "price": 100,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 2,
-      "satiety": 0,
-      "hydration": 0,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 2,
-      "bonusAtk": 0,
-      "bonusDef": 6,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 11,
-      "name": "강철투구",
-      "description": "",
-      "price": 70,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 2,
-      "satiety": 0,
-      "hydration": 0,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 1,
-      "bonusAtk": 0,
-      "bonusDef": 4,
-      "bonusSpd": 0,
-      "buffSecs": 0
-    },
-    {
-      "id": 12,
-      "name": "신속부츠",
-      "description": "",
-      "price": 90,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 2,
-      "satiety": 0,
-      "hydration": 0,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 5,
-      "bonusAtk": 0,
-      "bonusDef": 1,
-      "bonusSpd": 2,
-      "buffSecs": 0
-    },
-    {
-      "id": 13,
-      "name": "전투식량",
-      "description": "",
-      "price": 120,
-      "iconAsset": -1,
-      "effect": "none",
-      "power": 0,
-      "consumable": true,
-      "kind": 1,
-      "satiety": 6000,
-      "hydration": 3000,
-      "healHp": 0,
-      "healGp": 0,
-      "bodySlot": 0,
-      "bonusAtk": 5,
-      "bonusDef": 0,
-      "bonusSpd": 0,
-      "buffSecs": 60
+      "price": 0,
+      "satiety": 0
     }
   ],
-  "skills": [
+  "mobs": [],
+  "scenes": [
     {
-      "healing": false,
+      "actions": [
+        {
+          "radius": 1,
+          "refId": -3,
+          "removeTags": [],
+          "targetId": 1,
+          "time": 0.0,
+          "type": 3,
+          "x": 18,
+          "y": 16
+        },
+        {
+          "radius": 1,
+          "refId": -1,
+          "removeTags": [],
+          "targetId": 1,
+          "time": 1.0,
+          "type": 0,
+          "x": 22,
+          "y": 16
+        },
+        {
+          "radius": 1,
+          "refId": -1,
+          "removeTags": [],
+          "targetId": 0,
+          "time": 1.0,
+          "type": 0,
+          "x": 21,
+          "y": 17
+        },
+        {
+          "radius": 1,
+          "refId": 1,
+          "removeTags": [],
+          "targetId": 1,
+          "time": 0.800000011920929,
+          "type": 6,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "radius": 2,
+          "refId": 13,
+          "removeTags": [],
+          "targetId": -1,
+          "time": 1.0,
+          "type": 2,
+          "x": 23,
+          "y": 16
+        },
+        {
+          "radius": 1,
+          "refId": 1,
+          "removeTags": [],
+          "targetId": -1,
+          "time": 0.0,
+          "type": 1,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "editMapId": 1,
       "id": 1,
-      "mpCost": 4,
-      "name": "베기",
-      "power": 18
-    },
-    {
-      "healing": true,
-      "id": 2,
-      "mpCost": 6,
-      "name": "치유",
-      "power": 40
+      "name": "도입 장면"
     }
   ]
 }

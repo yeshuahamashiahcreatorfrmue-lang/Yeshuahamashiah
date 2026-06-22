@@ -113,6 +113,22 @@ jobs:
           if (-not (Test-Path shot_chars.png)) { throw "no chars screenshot" }
           Pop-Location
 
+      - name: Screenshot 시나리오 / 대화 tabs on real Windows
+        shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          $dir = "${{ steps.find.outputs.dir }}"
+          $exe = "${{ steps.find.outputs.exe }}"
+          Push-Location $dir
+          foreach ($t in @("scenario","dialogue","npc")) {
+            $env:TSUKURU_TAB = $t
+            $p = Start-Process -FilePath $exe -ArgumentList "--start","editor","--frames","24","--shot","shot_$t.png" -Wait -PassThru
+            Write-Host "$t-tab shot exit: $($p.ExitCode)"
+            if (-not (Test-Path "shot_$t.png")) { throw "no $t screenshot (탭이 렌더되지 않음)" }
+          }
+          Pop-Location
+
       - name: Stage release package
         shell: pwsh
         run: |

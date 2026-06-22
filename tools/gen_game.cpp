@@ -439,6 +439,34 @@ int main(int argc,char**argv){
     { Event e;e.id=eid++;e.x=22;e.y=2;e.type=EventType::Teleport;e.trigger=TriggerType::ActionButton;e.targetMap=cave->id;e.targetX=16;e.targetY=23; m->events.push_back(e); }
     sign(20,3,"동굴 입구 ->|안에서 속삭이는 것을 조심하라.");
 
+    // ---- demo 대화(분기) + 시나리오(장면): 새 기능이 비어 보이지 않도록 샘플 제공 ----
+    {
+        // 촌장 NPC: 등록 캐릭터(상하좌우, charId=1)를 사용하고 대화로그(dialogueId=1) 연결
+        Event e; e.id=eid++; e.x=20; e.y=18; e.type=EventType::Message; e.trigger=TriggerType::ActionButton;
+        e.charId=1; e.graphicAsset=HM[0]; e.speakerName="촌장"; e.dialogueId=1; m->events.push_back(e);
+
+        DialogueScenario d; d.id=1; d.name="촌장 대화";
+        DialogueLine l1; l1.speaker="촌장"; l1.text="용사여! 동굴의 수호자가 마을의 크리스탈을 훔쳐갔다네."; l1.speakerAsset=HM[0];
+        DialogueAnswer a1; a1.text="꼭 되찾아 오겠습니다"; a1.respType=DR_Scene; a1.sceneId=1;
+        DialogueAnswer a2; a2.text="보상을 주시겠소?"; a2.respType=DR_Reward; a2.rewardGold=100; a2.rewardExp=20;
+        l1.answers.push_back(a1); l1.answers.push_back(a2);
+        DialogueLine l2; l2.speaker="마을 주민"; l2.text="부디 조심하세요, 용사님!"; l2.speakerAsset=HM[0];
+        d.lines.push_back(l1); d.lines.push_back(l2);
+        db.dialogues.push_back(d);
+
+        // 시나리오(장면): 동료 캐릭터 등장→이동→공격동작→이펙트→대화
+        Scene sc; sc.id=1; sc.name="도입 장면"; sc.editMapId=m->id;
+        auto mk=[&](int type,int tag,int ref,int x,int y,float t,int rad){
+            SceneAction a; a.type=type; a.targetId=tag; a.refId=ref; a.x=x; a.y=y; a.time=t; a.radius=rad; sc.actions.push_back(a); };
+        mk(SA_Spawn,    1, -3, 18, 16, 0.0f, 1);   // 기사(charId 2) 등장: refId=-(2)-1=-3
+        mk(SA_MoveChar, 1, -1, 22, 16, 1.0f, 1);   // 기사 이동
+        mk(SA_MoveChar, 0, -1, 21, 17, 1.0f, 1);   // 플레이어 이동(동시 배치)
+        mk(SA_Motion,   1, MO_Attack, 0, 0, 0.8f, 1); // 기사 공격 동작
+        mk(SA_Effect,  -1, FX_slash, 23, 16, 1.0f, 2); // 이펙트
+        mk(SA_Dialogue,-1, 1, 0, 0, 0.0f, 1);      // 촌장 대화 재생
+        db.scenes.push_back(sc);
+    }
+
     p->startMap=m->id; p->startX=22; p->startY=20; p->startActor=1; p->playerSprite=A_hero;
     p->playerFrames=4; p->playerAtkFrames=2;   // hero sheet = 4 walk + 2 attack
     p->save();
