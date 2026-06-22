@@ -43,6 +43,21 @@ Editor::Editor(Engine& engine) : engine_(engine) {
         else if (s == "db") tab_ = Tab::Database;
     }
     if (const char* pk = getenv("TSUKURU_PICKER")) pickerId_ = atoi(pk); // debug: force-open a dropdown
+    if (getenv("TSUKURU_SEEDSTORY")) {             // debug: seed a dialogue+scene to view panels
+        Database& d = engine_.project().database;
+        Scene sc; sc.id = 1; sc.name = "도입 장면";
+        sc.actions.push_back({ SA_MoveChar, 0, -1, 5, 6, 1.0f });
+        sc.actions.push_back({ SA_Dialogue, -1, 1, 0, 0, 0.0f });
+        d.scenes.push_back(sc);
+        DialogueScenario dl; dl.id = 1; dl.name = "촌장 대화";
+        DialogueLine ln; ln.speaker = "촌장"; ln.text = "용사여, 무엇을 도와줄까?";
+        DialogueAnswer a1; a1.text = "보상을"; a1.respType = DR_Reward; a1.rewardGold = 100;
+        DialogueAnswer a2; a2.text = "시나리오"; a2.respType = DR_Scene; a2.sceneId = 1;
+        ln.answers.push_back(a1); ln.answers.push_back(a2);
+        dl.lines.push_back(ln);
+        d.dialogues.push_back(dl);
+        tab_ = Tab::Dialogue; dlgSel_ = 0; dlgLineSel_ = 0;
+    }
     if (const char* c = getenv("TSUKURU_DBCAT")) { // debug: pick DB category + first entry
         tab_ = Tab::Database; dbCategory_ = atoi(c); dbSelected_ = 0;
         if (const char* s = getenv("TSUKURU_DBSEL")) dbSelected_ = atoi(s);

@@ -69,8 +69,10 @@ void Editor::drawDialogueTab() {
             if (ly + 28 > y && ly < y + reg.height) {
                 std::string lbl = std::to_string(i+1) + ". " + (d.lines[i].speaker.empty()?"":("["+d.lines[i].speaker+"] ")) + d.lines[i].text;
                 if ((int)lbl.size() > 40) lbl = lbl.substr(0, 40) + "..";
-                if (ui::button({ x, ly, w-30, 26 }, lbl, dlgLineSel_ == i)) { dlgLineSel_ = i; dlgFocus_ = -1; }
-                if (ui::button({ x+w-28, ly, 28, 26 }, "x")) { d.lines.erase(d.lines.begin()+i); if(dlgLineSel_>=(int)d.lines.size())dlgLineSel_=(int)d.lines.size()-1; p.save(); EndScissorMode(); return; }
+                if (ui::button({ x, ly, w-88, 26 }, lbl, dlgLineSel_ == i)) { dlgLineSel_ = i; dlgFocus_ = -1; }
+                if (ui::button({ x+w-86, ly, 26, 26 }, "위")) { if(i>0){ std::swap(d.lines[i],d.lines[i-1]); if(dlgLineSel_==i)dlgLineSel_=i-1; else if(dlgLineSel_==i-1)dlgLineSel_=i; p.save(); } }
+                if (ui::button({ x+w-58, ly, 26, 26 }, "아래")) { if(i+1<(int)d.lines.size()){ std::swap(d.lines[i],d.lines[i+1]); if(dlgLineSel_==i)dlgLineSel_=i+1; else if(dlgLineSel_==i+1)dlgLineSel_=i; p.save(); } }
+                if (ui::button({ x+w-30, ly, 28, 26 }, "x")) { d.lines.erase(d.lines.begin()+i); if(dlgLineSel_>=(int)d.lines.size())dlgLineSel_=(int)d.lines.size()-1; p.save(); EndScissorMode(); return; }
             }
             ly += 30;
         }
@@ -121,19 +123,19 @@ void Editor::drawDialogueTab() {
             if (a.respType == DR_Reward) {
                 ui::intStepper({ ix, iy, iw/2-4, 24 }, "골드", a.rewardGold, 10, 0, 99999);
                 ui::intStepper({ ix+iw/2+4, iy, iw/2-4, 24 }, "경험", a.rewardExp, 5, 0, 99999); iy += 28;
-                ui::intStepper({ ix, iy, iw/2-4, 24 }, "아이템ID", a.rewardItemId, 1, -1, 9999);
+                entityButton({ ix, iy, iw/2-4, 24 }, "아이템", a.rewardItemId, ENT_Item, 3100+i);
                 ui::intStepper({ ix+iw/2+4, iy, iw/2-4, 24 }, "개수", a.rewardItemCount, 1, 1, 999); iy += 28;
             } else if (a.respType == DR_SpawnMob) {
-                ui::intStepper({ ix, iy, iw, 24 }, "몹ID(db.mobs)", a.mobId, 1, -1, 9999); iy += 28;
+                entityButton({ ix, iy, iw, 24 }, "몹", a.mobId, ENT_Mob, 3200+i); iy += 28;
             } else if (a.respType == DR_NpcHostile || a.respType == DR_NpcFriendly || a.respType == DR_NpcFollow) {
-                ui::intStepper({ ix, iy, iw/2-4, 24 }, "NPC ID", a.npcCharId, 1, -1, 9999);
+                entityButton({ ix, iy, iw/2-4, 24 }, "NPC", a.npcCharId, ENT_Mob, 3300+i);
                 int ms = (int)(a.durationSecs*1000);
                 if (ui::intStepper({ ix+iw/2+4, iy, iw/2-4, 24 }, "시간(s·0=무제한)", ms, 1000, 0, 600000)) a.durationSecs = ms/1000.0f;
                 iy += 28;
                 if (a.respType == DR_NpcFollow)
                     if (ui::button({ ix, iy, iw, 24 }, a.dismissFollowers ? "추종 해제 대답: 켜짐" : "추종 해제 대답: 꺼짐", a.dismissFollowers)) { a.dismissFollowers = !a.dismissFollowers; p.save(); }
             } else if (a.respType == DR_Scene) {
-                ui::intStepper({ ix, iy, iw, 24 }, "시나리오ID(시나리오 탭)", a.sceneId, 1, -1, 9999); iy += 28;
+                entityButton({ ix, iy, iw, 24 }, "시나리오", a.sceneId, ENT_Scene, 3400+i); iy += 28;
             }
         }
         ay += cardH;
@@ -201,25 +203,27 @@ void Editor::drawScenarioTab() {
             optionButton({ ix + 28, iy, 130, 24 }, "종류",
                 { kSceneActNames[0],kSceneActNames[1],kSceneActNames[2],kSceneActNames[3],kSceneActNames[4],kSceneActNames[5] },
                 {}, a.type, 4000 + i);
-            if (ui::button({ ix + iw - 60, iy, 28, 24 }, "위로")) { if(i>0){ std::swap(sc.actions[i],sc.actions[i-1]); p.save(); } }
+            if (ui::button({ ix + iw - 92, iy, 28, 24 }, "위")) { if(i>0){ std::swap(sc.actions[i],sc.actions[i-1]); p.save(); } }
+            if (ui::button({ ix + iw - 62, iy, 28, 24 }, "아래")) { if(i+1<(int)sc.actions.size()){ std::swap(sc.actions[i],sc.actions[i+1]); p.save(); } }
             if (ui::button({ ix + iw - 30, iy, 30, 24 }, "x")) { sc.actions.erase(sc.actions.begin()+i); p.save(); EndScissorMode(); return; }
             iy += 28;
-            // params per type
+            // params per type (id 참조는 이름 드롭다운)
             if (a.type == SA_MoveChar) {
                 ui::intStepper({ ix, iy, iw/3-4, 24 }, "대상태그", a.targetId, 1, 0, 99);
                 ui::intStepper({ ix+iw/3+2, iy, iw/3-4, 24 }, "X", a.x, 1, 0, 1742);
                 ui::intStepper({ ix+2*iw/3+4, iy, iw/3-4, 24 }, "Y", a.y, 1, 0, 1742); iy += 28;
                 int ms=(int)(a.time*1000); if (ui::intStepper({ ix, iy, iw, 24 }, "이동시간(ms)", ms, 100, 0, 60000)) a.time=ms/1000.0f;
+                DrawTextU("태그 0 = 플레이어", (int)ix, (int)iy+30, 11, ui::kTextDim);
             } else if (a.type == SA_Dialogue) {
-                ui::intStepper({ ix, iy, iw, 24 }, "대화ID(db.dialogues)", a.refId, 1, -1, 9999);
+                entityButton({ ix, iy, iw, 24 }, "대화", a.refId, ENT_Dialogue, 4100+i);
             } else if (a.type == SA_Effect) {
-                ui::intStepper({ ix, iy, iw/3-4, 24 }, "이펙트에셋", a.refId, 1, -1, 9999);
+                assetButton({ ix, iy, iw/3-4, 24 }, "이펙트", a.refId, 4200+i);
                 ui::intStepper({ ix+iw/3+2, iy, iw/3-4, 24 }, "X", a.x, 1, 0, 1742);
                 ui::intStepper({ ix+2*iw/3+4, iy, iw/3-4, 24 }, "Y", a.y, 1, 0, 1742); iy += 28;
                 int ms=(int)(a.time*1000); if (ui::intStepper({ ix, iy, iw, 24 }, "지속(ms)", ms, 100, 0, 60000)) a.time=ms/1000.0f;
             } else if (a.type == SA_Spawn) {
                 ui::intStepper({ ix, iy, iw/4-4, 24 }, "태그", a.targetId, 1, 0, 99);
-                ui::intStepper({ ix+iw/4+2, iy, iw/4-4, 24 }, "몹ID", a.refId, 1, -1, 9999);
+                entityButton({ ix+iw/4+2, iy, iw/4-4, 24 }, "몹", a.refId, ENT_Mob, 4300+i);
                 ui::intStepper({ ix+2*iw/4+2, iy, iw/4-4, 24 }, "X", a.x, 1, 0, 1742);
                 ui::intStepper({ ix+3*iw/4+4, iy, iw/4-4, 24 }, "Y", a.y, 1, 0, 1742);
             } else if (a.type == SA_Remove) {

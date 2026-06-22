@@ -37,6 +37,9 @@ public:
     void optionButtonStr(Rectangle r, const std::string& label,
                          const std::vector<std::string>& opts, const std::vector<std::string>& values,
                          std::string& target, int id);
+    // pick a database entity (item/mob/character/dialogue/scene) by NAME, store its id.
+    enum EntityKind { ENT_Item, ENT_Mob, ENT_Character, ENT_Dialogue, ENT_Scene };
+    void entityButton(Rectangle r, const std::string& label, int& id, int kind, int pickerId);
     void drawPickerOverlay();
     bool pickerOpen() const { return pickerId_ >= 0; }
 

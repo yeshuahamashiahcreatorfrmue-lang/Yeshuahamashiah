@@ -1,0 +1,138 @@
+// EditorWidgets: reusable editor UI — dropdown pickers (click → expand all
+// options → select) for plain options, strings, assets, and database entities.
+// One open picker at a time; the open list is drawn on top by drawPickerOverlay().
+#include "editor/Editor.h"
+#include "editor/EditorInternal.h"
+#include "core/Engine.h"
+#include "render/UI.h"
+#include "core/Text.h"
+#include "database/Database.h"
+#include <algorithm>
+
+namespace tsukuru {
+
+// Open this picker, recording the trigger button rect (called when clicked).
+void Editor::optionButton(Rectangle r, const std::string& label,
+                          const std::vector<std::string>& opts, const std::vector<int>& values,
+                          int& target, int id) {
+    int cur = 0;
+    for (int i = 0; i < (int)opts.size(); ++i) { int v = values.empty() ? i : values[i]; if (v == target) cur = i; }
+    std::string disp = opts.empty() ? "" : opts[cur];
+    std::string txt = label.empty() ? disp : (label + ": " + disp);
+    if (ui::button(r, txt, pickerId_ == id)) {
+        if (pickerId_ == id) pickerId_ = -1;
+        else { pickerId_ = id; pickerScroll_ = 0; }
+    }
+    if (pickerId_ == id) {   // keep the open list's data fresh against layout/scroll
+        pickerAnchor_ = r; pickerOpts_ = opts; pickerValues_ = values;
+        pickerTarget_ = &target; pickerStrTarget_ = nullptr;
+    }
+}
+
+// string-valued dropdown (e.g. sound-effect name)
+void Editor::optionButtonStr(Rectangle r, const std::string& label,
+                             const std::vector<std::string>& opts, const std::vector<std::string>& values,
+                             std::string& target, int id) {
+    int cur = 0;
+    for (int i = 0; i < (int)values.size(); ++i) if (values[i] == target) cur = i;
+    std::string disp = opts.empty() ? "" : opts[cur];
+    std::string txt = label.empty() ? disp : (label + ": " + disp);
+    if (ui::button(r, txt, pickerId_ == id)) {
+        if (pickerId_ == id) pickerId_ = -1;
+        else { pickerId_ = id; pickerScroll_ = 0; }
+    }
+    if (pickerId_ == id) {
+        pickerAnchor_ = r; pickerOpts_ = opts; pickerStrValues_ = values;
+        pickerStrTarget_ = &target; pickerTarget_ = nullptr;
+    }
+}
+
+// asset dropdown: 없음 + every registered image. Builds the full list only while
+// open (closed buttons just show the current name → no per-frame allocation).
+void Editor::assetButton(Rectangle r, const std::string& label, int& assetId, int id) {
+    std::string cur = assetId < 0 ? "없음" : assetName(assetId);
+    std::string txt = label.empty() ? cur : (label + ": " + cur);
+    if (ui::button(r, txt, pickerId_ == id)) {
+        if (pickerId_ == id) pickerId_ = -1;
+        else { pickerId_ = id; pickerScroll_ = 0; }
+    }
+    if (pickerId_ == id) {
+        std::vector<std::string> opts = { "없음" }; std::vector<int> vals = { -1 };
+        for (const auto* a : engine_.project().assets.byType(AssetType::Image)) { opts.push_back(a->name); vals.push_back(a->id); }
+        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerValues_ = std::move(vals);
+        pickerTarget_ = &assetId; pickerStrTarget_ = nullptr;
+    }
+}
+
+// database-entity dropdown: pick item/mob/character/dialogue/scene by NAME, store
+// its id (-1 = 없음). The button always shows the current name; the full list is
+// built only when open.
+void Editor::entityButton(Rectangle r, const std::string& label, int& id, int kind, int pickerId) {
+    Database& db = engine_.project().database;
+    auto nameOf = [&](int v) -> std::string {
+        if (v < 0) return "없음";
+        if (kind == ENT_Item)      { if (auto* it = db.item(v)) return it->name; }
+        else if (kind == ENT_Mob)  { if (auto* m  = db.mob(v))  return m->name; }
+        else if (kind == ENT_Character) { if (auto* c = db.character(v)) return c->name; }
+        else if (kind == ENT_Dialogue)  { if (auto* d = db.dialogue(v)) return d->name; }
+        else if (kind == ENT_Scene) { for (auto& s : db.scenes) if (s.id == v) return s.name; }
+        return "#" + std::to_string(v);
+    };
+    std::string cur = nameOf(id);
+    std::string txt = label.empty() ? cur : (label + ": " + cur);
+    if (ui::button(r, txt, pickerId_ == pickerId)) {
+        if (pickerId_ == pickerId) pickerId_ = -1;
+        else { pickerId_ = pickerId; pickerScroll_ = 0; }
+    }
+    if (pickerId_ == pickerId) {
+        std::vector<std::string> opts = { "없음" }; std::vector<int> vals = { -1 };
+        auto add = [&](int vid, const std::string& nm) { opts.push_back(nm); vals.push_back(vid); };
+        if (kind == ENT_Item)           for (auto& it : db.items)      add(it.id, it.name);
+        else if (kind == ENT_Mob)       for (auto& m  : db.mobs)       add(m.id,  m.name);
+        else if (kind == ENT_Character) for (auto& c  : db.characters) add(c.id,  c.name);
+        else if (kind == ENT_Dialogue)  for (auto& d  : db.dialogues)  add(d.id,  d.name);
+        else if (kind == ENT_Scene)     for (auto& s  : db.scenes)     add(s.id,  s.name);
+        pickerAnchor_ = r; pickerOpts_ = std::move(opts); pickerValues_ = std::move(vals);
+        pickerTarget_ = &id; pickerStrTarget_ = nullptr;
+    }
+}
+
+// Drawn ON TOP, after the active tab, so the expanded list overlays everything.
+void Editor::drawPickerOverlay() {
+    if (pickerId_ < 0 || (!pickerTarget_ && !pickerStrTarget_) || pickerOpts_.empty()) return;
+    int n = (int)pickerOpts_.size();
+    float rowH = 24, w = std::max(pickerAnchor_.width, 180.0f);
+    float x = pickerAnchor_.x;
+    float y = pickerAnchor_.y + pickerAnchor_.height + 2;
+    float maxH = (float)screenH() - y - 12;
+    float fullH = n * rowH + 6;
+    float listH = std::min(fullH, std::max(rowH * 3, maxH));
+    Rectangle box = { x - 2, y - 2, w + 4, listH + 4 };
+    DrawRectangleRec(box, ui::kPanelHi);
+    DrawRectangleLinesEx(box, 2, ui::kAccent);
+    if (ui::mouseIn(box)) pickerScroll_ -= GetMouseWheelMove() * rowH * 2;
+    float maxScroll = std::max(0.0f, fullH - listH);
+    if (pickerScroll_ < 0) pickerScroll_ = 0; if (pickerScroll_ > maxScroll) pickerScroll_ = maxScroll;
+    BeginScissorMode((int)(box.x * uiScale()), (int)(box.y * uiScale()), (int)(box.width * uiScale()), (int)(box.height * uiScale()));
+    float oy = y - pickerScroll_;
+    for (int i = 0; i < n; ++i) {
+        bool sel = pickerStrTarget_ ? (i < (int)pickerStrValues_.size() && pickerStrValues_[i] == *pickerStrTarget_)
+                                    : ((pickerValues_.empty() ? i : pickerValues_[i]) == *pickerTarget_);
+        if (oy + rowH > y - rowH && oy < y + listH) {
+            if (ui::button({ x, oy, w, rowH - 2 }, pickerOpts_[i], sel)) {
+                if (pickerStrTarget_) { if (i < (int)pickerStrValues_.size()) *pickerStrTarget_ = pickerStrValues_[i]; }
+                else *pickerTarget_ = pickerValues_.empty() ? i : pickerValues_[i];
+                pickerId_ = -1; pickerTarget_ = nullptr; pickerStrTarget_ = nullptr;
+                engine_.project().save();
+                EndScissorMode(); return;
+            }
+        }
+        oy += rowH;
+    }
+    EndScissorMode();
+    // click outside the list (and not on the anchor) closes it
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) &&
+        !ui::mouseIn(box) && !ui::mouseIn(pickerAnchor_)) { pickerId_ = -1; pickerTarget_ = nullptr; pickerStrTarget_ = nullptr; }
+}
+
+} // namespace tsukuru
