@@ -55,6 +55,31 @@ void Engine::startPlaytestAt(int mapId, int x, int y) {
     setMode(Mode::Play);
 }
 
+// Editor 테스트: jump into play on the scene's editing map and run the scene now.
+void Engine::startPlaytestScene(int sceneId) {
+    int mapId = project_->startMap, x = project_->startX, y = project_->startY;
+    for (const auto& s : project_->database.scenes)
+        if (s.id == sceneId && s.editMapId >= 0) mapId = s.editMapId;
+    state_.newGame(project_->database, project_->startActor, project_->playerCharId,
+                   project_->startMap, project_->startX, project_->startY,
+                   project_->startGold, project_->startItems);
+    state_.currentMap = mapId; state_.playerX = x; state_.playerY = y;
+    setMode(Mode::Play);                 // onEnter() loads the map
+    if (play_) play_->beginScene(sceneId);
+}
+
+// Editor 테스트: jump into play near the NPC and run the dialogue now.
+void Engine::startPlaytestDialogue(int dialogueId, int mapId, int x, int y) {
+    state_.newGame(project_->database, project_->startActor, project_->playerCharId,
+                   project_->startMap, project_->startX, project_->startY,
+                   project_->startGold, project_->startItems);
+    if (mapId >= 0) state_.currentMap = mapId;
+    if (x >= 0) state_.playerX = x;
+    if (y >= 0) state_.playerY = y;
+    setMode(Mode::Play);
+    if (play_) play_->beginDialogue(dialogueId);
+}
+
 int Engine::run(const std::string& projectDir, int maxFrames) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1280, 720, "쯔꾸르 엔진 — RPG 메이커");
@@ -86,6 +111,7 @@ int Engine::run(const std::string& projectDir, int maxFrames) {
         }
         setMode(startMode_);
     }
+    if (const char* ts = getenv("TSUKURU_TESTSCENE")) startPlaytestScene(atoi(ts));   // debug: run a scene
 
     int frame = 0;
     while (!WindowShouldClose() && !quit_) {

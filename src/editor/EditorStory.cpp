@@ -101,7 +101,10 @@ void Editor::drawDialogueTab() {
     DialogueScenario& d = list[dlgSel_];
     Event* npc = nullptr; if (m) for (auto& e : m->events) if (e.id == dlgNpcEventId_ && e.graphicAsset >= 0) npc = &e;
     float px = pop.x + 10, pw2 = pop.width - 20, py = pop.y + 8;
-    DrawTextU((npc ? ("대화 편집 — " + npcName(*npc)) : ("대화: " + d.name)).c_str(), (int)px, (int)py, 16, ui::kAccent);
+    DrawTextU((npc ? ("대화 편집 — " + npcName(*npc)) : ("대화: " + d.name)).c_str(), (int)px, (int)py, 15, ui::kAccent);
+    if (ui::button({ pop.x + pop.width - 158, pop.y + 6, 86, 24 }, "테스트")) {
+        engine_.startPlaytestDialogue(d.id, dlgMapId_, npc ? npc->x : -1, npc ? npc->y : -1); return;
+    }
     if (ui::button({ pop.x + pop.width - 66, pop.y + 6, 58, 24 }, "닫기")) { dlgPopupOpen_ = false; return; }
     py += 28;
     if (npc) {
@@ -358,7 +361,11 @@ void Editor::drawScenarioTab() {
         if (trigNpcId >= 0) { for (auto& e : m->events) if (e.id==trigNpcId) ts += "NPC '" + (e.speakerName.empty()?assetName(e.graphicAsset):e.speakerName) + "'"; }
         if (!trigPoint && trigNpcId < 0) ts += "없음";
         DrawTextU(ts.c_str(), (int)cx, (int)cy, 11, ui::kTextDim);
+        cy += 18;
+        if (trigPoint && ui::button({ cx, cy, cw, 22 }, "발동지점 제거")) { for (int i=0;i<(int)m->events.size();++i) if (&m->events[i]==trigPoint) { m->events.erase(m->events.begin()+i); break; } p.save(); }
     }
+    cy += 28;
+    if (ui::button({ cx, cy, cw, 26 }, "시나리오 테스트 (실행·F2로 복귀)")) { engine_.startPlaytestScene(sc.id); return; }
 
     // ---- BIG MAP (left): markers + drag(RTS) + place + radius + remove + triggers ----
     Rectangle canvas = { mapX, top, mapW, panelH };

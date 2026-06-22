@@ -38,6 +38,8 @@ public:
     void onEnter();      // called when switching into play mode
     void update(float dt);
     void draw();
+    void beginScene(int id);     // editor 테스트: 플레이 진입 후 이 시나리오 즉시 시작
+    void beginDialogue(int id);  // editor 테스트: 플레이 진입 후 이 대화 즉시 시작
 
 private:
     enum class Phase { Field, Message, Menu, Shop, GameOver, GameClear, Dialogue };

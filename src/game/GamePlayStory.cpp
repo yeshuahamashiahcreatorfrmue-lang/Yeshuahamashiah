@@ -10,6 +10,10 @@
 
 namespace tsukuru {
 
+// editor playtest entry points (public): jump straight into the authored content.
+void GamePlay::beginScene(int id)    { startScene(id); }
+void GamePlay::beginDialogue(int id) { startDialogue(id); }
+
 // ----------------------------- dialogue playback -----------------------------
 void GamePlay::startDialogue(int id) {
     if (!engine_.project().database.dialogue(id)) return;
