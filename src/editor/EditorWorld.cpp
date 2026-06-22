@@ -818,6 +818,7 @@ void Editor::ensureThumbsForTab() {
         // entering 시나리오 탭: drop the scene map thumb so map edits are reflected
         if (tab_ == Tab::Scenario && scnSel_ >= 0 && scnSel_ < (int)p.database.scenes.size())
             dropMapThumb(p.database.scenes[scnSel_].editMapId);
+        if (tab_ == Tab::Dialogue && dlgMapId_ >= 0) dropMapThumb(dlgMapId_);
         if (tab_ != Tab::World) { worldPreviewFull_ = false; worldPreviewStack_.clear(); }
         prevTab_ = tab_;
     }
@@ -827,6 +828,9 @@ void Editor::ensureThumbsForTab() {
             int mid = p.database.scenes[scnSel_].editMapId;
             if (mid >= 0 && p.map(mid) && !mapThumb(mid)) buildMapThumb(*p.map(mid));
         }
+    } else if (tab_ == Tab::Dialogue) {
+        // background map for the 대화 탭 (NPC 선택용)
+        if (dlgMapId_ >= 0 && p.map(dlgMapId_) && !mapThumb(dlgMapId_)) buildMapThumb(*p.map(dlgMapId_));
     } else if (tab_ == Tab::WorldView) {
         for (auto& m : p.maps) if (m->placed && !mapThumb(m->id)) buildMapThumb(*m);
     } else if (tab_ == Tab::World) {

@@ -1,17 +1,33 @@
 # 대화로그 탭 + 스토리 시나리오 탭
 
-## 1. 대화로그(이벤트 대화로그) 탭
-라인 1·2·3·4… 를 넉넉히 짜는 분기형 대화 편집기.
-- 3열 패널: [대화 목록] [대사 라인 목록] [선택 라인 편집].
-- 각 라인: 말하는 이 + 대사. **대답(answer)을 여러 개** 추가.
+## 1. 대화로그(이벤트 대화로그) 탭 — 맵에서 NPC로 편집
+라인 1·2·3·4… 를 넉넉히 짜는 분기형 대화 편집기. **맵에서 NPC를 골라** 편집.
+- 4열 패널: [맵(NPC 선택)] [대화 목록] [대사 라인 목록] [선택 라인 편집].
+- **맵 패널**: 상단 맵 드롭다운 + NPC 마커. NPC 클릭 = 그 NPC의 대화 선택(없으면
+  생성·연결). 선택 NPC 인스펙터에서 이름·**이미지(assetButton)**·**외부 이미지 추가**.
+- 각 라인: **말하는 NPC**(맵 NPC 드롭다운 또는 자유 입력) + 대사 + 초상 미리보기.
+  라인마다 다른 NPC를 지정하면 **여러 NPC가 번갈아 대화**(촌장→주민→…)하는 로그가 된다.
+  말하는 NPC 이름이 맵 NPC와 일치하면 그 NPC 그래픽이 초상(speakerAsset)으로 자동 연결.
+- 각 라인: **대답(answer)을 여러 개** 추가.
 - 각 대답마다 **대응(response)** 선택: 없음 / 보상(골드·경험·아이템) / 몹소환 /
   적대NPC(시간제한) / 우호NPC(시간제한) / 추종NPC(시간제한 + 대화로 떠나보내기).
   대답마다 "→라인"으로 다른 라인으로 분기 가능.
 - 데이터: `Database::dialogues` (entity/Story.h: DialogueScenario/Line/Answer).
 - 이벤트 연결: 이벤트 인스펙터의 "대화ID" (Message 이벤트가 이 시나리오를 재생).
-- 런타임(GamePlayStory.cpp): Phase::Dialogue — 대사 표시, 대답 버튼 클릭 시 대응 실행
-  (보상 지급 / 몹·NPC 소환). 시간제한 NPC는 lifeTimer로 자동 소멸, 추종 NPC는
-  Ally+Chase로 따라오고 dismissFollowers 대답으로 떠나보냄.
+- 런타임(GamePlayStory.cpp): Phase::Dialogue — 대사 표시(speakerAsset가 있으면 말풍선
+  왼쪽에 **NPC 초상** 표시), 대답 버튼 클릭 시 대응 실행(보상 지급 / 몹·NPC 소환).
+  시간제한 NPC는 lifeTimer로 자동 소멸, 추종 NPC는 Ally+Chase로 따라오고
+  dismissFollowers 대답으로 떠나보냄.
+- 데이터: DialogueLine.speakerAsset 추가. 대화 탭 배경맵은 dlgMapId_(편집용), 선택 NPC는
+  dlgNpcEventId_. 맵 썸네일은 ensureThumbsForTab()에서 생성·캐시.
+
+## 한글 입력 — 조합 중인 글자 실시간 표시 (build 0627c)
+기존엔 OS IME가 음절을 *확정*할 때(다음 글자 시작 시)만 raylib가 글자를 전달해
+"한 글자 늦게" 보였다. 이제 Win32 윈도우 프로시저를 서브클래싱해
+`WM_IME_COMPOSITION`의 조합 문자열(GCS_COMPSTR)을 읽어(`plat::imeComposition()`,
+UTF-8) 텍스트칸이 **조합 중인 자음/모음을 즉시** 강조색+밑줄로 표시한다. 확정 글자는
+기존대로 WM_CHAR→GetCharPressed로 들어오므로 중복 없음. (core/Platform.cpp,
+render/UI.cpp::textField). 비윈도우에선 빈 문자열(동작 동일).
 
 ## 2. 스토리 시나리오 탭 (시퀀서) — 맵 위 시각 편집
 장면(scene)별로 동작을 순서대로 배열하는 컷신 시퀀서. **맵을 보면서** 위치·반경·대상을 지정.

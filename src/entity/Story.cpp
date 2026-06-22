@@ -29,7 +29,8 @@ json dialogueToJson(const DialogueScenario& d) {
     for (const auto& l : d.lines) {
         json ans = json::array();
         for (const auto& a : l.answers) ans.push_back(answerToJson(a));
-        lines.push_back({{"speaker", l.speaker}, {"text", l.text}, {"answers", ans}});
+        lines.push_back({{"speaker", l.speaker}, {"text", l.text},
+                         {"speakerAsset", l.speakerAsset}, {"answers", ans}});
     }
     return {{"id", d.id}, {"name", d.name}, {"lines", lines}};
 }
@@ -39,6 +40,7 @@ DialogueScenario dialogueFromJson(const json& j) {
     for (const auto& lj : j.value("lines", json::array())) {
         DialogueLine l;
         l.speaker = lj.value("speaker", ""); l.text = lj.value("text", "");
+        l.speakerAsset = lj.value("speakerAsset", -1);
         for (const auto& aj : lj.value("answers", json::array())) l.answers.push_back(answerFromJson(aj));
         d.lines.push_back(l);
     }

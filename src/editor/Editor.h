@@ -166,6 +166,8 @@ private:
     int   scnSel_ = -1, scnFocus_ = -1;
     float scnActScroll_ = 0;
     int   scnActSel_ = -1;            // 맵에서 편집 중인 동작(액션) 인덱스
+    int   dlgMapId_ = -1;            // 대화 탭에서 배경으로 보는 맵
+    int   dlgNpcEventId_ = -1;       // 대화 탭에서 맵에서 선택한 NPC(event) id
 
     // dropdown picker state (see optionButton/drawPickerOverlay)
     int   pickerId_ = -1;

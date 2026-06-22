@@ -38,4 +38,12 @@ bool copyFileUtf8(const std::string& src, const std::string& dst);
 // it everywhere else. No-op off Windows. Cheap to call every frame (state-cached).
 void setImeEnabled(bool enabled);
 
+// Returns the IME's current in-progress composition string (UTF-8) — the
+// half-composed Hangul/CJK syllable that has been typed but not yet committed,
+// or "" if nothing is being composed. Text fields append it live so each
+// 자음/모음 shows immediately instead of one syllable behind. The committed text
+// still arrives normally through raylib's GetCharPressed. Empty off Windows
+// (where no OS IME composition is intercepted).
+std::string imeComposition();
+
 } // namespace plat

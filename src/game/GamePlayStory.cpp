@@ -138,12 +138,26 @@ void GamePlay::drawDialogueOverlay() {
     Rectangle box = { 40, (float)sh - boxH - 16, (float)sw - 80, (float)boxH };
     ui::panel(box, Fade(Color{ 12, 14, 22, 255 }, 0.96f));
     DrawRectangleLinesEx(box, 2, Fade(ui::kAccent, 0.7f));
+    // 말하는 NPC 초상(설정돼 있으면): 박스 왼쪽 위에 표시 — 여러 NPC가 번갈아 대화하는 느낌
+    float textX = box.x + 20;
+    if (ln.speakerAsset >= 0) {
+        const Texture2D& tex = engine_.assetTexture(ln.speakerAsset);
+        if (tex.id) {
+            float fw = tex.width >= tex.height*2 ? tex.width/4.0f : (float)tex.width;  // 4방향 시트면 1프레임
+            float ps = 84;
+            Rectangle pr = { box.x + 10, box.y - ps + 8, ps, ps };
+            DrawRectangleRec(pr, Fade(Color{ 12,14,22,255 }, 0.96f));
+            DrawTexturePro(tex, { 0,0,fw,(float)tex.height }, pr, {0,0}, 0, WHITE);
+            DrawRectangleLinesEx(pr, 2, Fade(ui::kAccent, 0.7f));
+            textX = box.x + ps + 24;
+        }
+    }
     if (!ln.speaker.empty()) {
         int nw = MeasureTextU(ln.speaker.c_str(), 18) + 20;
-        DrawRectangle((int)box.x + 16, (int)box.y - 16, nw, 26, ui::kAccent);
-        DrawTextU(ln.speaker.c_str(), (int)box.x + 26, (int)box.y - 12, 18, BLACK);
+        DrawRectangle((int)textX - 4, (int)box.y - 16, nw, 26, ui::kAccent);
+        DrawTextU(ln.speaker.c_str(), (int)textX + 6, (int)box.y - 12, 18, BLACK);
     }
-    DrawTextU(ln.text.c_str(), (int)box.x + 20, (int)box.y + 16, 20, ui::kText);
+    DrawTextU(ln.text.c_str(), (int)textX, (int)box.y + 16, 20, ui::kText);
 
     if (!ln.answers.empty()) {
         float by = box.y + 56;

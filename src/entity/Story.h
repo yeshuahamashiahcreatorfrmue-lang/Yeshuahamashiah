@@ -37,6 +37,7 @@ struct DialogueAnswer {
 struct DialogueLine {
     std::string speaker;          // 말하는 이(빈칸 가능)
     std::string text;             // 대사
+    int   speakerAsset = -1;      // 말하는 NPC의 초상(그래픽 에셋) — 맵에서 NPC 선택 시 설정
     std::vector<DialogueAnswer> answers;
 };
 

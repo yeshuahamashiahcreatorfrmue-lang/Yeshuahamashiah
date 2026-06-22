@@ -1,5 +1,6 @@
 #include "render/UI.h"
 #include "core/Text.h"
+#include "core/Platform.h"
 #include <cstring>
 
 namespace tsukuru {
@@ -60,9 +61,21 @@ bool textField(Rectangle r, std::string& text, bool focused, int maxLen) {
             text.erase(i);
         }
     }
-    std::string shown = text;
-    if (focused && ((int)(GetTime() * 2) % 2 == 0)) shown += "_";
-    DrawTextU(shown.c_str(), (int)r.x + 6, (int)(r.y + (r.height - 16) / 2), 16, kText);
+    // Live IME composition: show the half-typed Hangul/CJK syllable immediately
+    // (each 자음/모음 appears as it's composed) — committed text still comes via
+    // GetCharPressed above. The composing part is drawn in the accent colour.
+    std::string comp = (focused && g_inputEnabled) ? plat::imeComposition() : std::string();
+    int ty = (int)(r.y + (r.height - 16) / 2);
+    DrawTextU(text.c_str(), (int)r.x + 6, ty, 16, kText);
+    int caretX = (int)r.x + 6 + MeasureTextU(text.c_str(), 16);
+    if (!comp.empty()) {
+        DrawTextU(comp.c_str(), caretX, ty, 16, kAccentHi);
+        int cw = MeasureTextU(comp.c_str(), 16);
+        DrawLine(caretX, ty + 18, caretX + cw, ty + 18, kAccentHi);   // composition underline
+        caretX += cw;
+    }
+    if (focused && ((int)(GetTime() * 2) % 2 == 0))
+        DrawTextU("_", caretX, ty, 16, kText);
     return focused;
 }
 

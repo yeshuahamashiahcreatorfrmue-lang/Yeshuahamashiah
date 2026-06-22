@@ -33,6 +33,46 @@ std::wstring toWide(const std::string& s) {
     MultiByteToWideChar(CP_ACP, 0, s.c_str(), (int)s.size(), &w[0], n);
     return w;
 }
+// The font atlas + DrawTextU all use UTF-8, so the live composition preview must
+// be UTF-8 (NOT CP_ACP like file paths).
+std::string wideToUtf8(const std::wstring& w) {
+    if (w.empty()) return {};
+    int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    std::string s(n, 0);
+    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), (int)w.size(), &s[0], n, nullptr, nullptr);
+    return s;
+}
+
+// ---- live IME composition capture (so each jamo shows immediately) ----
+// raylib/GLFW only delivers COMMITTED text via WM_CHAR, so a composing Hangul
+// syllable stays invisible until the next syllable starts. We subclass the
+// window proc to read WM_IME_COMPOSITION's GCS_COMPSTR and expose it; the final
+// result still flows through WM_CHAR untouched.
+WNDPROC g_origProc = nullptr;
+std::string g_imeComp;
+LRESULT CALLBACK imeProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_IME_COMPOSITION) {
+        if (HIMC himc = ImmGetContext(h)) {
+            if (lp & GCS_RESULTSTR) g_imeComp.clear();   // committed → arrives via WM_CHAR
+            if (lp & GCS_COMPSTR) {
+                LONG bytes = ImmGetCompositionStringW(himc, GCS_COMPSTR, nullptr, 0);
+                if (bytes > 0) {
+                    std::wstring w((size_t)bytes / sizeof(wchar_t), 0);
+                    ImmGetCompositionStringW(himc, GCS_COMPSTR, &w[0], (DWORD)bytes);
+                    g_imeComp = wideToUtf8(w);
+                } else g_imeComp.clear();
+            }
+            ImmReleaseContext(h, himc);
+        }
+    } else if (msg == WM_IME_ENDCOMPOSITION) {
+        g_imeComp.clear();
+    }
+    return CallWindowProcW(g_origProc, h, msg, wp, lp);
+}
+void installImeHook(HWND h) {
+    if (g_origProc || !h) return;
+    g_origProc = (WNDPROC)SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)imeProc);
+}
 }
 
 namespace plat {
@@ -90,6 +130,7 @@ void setImeEnabled(bool enabled) {
     if (enabled == s_state) return;      // cheap: only act on a real change
     HWND hwnd = GetActiveWindow();
     if (!hwnd) return;
+    installImeHook(hwnd);   // ensure the composition-capture subclass is in place
     if (enabled) {
         // Re-attach the IME so composition works again (e.g. focusing a text box).
         ImmAssociateContext(hwnd, s_saved ? s_saved : ImmGetContext(hwnd));
@@ -101,6 +142,7 @@ void setImeEnabled(bool enabled) {
     }
     s_state = enabled;
 }
+std::string imeComposition() { return g_imeComp; }
 } // namespace plat
 
 #else  // non-Windows: harmless stubs
@@ -118,6 +160,7 @@ bool copyFileUtf8(const std::string& src, const std::string& dst) {
     return !ec;
 }
 void setImeEnabled(bool) {}   // IME control is Windows-only
+std::string imeComposition() { return {}; }   // no OS IME composition off Windows
 } // namespace plat
 
 #endif
