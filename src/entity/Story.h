@@ -56,8 +56,9 @@ enum SceneActType {
     SA_Spawn    = 3,   // NPC/몹/오브젝트 등장 (targetId=mob/char id, x, y)
     SA_Remove   = 4,   // 등장한 대상 제거 (targetId)
     SA_Wait     = 5,   // 대기 (time)
+    SA_Motion   = 6,   // 동작 전환: 대상(targetId)이 모션(refId=MO_*)을 time초간 재생 (죽음/공격 등)
 };
-inline const char* const kSceneActNames[6] = { "이동","대화","이펙트","등장","제거","대기" };
+inline const char* const kSceneActNames[7] = { "이동","대화","이펙트","등장","제거","대기","동작" };
 
 struct SceneAction {
     int   type = SA_Wait;

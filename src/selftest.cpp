@@ -77,7 +77,8 @@ static void testDatabase() {
     SceneAction eff{ SA_Effect, -1, 2, 10, 12, 1.5f, 4, {} };  // 반경 4칸 이펙트
     SceneAction rem{ SA_Remove, -1, -1, 0, 0, 0.0f, 1, {} };   // 복수 태그 제거
     rem.removeTags = { 3, 5 };
-    sc.actions.push_back(eff); sc.actions.push_back(rem);
+    SceneAction mot{ SA_Motion, 3, MO_Death, 0, 0, 0.8f, 1, {} }; // 태그3이 죽음 모션 0.8초
+    sc.actions.push_back(eff); sc.actions.push_back(rem); sc.actions.push_back(mot);
     db.scenes.push_back(sc);
 
     Database db2;
@@ -95,7 +96,7 @@ static void testDatabase() {
           db2.dialogue(1)->lines[0].answers[0].rewardGold == 100, "dialogue answer response round-trip");
     CHECK(db2.dialogue(1)->lines[0].answers[1].respType == DR_NpcFollow &&
           db2.dialogue(1)->lines[0].answers[1].durationSecs == 30, "dialogue follow answer round-trip");
-    CHECK(db2.scenes.size() == 1 && db2.scenes[0].actions.size() == 5 &&
+    CHECK(db2.scenes.size() == 1 && db2.scenes[0].actions.size() == 6 &&
           db2.scenes[0].actions[1].type == SA_Dialogue && db2.scenes[0].actions[1].refId == 1 &&
           db2.scenes[0].editMapId == 3,
           "scene round-trip (editMapId)");
@@ -104,6 +105,9 @@ static void testDatabase() {
     CHECK(db2.scenes[0].actions[4].type == SA_Remove && db2.scenes[0].actions[4].removeTags.size() == 2 &&
           db2.scenes[0].actions[4].removeTags[0] == 3 && db2.scenes[0].actions[4].removeTags[1] == 5,
           "scene 제거 복수태그 round-trip");
+    CHECK(db2.scenes[0].actions.size() == 6 && db2.scenes[0].actions[5].type == SA_Motion &&
+          db2.scenes[0].actions[5].targetId == 3 && db2.scenes[0].actions[5].refId == MO_Death,
+          "scene 동작전환(SA_Motion·죽음) round-trip");
 }
 
 static void testInventory(Database& db) {

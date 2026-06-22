@@ -199,9 +199,17 @@ private:
     int   scnDragIdx_ = -1;          // 시나리오: 드래그 중인 마커(액션 인덱스, -2=발동지점)
     // ── 장면녹화(RTS식 무대) 상태 ──
     bool  scnRecordMode_ = false;    // 녹화 모드: 무대 토큰을 끌어 배치 → '장면 녹화'로 기록
-    int   scnRecDragTag_ = -1000;    // 드래그 중인 무대 토큰의 태그(-1000=없음, 0=플레이어)
     int   scnRecEffect_ = -1;        // 뿌릴 이펙트 에셋(오른쪽 목록에서 선택)
     int   scnRecMob_ = -1;           // 무대에 등장시킬 몹
+    // RTS식 다중 선택/이동
+    std::vector<int> scnSelTags_;    // 현재 선택된 토큰 태그들(다중 선택)
+    bool  scnGroupDrag_ = false;     // 선택 그룹을 드래그 이동 중
+    Vector2 scnDragStartTile_{};     // 그룹 드래그 시작 타일
+    std::unordered_map<int, Vector2> scnDragBase_;  // 드래그 시작 시 각 태그 위치
+    bool  scnMarquee_ = false;       // 마퀴(박스) 선택 드래그 중
+    Vector2 scnMarqueeStart_{};      // 마퀴 시작 화면좌표
+    bool  scnCtxOpen_ = false;       // 우클릭 동작/삭제 메뉴 열림(선택 전체 대상)
+    Vector2 scnCtxPos_{};            // 컨텍스트 메뉴 위치
     int   scnRecRadius_ = 2;         // 뿌릴 이펙트 반경(칸)
     float scnStepDur_ = 1.0f;        // 한 장면(스텝) 표시시간 0.42~1.42초
     std::unordered_map<int, Vector2> scnDraft_;  // 태그 -> 이번 스텝의 드래프트 위치(칸)

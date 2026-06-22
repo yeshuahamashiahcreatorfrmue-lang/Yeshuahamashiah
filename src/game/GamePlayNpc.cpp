@@ -185,6 +185,12 @@ void GamePlay::updateNpcs(float dt) {
     for (auto& n : npcs_) {
         if (n.hurtFlash > 0) n.hurtFlash -= dt;
         if (n.atkCd > 0)     n.atkCd -= dt;
+        // 시나리오 동작 전환(공격/죽음 등) 재생: 타이머와 프레임 진행
+        if (n.sceneMotionT > 0) {
+            n.sceneMotionT -= dt;
+            n.animTime += dt; if (n.animTime > 0.12f) { n.animTime = 0; n.frame = (n.frame + 1) % 4; }
+            if (n.sceneMotionT <= 0) { n.sceneMotion = -1; n.frame = 0; }
+        }
 
         if (n.moving) {
             float tx = n.destX*(float)TS, ty = n.destY*(float)TS;
@@ -267,8 +273,10 @@ void GamePlay::drawNpcs() {
         const CharacterDef* cd = nullptr;
         if (n.charId >= 0) { cd = db.character(n.charId); if (!cd) cd = db.mob(n.charId); }
         if (cd) {   // 등록된 캐릭터: 방향별(상하좌우) 프레임으로 렌더 (몹과 동일 경로)
-            const auto& fr = cd->motions[MO_Walk].dirFrames(n.dir);
-            int asset = fr.empty() ? -1 : fr[(n.moving ? n.frame : 0) % (int)fr.size()];
+            int mo = (n.sceneMotionT > 0 && n.sceneMotion >= 0) ? n.sceneMotion : MO_Walk;  // 시나리오 동작 전환
+            const auto& fr = cd->motions[mo].dirFrames(n.dir).empty() ? cd->motions[MO_Walk].dirFrames(n.dir)
+                                                                      : cd->motions[mo].dirFrames(n.dir);
+            int asset = fr.empty() ? -1 : fr[((mo!=MO_Walk || n.moving) ? n.frame : 0) % (int)fr.size()];
             drawCharacter(asset, n.dir, 0, n.px, n.py, tint, 1, wS, hS);
         } else {    // 구버전: 단일 4방향 시트
             drawCharacter(n.spriteAsset, n.dir, n.moving ? n.frame : 0, n.px, n.py, tint, 4, wS, hS);

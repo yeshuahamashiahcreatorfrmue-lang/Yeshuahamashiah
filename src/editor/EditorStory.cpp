@@ -267,7 +267,8 @@ void Editor::drawScenarioTab() {
 
     // ── 장면녹화 모드 토글 + 컨트롤 ──
     if (ui::button({ cx, cy, cw, 26 }, scnRecordMode_ ? "장면녹화 모드: 켜짐 (끄기)" : "장면녹화 모드 켜기", scnRecordMode_)) {
-        scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear(); scnRecDragTag_ = -1000;
+        scnRecordMode_ = !scnRecordMode_; scnDraft_.clear(); scnPendingFx_.clear();
+        scnSelTags_.clear(); scnGroupDrag_ = false; scnMarquee_ = false; scnCtxOpen_ = false;
     }
     cy += 30;
     if (scnRecordMode_) {
@@ -315,17 +316,16 @@ void Editor::drawScenarioTab() {
         DrawLine((int)cx, (int)cy, (int)(cx+cw), (int)cy, ui::kPanelHi); cy += 6;
     } else { scnDraft_.clear(); scnPendingFx_.clear(); }
 
-    // add-action toolbar (6 types) — appends + selects
+    // add-action toolbar (7 types) — appends + selects
     DrawTextU("동작 추가:", (int)cx, (int)cy, 12, ui::kTextDim); cy += 16;
-    const char* an[6] = { kSceneActNames[0],kSceneActNames[1],kSceneActNames[2],kSceneActNames[3],kSceneActNames[4],kSceneActNames[5] };
-    for (int t = 0; t < 6; ++t) {
+    for (int t = 0; t < 7; ++t) {
         Rectangle b = { cx + (t%3)*(cw/3), cy + (t/3)*28, cw/3 - 4, 26 };
-        if (ui::button(b, std::string("+") + an[t])) {
+        if (ui::button(b, std::string("+") + kSceneActNames[t])) {
             SceneAction na; na.type = t; na.time = 1.0f;
             sc.actions.push_back(na); scnActSel_ = (int)sc.actions.size()-1; p.save();
         }
     }
-    cy += 60;
+    cy += 88;
     // action sequence chips (numbered) — click to select, reorder, delete
     DrawTextU(TextFormat("동작 순서 (%d) — 선택 후 맵에서 편집", (int)sc.actions.size()), (int)cx, (int)cy, 12, ui::kAccentHi); cy += 18;
     Rectangle chreg = { cx, cy, cw, 96 };
@@ -336,7 +336,7 @@ void Editor::drawScenarioTab() {
     for (int i = 0; i < (int)sc.actions.size(); ++i) {
         if (chy + 24 > cy && chy < cy + chreg.height) {
             SceneAction& a = sc.actions[i];
-            std::string lbl = std::to_string(i+1) + ". " + kSceneActNames[std::max(0,std::min(5,a.type))];
+            std::string lbl = std::to_string(i+1) + ". " + kSceneActNames[std::max(0,std::min(6,a.type))];
             if (ui::button({ cx, chy, cw - 78, 22 }, lbl, scnActSel_ == i)) scnActSel_ = (scnActSel_==i)?-1:i;
             if (ui::button({ cx + cw - 76, chy, 22, 22 }, "위")) { if (i>0) { std::swap(sc.actions[i],sc.actions[i-1]); p.save(); } }
             if (ui::button({ cx + cw - 52, chy, 26, 22 }, "아래")) { if (i+1<(int)sc.actions.size()) { std::swap(sc.actions[i],sc.actions[i+1]); p.save(); } }
@@ -359,7 +359,7 @@ void Editor::drawScenarioTab() {
     // selected action params
     if (scnActSel_ >= 0 && scnActSel_ < (int)sc.actions.size()) {
         SceneAction& a = sc.actions[scnActSel_];
-        DrawTextU(TextFormat("선택 동작 %d: %s", scnActSel_+1, kSceneActNames[std::max(0,std::min(5,a.type))]), (int)cx, (int)cy, 13, ui::kAccent); cy += 20;
+        DrawTextU(TextFormat("선택 동작 %d: %s", scnActSel_+1, kSceneActNames[std::max(0,std::min(6,a.type))]), (int)cx, (int)cy, 13, ui::kAccent); cy += 20;
         if (a.type == SA_MoveChar) {
             std::vector<std::string> o = { "플레이어(0)" }; std::vector<int> v = { 0 };
             for (auto& s2 : sc.actions) if (s2.type==SA_Spawn) { o.push_back(spawnTagLabel(s2.targetId)); v.push_back(s2.targetId); }
@@ -392,10 +392,18 @@ void Editor::drawScenarioTab() {
             else for (int t : a.removeTags) s2 += "#" + std::to_string(t) + " ";
             DrawTextU(s2.c_str(), (int)cx, (int)cy, 11, a.removeTags.empty()?ui::kTextDim:ui::kAccentHi); cy += 18;
             if (ui::button({ cx, cy, cw, 22 }, "선택 비우기")) { a.removeTags.clear(); p.save(); } cy += 26;
-        } else { // SA_Wait
+        } else if (a.type == SA_Wait) {
             std::vector<std::string> o = { "전체" }; std::vector<int> v = { -1 };
             for (auto& s2 : sc.actions) if (s2.type==SA_Spawn) { o.push_back(spawnTagLabel(s2.targetId)); v.push_back(s2.targetId); }
             optionButton({ cx, cy, cw, 24 }, "대기대상", o, v, a.targetId, 4160); cy += 28;
+            durControl(a.time);
+        } else if (a.type == SA_Motion) {   // 동작 전환(죽음/공격 등)
+            std::vector<std::string> o = { "플레이어(0)" }; std::vector<int> v = { 0 };
+            for (auto& s2 : sc.actions) if (s2.type==SA_Spawn) { o.push_back(spawnTagLabel(s2.targetId)); v.push_back(s2.targetId); }
+            optionButton({ cx, cy, cw, 24 }, "대상", o, v, a.targetId, 4180); cy += 28;
+            std::vector<std::string> mo; for (int k=0;k<MO_COUNT;++k) mo.push_back(kMotionNames[k]);
+            if (a.refId < 0) a.refId = MO_Attack;
+            optionButton({ cx, cy, cw, 24 }, "동작", mo, {}, a.refId, 4181); cy += 28;
             durControl(a.time);
         }
     } else {
@@ -535,39 +543,101 @@ void Editor::drawScenarioTab() {
         }
     }
   } else {
-    // ── 녹화 모드: 무대 토큰(플레이어/등장 몹)을 드래그 + 이펙트 뿌리기 ──
+    // ── 녹화 모드 (RTS식): 마퀴 다중선택 · 그룹 드래그 이동 · 우클릭 전체 동작/삭제 ──
     for (auto& kv : stage) if (!scnDraft_.count(kv.first)) scnDraft_[kv.first] = kv.second;  // init draft
-    bool pressedToken = false;
-    for (auto& kv : scnDraft_) {
-        int tag = kv.first;
-        bool drag = (scnRecDragTag_ == tag);
-        Vector2 sp = drag ? mouse : t2s(kv.second.x, kv.second.y);
-        Color col = (tag == 0) ? Color{120,170,250,255} : Color{120,200,120,255};
-        DrawCircleV(sp, 10, Fade(BLACK,0.6f)); DrawCircleV(sp, 8, col);
-        DrawTextU((tag==0 ? std::string("플레이어") : spawnTagLabel(tag)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, WHITE);
-        if (scnRecDragTag_==-1000 && CheckCollisionPointCircle(mouse, sp, 11) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) { scnRecDragTag_ = tag; pressedToken = true; }
+    auto selected = [&](int tag){ return std::find(scnSelTags_.begin(), scnSelTags_.end(), tag) != scnSelTags_.end(); };
+    // token under cursor
+    int hovTag = -1000;
+    for (auto& kv : scnDraft_) if (CheckCollisionPointCircle(mouse, t2s(kv.second.x, kv.second.y), 11)) hovTag = kv.first;
+
+    if (!scnCtxOpen_) {
+        // begin: press a token → (re)select + group drag; press empty → marquee (or effect drop)
+        if (lclick && !scnGroupDrag_ && !scnMarquee_) {
+            if (hovTag != -1000) {
+                if (!selected(hovTag)) scnSelTags_ = { hovTag };   // single-select unless already in group
+                int sx, sy; s2t(sx, sy); scnDragStartTile_ = { (float)sx, (float)sy };
+                scnDragBase_.clear(); for (int t : scnSelTags_) if (scnDraft_.count(t)) scnDragBase_[t] = scnDraft_[t];
+                scnGroupDrag_ = true;
+            } else if (inMap && scnRecEffect_ < 0) {
+                scnMarquee_ = true; scnMarqueeStart_ = mouse;     // empty drag → marquee
+            }
+        }
+        // group drag move (all selected together)
+        if (scnGroupDrag_) {
+            int tx, ty; s2t(tx, ty);
+            Vector2 d = { tx - scnDragStartTile_.x, ty - scnDragStartTile_.y };
+            for (auto& kv : scnDragBase_) scnDraft_[kv.first] = { kv.second.x + d.x, kv.second.y + d.y };
+            if (!IsMouseButtonDown(MOUSE_LEFT_BUTTON)) { scnGroupDrag_ = false; p.save(); }
+        }
+        // marquee select
+        if (scnMarquee_) {
+            Rectangle mr = { std::min(scnMarqueeStart_.x, mouse.x), std::min(scnMarqueeStart_.y, mouse.y),
+                             std::abs(mouse.x-scnMarqueeStart_.x), std::abs(mouse.y-scnMarqueeStart_.y) };
+            DrawRectangleRec(mr, Fade(ui::kAccent, 0.15f)); DrawRectangleLinesEx(mr, 1, ui::kAccent);
+            if (!IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                scnSelTags_.clear();
+                for (auto& kv : scnDraft_) if (CheckCollisionPointRec(t2s(kv.second.x, kv.second.y), mr)) scnSelTags_.push_back(kv.first);
+                scnMarquee_ = false;
+            }
+        }
+        // right-click → open action menu for the whole selection
+        if (hovTag != -1000 && IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+            if (!selected(hovTag)) scnSelTags_ = { hovTag };
+            scnCtxOpen_ = true; scnCtxPos_ = mouse;
+        }
+        // effect drop (오른쪽 목록에서 이펙트 선택 후 빈 곳 클릭)
+        if (scnRecEffect_ >= 0 && inMap && lclick && hovTag == -1000) {
+            int tx, ty; s2t(tx, ty);
+            SceneAction fx; fx.type = SA_Effect; fx.refId = scnRecEffect_; fx.x = tx; fx.y = ty; fx.radius = scnRecRadius_;
+            scnPendingFx_.push_back(fx);
+        }
     }
-    if (scnRecDragTag_ != -1000) {
-        int tx, ty; s2t(tx, ty);
-        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) scnDraft_[scnRecDragTag_] = { (float)tx, (float)ty };
-        else scnRecDragTag_ = -1000;
-    }
-    // pending (placed-but-not-recorded) effects
+    // pending effects
     for (auto& fx : scnPendingFx_) {
         Vector2 sp = t2s((float)fx.x, (float)fx.y); float rr = std::max(1, fx.radius) * tileSp;
         DrawCircleLines((int)sp.x,(int)sp.y, rr, Color{250,180,60,255});
         DrawCircle((int)sp.x,(int)sp.y, rr, Fade(Color{250,180,60,255}, 0.12f));
         DrawCircleV(sp, 4, Color{250,180,60,255});
     }
-    // drop an effect at the clicked tile (오른쪽 목록에서 이펙트 선택 후 맵 클릭)
-    if (scnRecEffect_ >= 0 && inMap && lclick && !pressedToken && scnRecDragTag_==-1000) {
-        int tx, ty; s2t(tx, ty);
-        SceneAction fx; fx.type = SA_Effect; fx.refId = scnRecEffect_; fx.x = tx; fx.y = ty; fx.radius = scnRecRadius_;
-        scnPendingFx_.push_back(fx);
+    // tokens (selected = bright ring)
+    for (auto& kv : scnDraft_) {
+        int tag = kv.first; Vector2 sp = t2s(kv.second.x, kv.second.y);
+        Color col = (tag == 0) ? Color{120,170,250,255} : Color{120,200,120,255};
+        if (selected(tag)) DrawCircleLines((int)sp.x,(int)sp.y, 13, ui::kAccentHi);
+        DrawCircleV(sp, 10, Fade(BLACK,0.6f)); DrawCircleV(sp, 8, col);
+        DrawTextU((tag==0 ? std::string("플레이어") : spawnTagLabel(tag)).c_str(), (int)sp.x+11, (int)sp.y-8, 12, WHITE);
+    }
+    // right-click context menu — applies to ALL selected tokens
+    if (scnCtxOpen_) {
+        const char* items[MO_COUNT+1];
+        for (int k=0;k<MO_COUNT;++k) items[k]=kMotionNames[k];
+        items[MO_COUNT]="유닛 삭제";
+        float mw=130, mh=(MO_COUNT+1)*22+24;
+        Rectangle box={ scnCtxPos_.x, scnCtxPos_.y, mw, mh };
+        if (box.x+mw > canvas.x+canvas.width) box.x = canvas.x+canvas.width-mw;
+        if (box.y+mh > canvas.y+canvas.height) box.y = canvas.y+canvas.height-mh;
+        DrawRectangleRec(box, ui::kPanelHi); DrawRectangleLinesEx(box, 2, ui::kAccent);
+        DrawTextU(TextFormat("선택 %d개 전체", (int)scnSelTags_.size()), (int)box.x+6, (int)box.y+4, 11, ui::kAccentHi);
+        for (int k=0;k<=MO_COUNT;++k) {
+            Rectangle b={ box.x+4, box.y+20+k*22, mw-8, 20 };
+            bool del = (k==MO_COUNT);
+            if (ui::button(b, items[k], false)) {
+                for (int tag : scnSelTags_) {
+                    if (del) { if (tag==0) continue;            // 플레이어는 삭제 불가
+                        SceneAction rm; rm.type=SA_Remove; rm.targetId=tag; sc.actions.push_back(rm); scnDraft_.erase(tag);
+                    } else {
+                        SceneAction mo; mo.type=SA_Motion; mo.targetId=tag; mo.refId=k; mo.time=scnStepDur_; sc.actions.push_back(mo);
+                    }
+                }
+                if (del) scnSelTags_.clear();
+                scnCtxOpen_=false; p.save(); setStatus(del?"선택 유닛 삭제 기록됨":"선택 전체 동작 기록됨");
+            }
+        }
+        if (lclick && !CheckCollisionPointRec(mouse, box)) scnCtxOpen_=false;
     }
   }
     // hint line
-    const char* hint = scnRecordMode_ ? "녹화: 토큰 드래그로 배치 → '장면 녹화' · 이펙트 선택 후 맵 클릭=뿌리기"
+    const char* hint = scnRecordMode_ ? "녹화: 빈곳 드래그=다중선택 · 선택 드래그=그룹이동 · 우클릭=전체 동작/삭제 → '장면 녹화'"
                      : scnTrigMode_==1 ? "발동지점: 맵 빈곳을 클릭" : scnTrigMode_==2 ? "발동 NPC: 맵의 NPC를 클릭"
                      : "마커 드래그=이동 · 빈곳 클릭=배치 · 휠=이펙트 반경";
     DrawTextU(hint, (int)canvas.x+8, (int)(canvas.y+canvas.height-22), 13, ui::kAccentHi);

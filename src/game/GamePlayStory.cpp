@@ -221,6 +221,7 @@ void GamePlay::updateScene(float dt) {
         case SA_Spawn: {
             if (const CharacterDef* md = db.mob(a.refId)) {
                 NpcInst n; n.eventId = -2000 - (int)npcs_.size();
+                n.charId = md->id;   // 방향별·동작전환 렌더
                 n.spriteAsset = md->motions[MO_Walk].frames.empty()? -1 : md->motions[MO_Walk].frames.front();
                 n.faction = NpcFaction::Neutral; n.behavior = NpcBehavior::Idle;
                 n.drawPct = md->drawPct; n.drawTilesW = std::max(1,md->drawTilesW); n.drawTilesH = std::max(1,md->drawTilesH);
@@ -242,6 +243,18 @@ void GamePlay::updateScene(float dt) {
                 sceneTags_.erase(it);
             }
             advance = true; break;
+        }
+        case SA_Motion: {   // 대상이 모션(공격/죽음 등)을 time초간 재생
+            int mo = std::max(0, std::min((int)MO_COUNT-1, a.refId));
+            if (a.targetId == 0) {                       // 플레이어
+                playMotion_ = mo; motionFrame_ = 0; motionAnim_ = 0;
+            } else {
+                auto it = sceneTags_.find(a.targetId);
+                if (it != sceneTags_.end()) for (auto& n : npcs_) if (n.eventId == it->second) {
+                    n.sceneMotion = mo; n.sceneMotionT = std::max(0.2f, a.time);
+                }
+            }
+            sceneTimer_ += dt; if (sceneTimer_ >= a.time) advance = true; break;
         }
     }
     if (advance) { ++sceneStep_; sceneTimer_ = 0; }

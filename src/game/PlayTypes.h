@@ -48,6 +48,8 @@ struct NpcInst {
     int dir = 0;
     float moveCd = 0;
     int frame = 0; float animTime = 0;
+    int   sceneMotion = -1;      // 시나리오 동작 전환(죽음/공격 등) 재생 중인 모션(-1=기본 걷기)
+    float sceneMotionT = 0;      // 남은 재생 시간(초); 0이면 걷기로 복귀
 
     // behaviour / faction (copied from the source Event)
     NpcFaction  faction  = NpcFaction::Neutral;
